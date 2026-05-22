@@ -52,6 +52,38 @@ if (!result.ok) throw new Error(result.error.kind);
 result.response; // final assistant message
 ```
 
+## Model request options
+
+Both `generate()` and `stream()` accept normalized model request options as
+top-level fields. The `options` bag from earlier releases is gone.
+
+```typescript
+const result = await generate({
+  provider,
+  model,
+  messages,
+  temperature: 0.2,
+  topP: 0.9,
+  maxOutputTokens: 500,
+  stop: ["END"],
+});
+```
+
+Use `providerOptions` for raw provider-specific fields not covered by the
+normalized surface:
+
+```typescript
+await generate({
+  provider,
+  model,
+  messages,
+  maxOutputTokens: 500,
+  providerOptions: {
+    prompt_cache_key: "thread-123",
+  },
+});
+```
+
 ## Passing an Instruct
 
 Both `stream()` and `generate()` accept an `Instruct` as the latest user
@@ -77,6 +109,17 @@ const result = await generate({
 
 if (!result.ok) throw new Error(result.error.kind);
 result.response.answer; // string
+```
+
+## TypeScript types
+
+The parameter types for `generate()` and `stream()` are `GenerateParams` and
+`StreamParams` respectively (renamed from `GenerateOptions` / `StreamOptions`
+in 0.18.0). Both extend `AxleModelRequestOptions` for the normalized model
+request surface.
+
+```typescript
+import type { GenerateParams, StreamParams, AxleModelRequestOptions } from "@fifthrevision/axle";
 ```
 
 ## When to use which

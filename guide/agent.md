@@ -45,6 +45,87 @@ await agent.send("What's my name?").final;
 // → "Your name is Ana."
 ```
 
+## Model request options
+
+`Agent` accepts normalized model request options at construction time. These
+become the defaults for every `send()` call.
+
+```typescript
+const agent = new Agent({
+  provider,
+  model,
+  maxOutputTokens: 500,
+  temperature: 0.7,
+  topP: 0.9,
+  stop: ["END"],
+  reasoning: true,
+});
+```
+
+### Per-turn overrides
+
+Options passed to `send()` override the agent defaults for that turn only.
+
+```typescript
+await agent.send("Summarize this", { temperature: 0 });
+```
+
+### Provider-specific options
+
+Use `providerOptions` for raw provider-specific fields not covered by the
+normalized surface. At the agent level these are defaults; `providerOptions`
+passed to `send()` are **shallow-merged** with those defaults.
+
+```typescript
+const agent = new Agent({
+  provider,
+  model,
+  providerOptions: { seed: 42 },
+});
+
+// This turn gets { seed: 42, metadata: { source: "send" } }
+await agent.send("Go", {
+  providerOptions: { metadata: { source: "send" } },
+});
+```
+
+### Tool choice
+
+Control how the model uses tools for a specific turn:
+
+```typescript
+await agent.send("Search the web", {
+  toolChoice: { type: "tool", name: "web_search" },
+  parallelToolCalls: false,
+});
+```
+
+Supported values for `toolChoice`:
+
+```typescript
+type ToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | { type: "tool"; name: string };
+```
+
+## Context counter
+
+`agent.context()` returns an estimate of how many tokens the current system
+prompt, messages, and tools occupy in the context window.
+
+```typescript
+const usage = agent.context();
+console.log(usage.total);    // estimated total tokens
+console.log(usage.messages); // tokens in conversation history
+console.log(usage.tools);    // tokens for tool definitions
+```
+
+The returned `ContextUsage` object has `total`, `system`, `tools`, `mcpTools`,
+`providerTools`, and `messages` fields. When a `limit` is provided it also
+includes `free`.
+
 ## Cancellation
 
 `send()` returns a handle. Call `handle.cancel(reason)` to abort mid-stream.

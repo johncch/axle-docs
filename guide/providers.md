@@ -62,6 +62,9 @@ const agent = new Agent({
 });
 ```
 
+Supported models include the Gemini 2.5 family (Flash, Flash Lite), Gemini 3
+Flash, and Gemini 3.5 Flash.
+
 ## Chat Completions (OpenAI-compatible)
 
 Use any endpoint that speaks the OpenAI Chat Completions API — local LLMs via
