@@ -52,6 +52,43 @@ if (!result.ok) throw new Error(result.error.kind);
 result.response; // final assistant message
 ```
 
+## Model request options
+
+Both `stream()` and `generate()` accept normalized model request options as
+top-level fields. Pass them directly alongside `provider`, `model`, and
+`messages`:
+
+```typescript
+const result = await generate({
+  provider,
+  model,
+  messages,
+  maxOutputTokens: 512,
+  temperature: 0.3,
+  topP: 0.9,
+  stop: ["END"],
+  reasoning: true,
+});
+```
+
+For provider-specific controls that are not represented by the normalized
+fields, use `providerOptions`:
+
+```typescript
+const result = await generate({
+  provider,
+  model,
+  messages,
+  maxOutputTokens: 512,
+  providerOptions: {
+    prompt_cache_key: "thread-123",
+  },
+});
+```
+
+See [Agent — model request options](/guide/agent#model-request-options) for
+the full option reference.
+
 ## Passing an Instruct
 
 Both `stream()` and `generate()` accept an `Instruct` as the latest user

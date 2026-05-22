@@ -40,6 +40,39 @@ result.response; // always present when ok is true
 Abort, fatal-tool, configuration, and unexpected execution errors still
 **throw** — they are not returned as `ok: false`.
 
+## Usage stats
+
+Successful results include a `usage` object with token counts:
+
+```typescript
+if (result.ok) {
+  console.log(`in: ${result.usage.in}, out: ${result.usage.out}`);
+
+  // Detail fields are present when the provider reports them:
+  if (result.usage.cachedIn !== undefined) {
+    console.log(`cached input tokens: ${result.usage.cachedIn}`);
+  }
+  if (result.usage.reasoningOut !== undefined) {
+    console.log(`reasoning tokens: ${result.usage.reasoningOut}`);
+  }
+}
+```
+
+The full `Stats` type:
+
+```typescript
+type Stats = {
+  in: number;           // Total effective input tokens
+  out: number;          // Total output tokens
+  cachedIn?: number;    // Input tokens served from cache (included in `in`)
+  cacheWriteIn?: number;// Input tokens written to cache (included in `in`)
+  reasoningOut?: number;// Output tokens spent on reasoning (included in `out`)
+};
+```
+
+`in` and `out` are always present and represent top-line totals. The optional
+fields are populated when the provider reports that detail.
+
 ## Cancellation
 
 Cancellation follows standard JavaScript abort semantics:
