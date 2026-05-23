@@ -40,6 +40,34 @@ result.response; // always present when ok is true
 Abort, fatal-tool, configuration, and unexpected execution errors still
 **throw** — they are not returned as `ok: false`.
 
+## Usage stats
+
+`result.usage` reports token counts for the run. The `in` and `out` fields
+are always present; detail fields are included when the provider reports them:
+
+```typescript
+type Stats = {
+  in: number;             // total input tokens
+  out: number;            // total output tokens
+  cachedIn?: number;      // input tokens served from cache (included in `in`)
+  cacheWriteIn?: number;  // input tokens written to cache (included in `in`)
+  reasoningOut?: number;  // output tokens spent on reasoning (included in `out`)
+};
+```
+
+```typescript
+const result = await agent.send("Hello").final;
+if (result.ok) {
+  console.log(`in=${result.usage.in}, out=${result.usage.out}`);
+  if (result.usage.cachedIn) {
+    console.log(`cached=${result.usage.cachedIn}`);
+  }
+  if (result.usage.reasoningOut) {
+    console.log(`reasoning=${result.usage.reasoningOut}`);
+  }
+}
+```
+
 ## Cancellation
 
 Cancellation follows standard JavaScript abort semantics:

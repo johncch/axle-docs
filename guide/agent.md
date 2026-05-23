@@ -20,6 +20,36 @@ const agent = new Agent({
 });
 ```
 
+## Request options
+
+`Agent` accepts normalized model request options as constructor defaults. These
+apply to every `send()` unless overridden per-turn.
+
+```typescript
+const agent = new Agent({
+  provider,
+  model,
+  reasoning: true,
+  maxOutputTokens: 1000,
+  temperature: 0.7,
+  topP: 0.9,
+  stop: ["END"],
+});
+```
+
+Use `providerOptions` for raw provider-specific fields that are not covered by
+the normalized surface:
+
+```typescript
+const agent = new Agent({
+  provider,
+  model,
+  providerOptions: { seed: 42 },
+});
+```
+
+See [Low-level APIs](/guide/low-level) for the full list of normalized options.
+
 ## `send()`
 
 ```typescript
@@ -33,6 +63,31 @@ console.log(result.response);
 - For string inputs, `result.response` is the assistant's text.
 - For `Instruct` inputs with a schema, `result.response` is the parsed object.
 - See [Results & Errors](/guide/results) for details on the result shape.
+
+### Per-turn overrides
+
+Pass any normalized request option to `send()` to override the agent's defaults
+for that turn only:
+
+```typescript
+await agent.send("Summarize this", { temperature: 0 });
+await agent.send("Be creative", { temperature: 1.2, maxOutputTokens: 2000 });
+```
+
+`providerOptions` are shallow-merged with the agent's defaults:
+
+```typescript
+const agent = new Agent({
+  provider,
+  model,
+  providerOptions: { seed: 1 },
+});
+
+// The request receives: { seed: 1, metadata: { source: "send" } }
+await agent.send("Go", {
+  providerOptions: { metadata: { source: "send" } },
+});
+```
 
 ## Multi-turn conversations
 
@@ -64,6 +119,17 @@ try {
     throw err;
   }
 }
+```
+
+## Context counter
+
+`agent.context()` returns an estimate of the current context window usage,
+broken down by system prompt, messages, tools, MCP tools, and provider tools:
+
+```typescript
+const ctx = agent.context();
+console.log(`Using ~${ctx.total} tokens (${ctx.free} free)`);
+// { total, system, messages, tools, mcpTools, providerTools, limit?, free? }
 ```
 
 ## Streaming events
