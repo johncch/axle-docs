@@ -7,7 +7,7 @@ description: Two event models — Agent.on() (high-level turn parts) and stream(
 
 Axle has two streaming event models, used at different levels of the API:
 
-- **`Agent.on(...)`** emits `AgentEvent` — a high-level "turn" view organized
+- **`Agent.on(...)`** emits `TurnEvent` — a high-level "turn" view organized
   around parts (text, thinking, action). Use this for app code built on
   `Agent`.
 - **`stream(...).on(...)`** emits `StreamEvent` — a lower-level view that
@@ -16,14 +16,17 @@ Axle has two streaming event models, used at different levels of the API:
   directly.
 
 `Agent` uses `stream()` internally and translates each `StreamEvent` into one
-or more `AgentEvent`s.
+or more `TurnEvent`s via `TurnEventBuilder`, then accumulates them into
+`Turn[]` via `TurnAccumulator`.
 
 ## Agent events
 
 ```typescript
+import type { TurnEvent } from "@fifthrevision/axle";
+
 const agent = new Agent({ provider, model });
 
-agent.on((event) => {
+agent.on((event: TurnEvent) => {
   switch (event.type) {
     case "part:start":
       if (event.part.type === "text") console.log("[text started]");
@@ -67,6 +70,8 @@ agent.on((event) => {
 | `action:complete`        | `turnId`, `partId`, `result` (`ActionResult`)                    | Action finished — inspect `result.type` for `success` vs `error`.    |
 | `action:error`           | `turnId`, `partId`, `error`                                      | Action failed with a typed error.                                    |
 | `action:child-event`     | `turnId`, `partId`, `event`                                      | An event from a nested sub-agent run.                                |
+| `annotation:update`      | `target`, `annotation`                                           | An annotation was created or updated on a session, turn, or part.    |
+| `annotation:end`         | `target`, `annotation`                                           | An annotation was finalised on a session, turn, or part.             |
 | `error`                  | `error`                                                          | Top-level error during the run.                                      |
 
 ### Part types
@@ -79,7 +84,89 @@ agent.on((event) => {
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
   `part.kind`: `"tool" | "agent" | "provider-tool"`.
 
+All part variants (and `Turn` itself) support embedded annotations once the
+stream is accumulated. See [Annotations](#annotations) below.
+
 Callbacks are registered once and fire on every subsequent `send()`.
+
+## TurnAccumulator
+
+`TurnAccumulator` materialises a `TurnEvent` stream into `Turn[]`. It is
+especially useful in SSE or WebSocket consumers that multiplex Axle turn
+events with host-level events (e.g. `run:terminal`, `session:expired`).
+
+```typescript
+import {
+  TurnAccumulator,
+  type Annotation,
+  type TurnEvent,
+} from "@fifthrevision/axle";
+
+type AppAnnotation =
+  | Annotation<{ image: string }, "sandbox">
+  | Annotation<{ score: number; passed: boolean }, "eval">;
+
+type HostEvent =
+  | { type: "run:terminal"; status: string }
+  | { type: "session:expired" };
+
+const accumulator = new TurnAccumulator<AppAnnotation, HostEvent>();
+
+function applyEvent(event: TurnEvent<AppAnnotation> | HostEvent) {
+  const result = accumulator.apply(event);
+
+  if (!result.handled) {
+    // result.event is a HostEvent — handle it yourself
+    applyHostEvent(result.event);
+  }
+
+  render(result.state.turns);
+}
+```
+
+- Known `TurnEvent`s return `handled: true`.
+- Unknown host events return `handled: false`; `result.event` is typed as the
+  host event union.
+- `state.turns` contains the fully accumulated `Turn[]` snapshot.
+- `state.sessionAnnotations` contains session-level annotations.
+
+`Agent` uses `TurnAccumulator` internally to derive `history.turns` — so
+`agent.history.turns` is already a snapshot, not a mutable object.
+
+## Annotations
+
+`Turn`, `TurnPart`, and every part variant accept embedded annotations.
+Annotations are presentation metadata (eval scores, sandbox status, deployment
+state, etc.) that render alongside turns without entering model state.
+
+```typescript
+import type { Annotation, TurnEvent } from "@fifthrevision/axle";
+
+type AppAnnotation =
+  | Annotation<{ image: string }, "sandbox">
+  | Annotation<{ score: number; passed: boolean }, "eval">;
+
+const annotation: AppAnnotation = {
+  id: crypto.randomUUID(),
+  kind: "eval",
+  label: "Plan adherence",
+  placement: "after",
+  status: "complete",
+  data: { score: 0.92, passed: true },
+};
+
+const event: TurnEvent<AppAnnotation> = {
+  type: "annotation:end",
+  target: { type: "turn", turnId },
+  annotation,
+};
+```
+
+`label` is required so generic renderers have a common UI surface.
+
+`annotation:end` defaults missing `status` to `"complete"` when accumulated.
+
+`annotation:update` and `annotation:end` carry the full updated annotation — there is no patch or merge.
 
 ## stream() events
 

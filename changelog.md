@@ -5,6 +5,24 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.19.0] - 2026-05-24
+
+- Added a browser-only export for client-side bundles that omits server-only code
+- Added annotations support to Turns
+- Renamed `AgentEvent` to `TurnEvent` and `AgentEventCallback` to `TurnEventCallback`
+- Replaced `TurnBuilder` with `TurnEventBuilder` (event translation) and `TurnAccumulator` (turn materialisation)
+- `Agent` now derives `history.turns` by applying `TurnEvent`s through `TurnAccumulator`; turns are snapshots, not mutated objects
+- See the [0.19.0 migration guide](/migration/0.19.0) for full details
+
+## [0.18.0] - 2026-05-22
+
+- Added support for Gemini 3.5 Flash
+- Standardized request options across providers, including output tokens, temperature, top-p, stop sequences, tool choice, and provider-specific options
+- Renamed provider option types and runtime parameters
+- Updated usage stats to include cached tokens and thinking tokens
+- Added a simple context counter and split MCP tools for more flexible tool usage
+- Fixed bugs found during smoke testing
+
 ## [0.17.0] - 2026-05-13
 
 - Updated the Instruct constructor to use object-style options

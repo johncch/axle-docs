@@ -69,4 +69,30 @@ try {
 ## Streaming events
 
 `agent.on(...)` registers a callback that fires for every subsequent `send()`.
-See [Streaming](/guide/streaming) for the full event list.
+The callback receives `TurnEvent` values. See [Streaming](/guide/streaming)
+for the full event list.
+
+```typescript
+import type { TurnEvent, TurnEventCallback } from "@fifthrevision/axle";
+
+const callback: TurnEventCallback = (event: TurnEvent) => {
+  if (event.type === "text:delta") process.stdout.write(event.delta);
+};
+
+agent.on(callback);
+```
+
+## History and turns
+
+`agent.history.turns` returns a snapshot of accumulated `Turn[]`. Axle derives
+this by applying emitted `TurnEvent`s through a `TurnAccumulator` internally —
+so turns are snapshots rather than objects that mutate in place during streaming.
+
+```typescript
+// Read the latest turns after a send
+const turns = agent.history.turns;
+```
+
+If you need to observe turn state as it streams, consume `TurnEvent`s via
+`agent.on(...)` or use `TurnAccumulator` directly in your own transport layer.
+See [Streaming](/guide/streaming) for details.
