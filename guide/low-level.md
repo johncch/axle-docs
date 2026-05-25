@@ -52,6 +52,61 @@ if (!result.ok) throw new Error(result.error.kind);
 result.response; // final assistant message
 ```
 
+## Request options
+
+Both `generate()` and `stream()` accept normalized model request options
+directly as top-level fields:
+
+```typescript
+await generate({
+  provider,
+  model,
+  messages,
+  temperature: 0.2,
+  topP: 0.9,
+  maxOutputTokens: 500,
+  stop: ["END"],
+  reasoning: true,
+});
+```
+
+The full normalized option surface (`AxleModelRequestOptions`):
+
+| Option              | Type                     | Description                                                 |
+| ------------------- | ------------------------ | ----------------------------------------------------------- |
+| `reasoning`         | `boolean`                | Enable/disable provider reasoning or thinking mode.         |
+| `maxOutputTokens`   | `number`                 | Maximum output tokens to request.                           |
+| `temperature`       | `number`                 | Sampling temperature.                                       |
+| `topP`              | `number`                 | Nucleus sampling value.                                     |
+| `stop`              | `string \| string[]`     | Stop sequence(s) for text generation.                       |
+| `toolChoice`        | `ToolChoice`             | Constrain tool use for this request.                        |
+| `parallelToolCalls` | `boolean`                | Request that the provider avoid parallel tool calls.        |
+| `providerOptions`   | `ProviderOptions`        | Raw provider-specific fields applied after normalized ones. |
+| `signal`            | `AbortSignal`            | Abort signal for cancellation.                              |
+
+`ToolChoice` can be `"auto"`, `"none"`, `"required"`, or `{ type: "tool", name: string }`.
+
+### Provider options
+
+Use `providerOptions` for raw provider-specific fields — cache controls,
+reasoning budgets, frequency/presence penalties, and so on:
+
+```typescript
+await generate({
+  provider,
+  model,
+  messages,
+  maxOutputTokens: 500,
+  providerOptions: {
+    prompt_cache_key: "thread-123",
+  },
+});
+```
+
+Provider adapters apply fields in this order: provider defaults → Axle
+normalized options → `providerOptions`. This means `providerOptions`
+intentionally wins if it conflicts with a normalized Axle field.
+
 ## Passing an Instruct
 
 Both `stream()` and `generate()` accept an `Instruct` as the latest user
@@ -77,6 +132,16 @@ const result = await generate({
 
 if (!result.ok) throw new Error(result.error.kind);
 result.response.answer; // string
+```
+
+## TypeScript types
+
+The parameter types for these functions are exported from
+`@fifthrevision/axle`:
+
+```typescript
+import type { GenerateParams, StreamParams } from "@fifthrevision/axle";
+import type { GenerateInstructParams, StreamInstructParams } from "@fifthrevision/axle";
 ```
 
 ## When to use which
