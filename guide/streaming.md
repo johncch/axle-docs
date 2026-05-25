@@ -7,7 +7,7 @@ description: Two event models — Agent.on() (high-level turn parts) and stream(
 
 Axle has two streaming event models, used at different levels of the API:
 
-- **`Agent.on(...)`** emits `AgentEvent` — a high-level "turn" view organized
+- **`Agent.on(...)`** emits `TurnEvent` — a high-level "turn" view organized
   around parts (text, thinking, action). Use this for app code built on
   `Agent`.
 - **`stream(...).on(...)`** emits `StreamEvent` — a lower-level view that
@@ -16,7 +16,7 @@ Axle has two streaming event models, used at different levels of the API:
   directly.
 
 `Agent` uses `stream()` internally and translates each `StreamEvent` into one
-or more `AgentEvent`s.
+or more `TurnEvent`s.
 
 ## Agent events
 
@@ -51,23 +51,26 @@ agent.on((event) => {
 
 ### Event types
 
-| Event                    | Carries                                                          | Description                                                          |
-| ------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `session:restore`        | `turns`, `config?`                                               | Replayed when prior turns are restored into the agent.               |
-| `turn:user`              | `turn`                                                           | A user turn was appended to history.                                 |
-| `turn:start`             | `turnId`                                                         | A new assistant turn began.                                          |
-| `turn:end`               | `turnId`, `status`, `usage`, `timing?`                           | The assistant turn finished (`complete`, `cancelled`, `error`).      |
-| `part:start`             | `turnId`, `part` (`TurnPart`)                                    | A new part started — discriminate on `part.type`.                    |
-| `text:delta`             | `turnId`, `partId`, `delta`                                      | Incremental text chunk inside the current text part.                 |
-| `thinking:delta`         | `turnId`, `partId`, `delta`                                      | Incremental reasoning chunk inside a thinking part.                  |
-| `part:end`               | `turnId`, `partId`, `timing?`                                    | The current part finished.                                           |
-| `action:args-delta`      | `turnId`, `partId`, `delta`, `accumulated`                       | Tool/agent arguments are still streaming in.                         |
-| `action:running`         | `turnId`, `partId`, `parameters?`                                | Local tool / sub-agent / provider tool started executing.            |
-| `action:progress`        | `turnId`, `partId`, `chunk`                                      | Streamed output from a running action (e.g. `execTool` stdout).      |
-| `action:complete`        | `turnId`, `partId`, `result` (`ActionResult`)                    | Action finished — inspect `result.type` for `success` vs `error`.    |
-| `action:error`           | `turnId`, `partId`, `error`                                      | Action failed with a typed error.                                    |
-| `action:child-event`     | `turnId`, `partId`, `event`                                      | An event from a nested sub-agent run.                                |
-| `error`                  | `error`                                                          | Top-level error during the run.                                      |
+| Event                    | Carries                                                                      | Description                                                          |
+| ------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `session:restore`        | `turns`, `sessionAnnotations?`, `config?`                                    | Replayed when prior turns are restored into the agent.               |
+| `turn:user`              | `turn`                                                                       | A user turn was appended to history.                                 |
+| `turn:start`             | `turnId`, `timing?`                                                          | A new assistant turn began.                                          |
+| `turn:end`               | `turnId`, `status`, `usage`, `timing?`                                       | The assistant turn finished (`complete`, `cancelled`, `error`).      |
+| `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type`.                    |
+| `text:delta`             | `turnId`, `partId`, `delta`                                                  | Incremental text chunk inside the current text part.                 |
+| `thinking:delta`         | `turnId`, `partId`, `delta`                                                  | Incremental reasoning chunk inside a thinking part.                  |
+| `part:end`               | `turnId`, `partId`, `timing?`                                                | The current part finished.                                           |
+| `action:args-delta`      | `turnId`, `partId`, `delta`, `accumulated`                                   | Tool/agent arguments are still streaming in.                         |
+| `action:running`         | `turnId`, `partId`, `parameters?`                                            | Local tool / sub-agent / provider tool started executing.            |
+| `action:progress`        | `turnId`, `partId`, `chunk`                                                  | Streamed output from a running action (e.g. `execTool` stdout).      |
+| `action:complete`        | `turnId`, `partId`, `result` (`ActionResult`), `timing?`                     | Action finished — inspect `result.type` for `success` vs `error`.    |
+| `action:error`           | `turnId`, `partId`, `error`, `timing?`                                       | Action failed with a typed error.                                    |
+| `action:child-event`     | `turnId`, `partId`, `event`                                                  | An event from a nested sub-agent run.                                |
+| `annotation:start`       | `target`, `annotation`                                                       | An annotation was created on a session, turn, or part.               |
+| `annotation:update`      | `target`, `annotation`                                                       | An annotation was updated.                                           |
+| `annotation:end`         | `target`, `annotation`                                                       | An annotation finished (`status` defaults to `"complete"`).          |
+| `error`                  | `error`                                                                      | Top-level error during the run.                                      |
 
 ### Part types
 
