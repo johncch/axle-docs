@@ -26,3 +26,87 @@ concerns in your host application on top of:
 
 Axle deliberately does not opine on these — they are application-specific
 and changing them shouldn't require forking the agent core.
+
+## Agent definitions and sessions
+
+0.20.0 introduces serializable types for save/resume workflows:
+
+- **`AgentDefinition`** — a serializable recipe. It describes the provider,
+  model, system prompt, tools, and request defaults in a form safe to store in
+  a database or send over the wire. It is deliberately not executable by
+  itself; the host resolves providers and tools into a runtime `AgentConfig`.
+- **`AgentSession`** — continuation and render state. It holds the
+  model-facing message history, renderable turns, session annotations, and
+  the stable `sessionId`.
+- **`SavedAgent`** — the pair of `{ definition, session }` suitable for
+  persistence.
+
+### Saving an agent
+
+```typescript
+import type { SavedAgent, AgentDefinition } from "@fifthrevision/axle";
+
+// Your serializable definition — store this in your DB
+const definition: AgentDefinition = {
+  version: 1,
+  name: "my-agent",
+  provider: { type: "anthropic" },
+  model: "claude-sonnet-4-5-20250929",
+  system: "You are a helpful assistant.",
+};
+
+const agent = new Agent(await createAgentConfig(definition, myResolver));
+await agent.send("Hello").final;
+
+// Snapshot the current session
+const saved: SavedAgent = {
+  definition,
+  session: agent.snapshot(),
+};
+
+// Persist `saved` (JSON-serializable)
+await db.saveAgent(userId, saved);
+```
+
+### Restoring an agent
+
+```typescript
+import { Agent, createAgentConfig } from "@fifthrevision/axle";
+
+const saved = await db.loadAgent(userId);
+
+// Host resolves the definition into executable dependencies
+const config = await createAgentConfig(saved.definition, myResolver);
+const agent = new Agent(config);
+agent.restore(saved.session);
+
+// Continue the conversation — history is fully restored
+await agent.send("What did we discuss before?").final;
+```
+
+### The resolver pattern
+
+`createAgentConfig(definition, resolver)` separates the serializable recipe
+from the runtime wiring. Your resolver receives the `AgentDefinition` and
+returns the live objects:
+
+```typescript
+import type { AgentDefinitionResolver } from "@fifthrevision/axle";
+import { anthropic, openai } from "@fifthrevision/axle";
+
+const myResolver: AgentDefinitionResolver = async (definition) => {
+  const providerMap = {
+    anthropic: anthropic(process.env.ANTHROPIC_API_KEY!),
+    openai: openai(process.env.OPENAI_API_KEY!),
+  };
+
+  return {
+    provider: providerMap[definition.provider.type],
+    // Resolve tool names to ExecutableTool instances, MCP clients, etc.
+    tools: resolveTools(definition.tools),
+  };
+};
+```
+
+Harness concerns — memory implementations, file resolvers, tracers, stores —
+are layered onto the returned `AgentConfig` by the host after resolution.

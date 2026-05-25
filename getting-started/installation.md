@@ -21,10 +21,10 @@ yarn add @fifthrevision/axle
 
 ## As a CLI
 
-Install globally to use the `axle` command anywhere:
+Install the CLI package globally to use the `axle` command anywhere:
 
 ```bash
-npm install -g @fifthrevision/axle
+npm install -g @fifthrevision/axle-cli
 ```
 
 See the [CLI overview](/cli/overview) for usage.

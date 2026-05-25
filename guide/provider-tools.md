@@ -10,13 +10,21 @@ search, code interpreter). Pass them via the `providerTools` option using
 `{ type: "provider", name: "..." }`.
 
 ```typescript
-import { Agent, calculatorTool } from "@fifthrevision/axle";
-import type { ProviderTool } from "@fifthrevision/axle";
+import { Agent } from "@fifthrevision/axle";
+import type { ExecutableTool, ProviderTool } from "@fifthrevision/axle";
+import { z } from "zod";
+
+const myTool: ExecutableTool = {
+  name: "lookup",
+  description: "Look up a value",
+  schema: z.object({ key: z.string() }),
+  async execute(input) { return "result"; },
+};
 
 const agent = new Agent({
   provider,
   model,
-  tools: [calculatorTool],
+  tools: [myTool],
   providerTools: [{ type: "provider", name: "web_search" }],
 });
 ```
