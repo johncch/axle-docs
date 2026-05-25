@@ -5,38 +5,51 @@ description: Configure API keys and provider defaults for the CLI.
 
 # Configuration
 
-For CLI use, create an `axle.config.yaml` in your working directory with API
-keys:
+The CLI reads provider credentials from environment variables or a local
+`.env` file in your working directory. There is no `axle.config.yaml` or
+other config file.
 
-```yaml
-# axle.config.yaml
-openai:
-  api-key: "<api-key>"
-anthropic:
-  api-key: "<api-key>"
-gemini:
-  api-key: "<api-key>"
-chatcompletions:
-  base-url: "http://localhost:11434/v1"
-  model: "llama3"
-  api-key: "<api-key>" # optional
+## Environment variables
+
+```bash
+# Provider API keys
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+GEMINI_API_KEY=...
+
+# Optional model overrides
+OPENAI_MODEL=gpt-4.1
+ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
+GEMINI_MODEL=gemini-2.5-pro
+
+# OpenAI-compatible endpoints (Ollama, vLLM, etc.)
+CHATCOMPLETIONS_BASE_URL=http://localhost:11434/v1
+CHATCOMPLETIONS_MODEL=llama3
+CHATCOMPLETIONS_API_KEY=...   # optional
 ```
 
-## Overrides
+Place these in a `.env` file alongside your job files and the CLI will load
+them automatically. Keep `.env` out of source control.
 
-Provider-level keys in the job file override the config file. For example,
-specifying `provider.model` in `axle.job.yaml` overrides any default model
-from `axle.config.yaml`.
+## Per-job overrides
 
-## Recommended setup
+Provider-level fields in the job file override environment defaults:
 
-- Keep `axle.config.yaml` outside source control. Treat it like an `.env`
-  file.
-- Use environment variables (e.g. `ANTHROPIC_API_KEY`) for CI by passing
-  them through `axle.config.yaml` via templating in your deploy step, or by
-  using the library API directly.
+```yaml
+provider:
+  type: openai
+  model: gpt-4.1
+```
 
-## Locating config
+To use a non-standard environment variable for an API key, use `apiKeyEnv`:
 
-By default the CLI searches the current directory. Use `-c
-path/to/config.yaml` to point at a specific config file.
+```yaml
+provider:
+  type: openai
+  apiKeyEnv: CUSTOM_OPENAI_KEY
+```
+
+## CI/CD
+
+In CI, set the environment variables directly in your pipeline secrets. No
+config file is required — the CLI picks them up automatically.

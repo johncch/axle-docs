@@ -10,13 +10,22 @@ tools, and conversation history. `send()` is the only verb — it accepts either
 a plain string or an [`Instruct`](/guide/instruct).
 
 ```typescript
-import { Agent, anthropic, calculatorTool } from "@fifthrevision/axle";
+import { Agent, anthropic } from "@fifthrevision/axle";
+import type { ExecutableTool } from "@fifthrevision/axle";
+import { z } from "zod";
+
+const myTool: ExecutableTool = {
+  name: "lookup",
+  description: "Look up a value",
+  schema: z.object({ key: z.string() }),
+  async execute(input) { return "result"; },
+};
 
 const agent = new Agent({
   provider: anthropic(apiKey),
   model: "claude-sonnet-4-5-20250929",
   system: "You are a helpful assistant.",
-  tools: [calculatorTool],
+  tools: [myTool],
 });
 ```
 
@@ -136,3 +145,30 @@ console.log(`Using ~${ctx.total} tokens (${ctx.free} free)`);
 
 `agent.on(...)` registers a callback that fires for every subsequent `send()`.
 See [Streaming](/guide/streaming) for the full event list.
+
+## Session snapshot and restore
+
+`Agent` supports serializable session state for save/resume workflows.
+
+```typescript
+// Save the current session
+const saved: SavedAgent = {
+  definition: myAgentDefinition, // AgentDefinition (serializable recipe)
+  session: agent.snapshot(),     // AgentSession (messages, turns, sessionId)
+};
+
+// Restore from a saved session
+const config = await createAgentConfig(saved.definition, resolver);
+const restoredAgent = new Agent(config);
+restoredAgent.restore(saved.session);
+```
+
+`AgentDefinition` is a serializable recipe — it describes the provider, model,
+tools, and request defaults in a form that can be stored in a database or sent
+over the wire. Hosts resolve it into a runtime `AgentConfig` using
+`createAgentConfig(definition, resolver)`.
+
+`AgentSession` holds continuation state: the model-facing message history,
+renderable turns, session annotations, and the stable `sessionId`.
+
+See [Hosting & Sessions](/guide/hosting) for the full pattern.

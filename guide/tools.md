@@ -32,26 +32,47 @@ Axle drives the tool-call loop automatically — the agent will call your tool,
 feed the result back to the model, and continue until the model produces a
 final response.
 
-## Built-in tools
+## Defining tools
 
-Axle includes several ready-to-use tools:
-
-- `braveSearchTool` — web search via Brave
-- `calculatorTool` — basic math
-- `execTool` — run shell commands
-- `readFileTool` — read a file from disk
-- `writeFileTool` — write a file to disk
-- `patchFileTool` — apply a patch to an existing file
+Define tools directly in your application code. The `ExecutableTool` type
+describes the interface:
 
 ```typescript
-import { Agent, calculatorTool, readFileTool } from "@fifthrevision/axle";
+import type { ExecutableTool } from "@fifthrevision/axle";
+import { z } from "zod";
 
-const agent = new Agent({
-  provider,
-  model,
-  tools: [calculatorTool, readFileTool],
-});
+const myTool: ExecutableTool = {
+  name: "lookup",
+  description: "Look up information by key",
+  schema: z.object({ key: z.string() }),
+  async execute(input, ctx) {
+    // input is fully typed from the Zod schema
+    // ctx provides signal, emit, registry, and tracer
+    return "result";
+  },
+};
 ```
+
+The `ctx` parameter gives access to:
+- `ctx.signal` — `AbortSignal` for cancellation
+- `ctx.emit(chunk)` — stream progress chunks (surfaces as `action:progress` events)
+- `ctx.registry` — the live tool registry (for dynamic tool loading)
+- `ctx.tracer` — tracing context
+
+## CLI built-in tools
+
+When using the CLI (`@fifthrevision/axle-cli`), the following tool names can
+be declared in job files and are resolved automatically:
+
+- `calculator` — basic math
+- `exec` — run shell commands
+- `patch-file` — apply a patch to an existing file
+- `read-file` — read a file from disk
+- `write-file` — write a file to disk
+
+These tools are not exported from the `@fifthrevision/axle` library package.
+Define equivalent tools in your application code if you need them outside the
+CLI.
 
 ## Tool failures
 
@@ -62,6 +83,7 @@ errors preserve available partial output, messages, usage, and tool context.
 
 ## Abort signals
 
-Tool `execute` receives an `AbortSignal` as its second argument. Long-running
-tools should respect it so `handle.cancel()` propagates correctly through to
-external processes, MCP servers, and HTTP requests.
+Tool `execute` receives an `AbortSignal` via `ctx.signal` as part of
+`ToolContext`. Long-running tools should respect it so `handle.cancel()`
+propagates correctly through to external processes, MCP servers, and HTTP
+requests.

@@ -5,6 +5,24 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.20.0] - 2026-05-25
+
+- Split the library and CLI into separate packages: `@fifthrevision/axle` (library) and `@fifthrevision/axle-cli` (CLI)
+- The `axle` binary is no longer published by the core package; install `@fifthrevision/axle-cli` globally
+- Built-in local tools (`calculatorTool`, `execTool`, `readFileTool`, `writeFileTool`, `patchFileTool`) and `braveSearchTool` removed from the core package; define tools directly in application code or use CLI job files
+- `ProceduralMemory` and `LocalFileStore` moved to the CLI package; core now exports only the `AgentMemory` and `FileStore` interfaces
+- Added `AgentDefinition`, `AgentSession`, `SavedAgent` for serializable agent save/resume
+- Added `createAgentConfig(definition, resolver)` for constructing runtime config from a serializable definition
+- Added `agent.snapshot()` and `agent.restore(session)` for session continuation
+- CLI no longer loads `axle.config.yml`/`axle.config.yaml` or JSON config files; credentials come from environment variables or a local `.env` file
+- CLI now requires an explicit `-j path/to/job.yml` flag; default job file lookup removed
+- See the [0.20.0 migration guide](/migration/0.20.0) for full details
+
+## [0.19.0] - 2026-05-24
+
+- Added a browser-only export for client-side bundles that omits server-only code
+- Added annotations support to Turns; see the [0.19.0 migration guide](/migration/0.19.0) for details
+
 ## [0.18.0] - 2026-05-22
 
 - Added support for Gemini 3.5 Flash

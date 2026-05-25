@@ -5,32 +5,63 @@ description: Let the agent learn corrections and apply them on later runs.
 
 # Procedural memory
 
-`ProceduralMemory` lets the agent extract durable instructions from feedback
-and apply them to future runs of the same agent (matched by `name`).
+An agent can use a memory implementation to extract durable instructions from
+feedback and apply them to future runs. Pass any object implementing the
+`AgentMemory` interface as `memory` in the agent config.
 
-Run the script twice — the second run will already apply the feedback the
-first run learned.
+In 0.20.0, the `ProceduralMemory` class moved out of the core
+`@fifthrevision/axle` package into the CLI. Hosts should provide their own
+memory implementations, or use the CLI behavior through job files.
+
+The example below shows a minimal in-memory implementation to illustrate the
+pattern. Run the script twice — the second run will already apply the feedback
+the first run learned.
 
 Source: [`examples/scripts/simple-memory.ts`](https://github.com/johncch/axle/blob/main/examples/scripts/simple-memory.ts)
 
 ```typescript
-import { Agent, ProceduralMemory, anthropic } from "@fifthrevision/axle";
+import { Agent, anthropic } from "@fifthrevision/axle";
+import type { AgentMemory, MemoryContext } from "@fifthrevision/axle";
 
 const provider = anthropic(process.env.ANTHROPIC_API_KEY!);
 const model = "claude-sonnet-4-5-20250929";
 
-const memory = new ProceduralMemory({
-  provider,
-  model,
-});
+/**
+ * A minimal in-process memory that extracts "Always ..." corrections from
+ * the conversation and prepends them to subsequent runs as instructions.
+ */
+class ProceduralMemory implements AgentMemory {
+  private instructions: string[] = [];
+
+  async recall() {
+    if (this.instructions.length === 0) return {};
+    const numbered = this.instructions.map(
+      (instruction, index) => `${index + 1}. ${instruction}`,
+    );
+    return { systemSuffix: `## Learned Instructions\n\n${numbered.join("\n")}` };
+  }
+
+  async record(context: MemoryContext) {
+    const latestCorrection = [...context.messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "user" &&
+          message.content.toString().includes("Always"),
+      );
+    if (!latestCorrection || typeof latestCorrection.content !== "string") return;
+    if (!this.instructions.includes(latestCorrection.content)) {
+      this.instructions.push(latestCorrection.content);
+    }
+  }
+}
 
 const agent = new Agent({
   provider,
   model,
   system: "You are a helpful assistant that summarizes text.",
   name: "summarizer",
-  // scope: { user: "demo" },
-  memory,
+  memory: new ProceduralMemory(),
 });
 
 agent.on((event) => {
@@ -62,5 +93,4 @@ try {
 
 console.log("[Complete]");
 console.log("[Tip] Run this script again to see learned instructions applied from the start.");
-console.log("[Tip] Check .axle/memory/procedural/ to see the stored instructions.");
 ```
