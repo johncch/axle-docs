@@ -33,8 +33,8 @@ const agent = new Agent({
 });
 ```
 
-Supported models include the Claude 4 family (Opus 4.7, Sonnet 4.5, Haiku 4.5)
-and the available Anthropic provider tools — see
+Supported models include the Claude 4 family (Opus 4.8, Opus 4.7, Sonnet 4.5,
+Haiku 4.5) and the available Anthropic provider tools — see
 [Provider Tools](/guide/provider-tools).
 
 ## OpenAI
@@ -44,7 +44,7 @@ const provider = openai(process.env.OPENAI_API_KEY);
 
 const agent = new Agent({
   provider,
-  model: "gpt-4o-mini",
+  model: "gpt-5-mini",
 });
 ```
 
@@ -58,13 +58,13 @@ const provider = gemini(process.env.GEMINI_API_KEY);
 
 const agent = new Agent({
   provider,
-  model: "gemini-2.5-flash",
+  model: "gemini-3.5-flash",
 });
 ```
 
-Supported models include `gemini-2.5-flash`, `gemini-2.5-pro`,
-`gemini-3.5-flash`, `gemini-3-flash-preview`, and other variants available
-via the Gemini API. See the models export for the full list.
+Supported models include `gemini-3.5-flash`, `gemini-2.5-flash`,
+`gemini-2.5-pro`, `gemini-3-flash-preview`, and other variants available via
+the Gemini API. See the models export for the full list.
 
 ## Chat Completions (OpenAI-compatible)
 
@@ -77,6 +77,50 @@ const provider = chatCompletions("http://localhost:11434/v1", {
 });
 
 const agent = new Agent({ provider, model: "llama3" });
+```
+
+## Retry and timeout options
+
+All provider factories accept a second `options` argument with portable
+client-level settings:
+
+```typescript
+const provider = openai(process.env.OPENAI_API_KEY, {
+  maxRetries: 2,
+  timeoutMs: 30_000,
+});
+```
+
+These options are supported by all four providers:
+
+| Option       | Type     | Description                                                                 |
+| ------------ | -------- | --------------------------------------------------------------------------- |
+| `maxRetries` | `number` | Retry attempts after the first request. Defaults to `2`. Use `0` to disable. |
+| `timeoutMs`  | `number` | Request timeout in milliseconds. Omit to use the provider SDK default.      |
+
+For `chatCompletions`, pass options as an object (the string `apiKey`
+positional form is still supported):
+
+```typescript
+// object form (preferred)
+const provider = chatCompletions("http://localhost:11434/v1", {
+  apiKey: "optional",
+  maxRetries: 0,
+  timeoutMs: 60_000,
+});
+
+// legacy positional form (still works)
+const provider = chatCompletions("http://localhost:11434/v1", "my-key");
+```
+
+CLI provider config also accepts these fields:
+
+```yaml
+provider:
+  type: openai
+  model: gpt-5-mini
+  maxRetries: 2
+  timeoutMs: 30000
 ```
 
 ## Models export

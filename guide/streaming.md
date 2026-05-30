@@ -33,6 +33,15 @@ agent.on((event) => {
     case "text:delta":
       process.stdout.write(event.delta);
       break;
+    case "text:citation":
+      console.log(`[citation] ${event.citation.source.type}`);
+      break;
+    case "thinking:delta":
+      process.stdout.write(event.delta);
+      break;
+    case "thinking:summary-delta":
+      process.stdout.write(event.delta);
+      break;
     case "action:running":
       console.log("[tool running]");
       break;
@@ -59,7 +68,10 @@ agent.on((event) => {
 | `turn:end`               | `turnId`, `status`, `usage`, `timing?`                                       | The assistant turn finished (`complete`, `cancelled`, `error`).      |
 | `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type`.                    |
 | `text:delta`             | `turnId`, `partId`, `delta`                                                  | Incremental text chunk inside the current text part.                 |
+| `text:citation`          | `turnId`, `partId`, `citation`                                               | A citation was attached to the current text part.                    |
 | `thinking:delta`         | `turnId`, `partId`, `delta`                                                  | Incremental reasoning chunk inside a thinking part.                  |
+| `thinking:summary-delta` | `turnId`, `partId`, `delta`                                                  | Incremental summary chunk for a provider-summarized thinking part.   |
+| `thinking:update`        | `turnId`, `partId`                                                           | Thinking part metadata updated (e.g. `redacted`, `continuity`).     |
 | `part:end`               | `turnId`, `partId`, `timing?`                                                | The current part finished.                                           |
 | `action:args-delta`      | `turnId`, `partId`, `delta`, `accumulated`                                   | Tool/agent arguments are still streaming in.                         |
 | `action:running`         | `turnId`, `partId`, `parameters?`                                            | Local tool / sub-agent / provider tool started executing.            |
@@ -76,8 +88,8 @@ agent.on((event) => {
 
 `part:start` carries a `TurnPart`, discriminated by `part.type`:
 
-- `"text"` — assistant text. Subsequent `text:delta` events fill it in.
-- `"thinking"` — reasoning content. Subsequent `thinking:delta` events fill it in.
+- `"text"` — assistant text. Subsequent `text:delta` events fill it in. `text:citation` events attach citations.
+- `"thinking"` — reasoning content. May have `text`, `summary` (streamed via `thinking:summary-delta`), `redacted`, or `continuity` fields. Raw thinking text arrives via `thinking:delta`.
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
   `part.kind`: `"tool" | "agent" | "provider-tool"`.

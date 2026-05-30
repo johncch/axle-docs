@@ -5,6 +5,20 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.21.0] - 2026-05-30
+
+- Added citations support on text parts (`part.citations`)
+- Added richer thinking/reasoning formats: redacted thinking, provider summaries, and `continuity` for continuation state
+- Added new turn events: `text:citation`, `thinking:summary-delta`, `thinking:update`
+- Added `metadata` option to `agent.send()` and `Instruct` for stable host-owned user-turn metadata
+- Added convenience constructor form `new Agent(config, session)` for restoring saved sessions
+- Added `maxRetries` and `timeoutMs` options to all provider factories (`openai`, `anthropic`, `gemini`, `chatCompletions`)
+- Added `CLAUDE_OPUS_4_8` to Anthropic model constants
+- Updated default OpenAI model to `gpt-5-mini`
+- Updated default Gemini model to `gemini-3.5-flash`
+- CLI provider config now accepts `maxRetries` and `timeoutMs` fields
+- See the [0.21.0 migration guide](/migration/0.21.0) for full details
+
 ## [0.20.0] - 2026-05-25
 
 - Split the library and CLI into separate packages: `@fifthrevision/axle` (library) and `@fifthrevision/axle-cli` (CLI)

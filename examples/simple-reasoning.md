@@ -26,6 +26,9 @@ async function reasonIt() {
     if (event.type === "thinking:delta") {
       process.stdout.write(event.delta);
     }
+    if (event.type === "thinking:summary-delta") {
+      process.stdout.write(event.delta);
+    }
     if (event.type === "part:start" && event.part.type === "text") {
       process.stdout.write("\n\n--- response ---\n");
     }
@@ -44,3 +47,37 @@ async function reasonIt() {
 
 reasonIt();
 ```
+
+## Rendering thinking parts
+
+Thinking parts now carry one of three representations depending on the
+provider. Discriminate on the available fields:
+
+```typescript
+agent.on((event) => {
+  if (event.type === "part:start" && event.part.type === "thinking") {
+    const part = event.part;
+
+    if (part.redacted) {
+      // Provider redacted the reasoning — show a placeholder
+      process.stdout.write("[thinking redacted]\n");
+    } else if (part.summary !== undefined) {
+      // Provider supplies a summary (streamed via thinking:summary-delta)
+      process.stdout.write("--- thinking summary ---\n");
+    } else {
+      // Full thinking text (streamed via thinking:delta)
+      process.stdout.write("--- thinking ---\n");
+    }
+  }
+
+  if (event.type === "thinking:delta") {
+    process.stdout.write(event.delta);
+  }
+
+  if (event.type === "thinking:summary-delta") {
+    process.stdout.write(event.delta);
+  }
+});
+```
+
+See [Streaming](/guide/streaming) for the full event list.

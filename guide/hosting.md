@@ -29,7 +29,7 @@ and changing them shouldn't require forking the agent core.
 
 ## Agent definitions and sessions
 
-0.20.0 introduces serializable types for save/resume workflows:
+0.20.0 introduced serializable types for save/resume workflows:
 
 - **`AgentDefinition`** — a serializable recipe. It describes the provider,
   model, system prompt, tools, and request defaults in a form safe to store in
@@ -70,6 +70,9 @@ await db.saveAgent(userId, saved);
 
 ### Restoring an agent
 
+Pass the saved session directly to the `Agent` constructor (0.21.0+) for the
+shortest restore path:
+
 ```typescript
 import { Agent, createAgentConfig } from "@fifthrevision/axle";
 
@@ -77,12 +80,24 @@ const saved = await db.loadAgent(userId);
 
 // Host resolves the definition into executable dependencies
 const config = await createAgentConfig(saved.definition, myResolver);
-const agent = new Agent(config);
-agent.restore(saved.session);
+
+// Constructor form — restore in one step
+const agent = new Agent(config, saved.session);
 
 // Continue the conversation — history is fully restored
 await agent.send("What did we discuss before?").final;
 ```
+
+The two-step form using `agent.restore(session)` is still supported and
+equivalent:
+
+```typescript
+const agent = new Agent(config);
+agent.restore(saved.session);
+```
+
+If both `config.sessionId` and `session.sessionId` are supplied, the restored
+session id wins.
 
 ### The resolver pattern
 

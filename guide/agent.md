@@ -98,6 +98,21 @@ await agent.send("Go", {
 });
 ```
 
+### User-turn metadata
+
+Pass `metadata` to `send()` to attach stable host-owned data to the user
+message. Providers ignore it; Axle stores it in history and copies it onto the
+corresponding user `Turn`.
+
+```typescript
+await agent.send("Rewrite this prompt", {
+  metadata: { surface: "prompt-editor", requestId: "abc123" },
+});
+```
+
+Use metadata for stable facts about the message. Use annotations for mutable,
+async, or explicitly placed UI state.
+
 ## Multi-turn conversations
 
 The agent maintains its own history. Each `send()` is appended to that
@@ -150,18 +165,35 @@ See [Streaming](/guide/streaming) for the full event list.
 
 `Agent` supports serializable session state for save/resume workflows.
 
+### Saving a session
+
 ```typescript
-// Save the current session
 const saved: SavedAgent = {
   definition: myAgentDefinition, // AgentDefinition (serializable recipe)
   session: agent.snapshot(),     // AgentSession (messages, turns, sessionId)
 };
+```
 
-// Restore from a saved session
+### Restoring a session
+
+You can restore a session either by passing it to the constructor (preferred)
+or by calling `restore()` after construction:
+
+```typescript
+// Constructor form (0.21.0+) — shorter, equivalent to the two-step form below
+const config = await createAgentConfig(saved.definition, resolver);
+const restoredAgent = new Agent(config, saved.session);
+```
+
+```typescript
+// Two-step form — still supported
 const config = await createAgentConfig(saved.definition, resolver);
 const restoredAgent = new Agent(config);
 restoredAgent.restore(saved.session);
 ```
+
+If both `config.sessionId` and `session.sessionId` are supplied, the restored
+session id wins.
 
 `AgentDefinition` is a serializable recipe — it describes the provider, model,
 tools, and request defaults in a form that can be stored in a database or sent
