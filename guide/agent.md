@@ -98,6 +98,18 @@ await agent.send("Go", {
 });
 ```
 
+### User turn metadata
+
+Pass `metadata` to attach stable, host-owned data to a user turn. Providers
+ignore it; Axle stores it in history and copies it onto the corresponding user
+`Turn`. Use annotations for mutable or async UI state instead.
+
+```typescript
+await agent.send("Rewrite this prompt", {
+  metadata: { surface: "prompt-editor", userId: "u_123" },
+});
+```
+
 ## Multi-turn conversations
 
 The agent maintains its own history. Each `send()` is appended to that
@@ -150,6 +162,27 @@ See [Streaming](/guide/streaming) for the full event list.
 
 `Agent` supports serializable session state for save/resume workflows.
 
+### Restoring via the constructor (0.21.0+)
+
+The shortest path to rehydration is passing the saved session directly to the
+constructor:
+
+```typescript
+const agent = new Agent(config, session);
+```
+
+This is equivalent to:
+
+```typescript
+const agent = new Agent(config);
+agent.restore(session);
+```
+
+Both forms remain supported. If both `config.sessionId` and `session.sessionId`
+are provided, the restored session id wins.
+
+### Full save/restore pattern
+
 ```typescript
 // Save the current session
 const saved: SavedAgent = {
@@ -157,10 +190,12 @@ const saved: SavedAgent = {
   session: agent.snapshot(),     // AgentSession (messages, turns, sessionId)
 };
 
-// Restore from a saved session
+// Restore from a saved session — constructor shorthand
 const config = await createAgentConfig(saved.definition, resolver);
-const restoredAgent = new Agent(config);
-restoredAgent.restore(saved.session);
+const restoredAgent = new Agent(config, saved.session);
+
+// Continue the conversation — history is fully restored
+await restoredAgent.send("What did we discuss before?").final;
 ```
 
 `AgentDefinition` is a serializable recipe — it describes the provider, model,

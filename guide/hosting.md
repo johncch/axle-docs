@@ -70,6 +70,9 @@ await db.saveAgent(userId, saved);
 
 ### Restoring an agent
 
+As of 0.21.0, the constructor accepts a saved session directly as the second
+argument — the shortest path to rehydration:
+
 ```typescript
 import { Agent, createAgentConfig } from "@fifthrevision/axle";
 
@@ -77,12 +80,23 @@ const saved = await db.loadAgent(userId);
 
 // Host resolves the definition into executable dependencies
 const config = await createAgentConfig(saved.definition, myResolver);
-const agent = new Agent(config);
-agent.restore(saved.session);
+
+// Pass the session to the constructor (0.21.0+)
+const agent = new Agent(config, saved.session);
 
 // Continue the conversation — history is fully restored
 await agent.send("What did we discuss before?").final;
 ```
+
+The explicit `restore()` call still works and is equivalent:
+
+```typescript
+const agent = new Agent(config);
+agent.restore(saved.session);
+```
+
+If both `config.sessionId` and `session.sessionId` are supplied, the restored
+session id wins.
 
 ### The resolver pattern
 

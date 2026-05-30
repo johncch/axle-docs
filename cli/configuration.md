@@ -18,9 +18,9 @@ ANTHROPIC_API_KEY=...
 GEMINI_API_KEY=...
 
 # Optional model overrides
-OPENAI_MODEL=gpt-4.1
+OPENAI_MODEL=gpt-5-mini
 ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
-GEMINI_MODEL=gemini-2.5-pro
+GEMINI_MODEL=gemini-3.5-flash
 
 # OpenAI-compatible endpoints (Ollama, vLLM, etc.)
 CHATCOMPLETIONS_BASE_URL=http://localhost:11434/v1
@@ -38,7 +38,7 @@ Provider-level fields in the job file override environment defaults:
 ```yaml
 provider:
   type: openai
-  model: gpt-4.1
+  model: gpt-5-mini
 ```
 
 To use a non-standard environment variable for an API key, use `apiKeyEnv`:
@@ -48,6 +48,22 @@ provider:
   type: openai
   apiKeyEnv: CUSTOM_OPENAI_KEY
 ```
+
+### Retry and timeout
+
+Provider config also accepts `maxRetries` and `timeoutMs` for reliability
+tuning:
+
+```yaml
+provider:
+  type: anthropic
+  model: claude-sonnet-4-5-20250929
+  maxRetries: 2
+  timeoutMs: 30000
+```
+
+- `maxRetries` — number of retry attempts after the first request (`0` disables retries).
+- `timeoutMs` — request timeout in milliseconds.
 
 ## CI/CD
 

@@ -33,6 +33,20 @@ agent.on((event) => {
     case "text:delta":
       process.stdout.write(event.delta);
       break;
+    case "text:citation":
+      // A citation was attached to the current text part
+      console.log(`[citation] ${event.citation.source.type}`);
+      break;
+    case "thinking:delta":
+      process.stdout.write(event.delta);
+      break;
+    case "thinking:summary-delta":
+      // Provider-supplied summary of reasoning (e.g. Gemini flash thinking)
+      process.stdout.write(event.delta);
+      break;
+    case "thinking:update":
+      // Thinking part metadata updated (redacted flag, continuity, etc.)
+      break;
     case "action:running":
       console.log("[tool running]");
       break;
@@ -59,7 +73,10 @@ agent.on((event) => {
 | `turn:end`               | `turnId`, `status`, `usage`, `timing?`                                       | The assistant turn finished (`complete`, `cancelled`, `error`).      |
 | `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type`.                    |
 | `text:delta`             | `turnId`, `partId`, `delta`                                                  | Incremental text chunk inside the current text part.                 |
+| `text:citation`          | `turnId`, `partId`, `citation`                                               | A citation was attached to the current text part.                    |
 | `thinking:delta`         | `turnId`, `partId`, `delta`                                                  | Incremental reasoning chunk inside a thinking part.                  |
+| `thinking:summary-delta` | `turnId`, `partId`, `delta`                                                  | Incremental provider-supplied reasoning summary chunk.               |
+| `thinking:update`        | `turnId`, `partId`                                                           | Thinking part metadata updated (redacted, continuity, providerMetadata). |
 | `part:end`               | `turnId`, `partId`, `timing?`                                                | The current part finished.                                           |
 | `action:args-delta`      | `turnId`, `partId`, `delta`, `accumulated`                                   | Tool/agent arguments are still streaming in.                         |
 | `action:running`         | `turnId`, `partId`, `parameters?`                                            | Local tool / sub-agent / provider tool started executing.            |
@@ -77,12 +94,65 @@ agent.on((event) => {
 `part:start` carries a `TurnPart`, discriminated by `part.type`:
 
 - `"text"` — assistant text. Subsequent `text:delta` events fill it in.
-- `"thinking"` — reasoning content. Subsequent `thinking:delta` events fill it in.
+  `text:citation` events attach citations to the part.
+- `"thinking"` — reasoning content. Subsequent `thinking:delta` events fill in
+  raw text (when available); `thinking:summary-delta` fills in a
+  provider-supplied summary; `thinking:update` signals metadata changes such as
+  `redacted` or `continuity`.
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
   `part.kind`: `"tool" | "agent" | "provider-tool"`.
 
 Callbacks are registered once and fire on every subsequent `send()`.
+
+### Thinking part shape
+
+The `ThinkingPart` (carried on `part:start` and updated via `thinking:update`)
+has the following shape as of 0.21.0:
+
+```typescript
+interface ThinkingPart {
+  type: "thinking";
+  id?: string;
+  text?: string;        // raw reasoning text — may be absent (e.g. redacted or summary-only)
+  summary?: string;     // provider-supplied reasoning summary
+  redacted?: boolean;   // true when the provider redacts the reasoning content
+  continuity?: ThinkingContinuity;         // provider-specific continuation state
+  providerMetadata?: Record<string, unknown>;
+}
+```
+
+To render thinking content defensively:
+
+```typescript
+agent.on((event) => {
+  if (event.type === "part:start" && event.part.type === "thinking") {
+    if (event.part.redacted) {
+      renderThinkingPlaceholder();
+    }
+  }
+  if (event.type === "thinking:delta") {
+    renderThinkingText(event.delta);
+  }
+  if (event.type === "thinking:summary-delta") {
+    renderThinkingSummary(event.delta);
+  }
+});
+```
+
+### Citations
+
+When the model returns citations (e.g. via web search), they arrive as
+`text:citation` events and are also accumulated onto `TextPart.citations`:
+
+```typescript
+agent.on((event) => {
+  if (event.type === "text:citation") {
+    const { source, outputSpan } = event.citation;
+    console.log(`[citation] ${source.type}: ${source.url ?? source.title}`);
+  }
+});
+```
 
 ## stream() events
 

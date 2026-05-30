@@ -33,8 +33,8 @@ const agent = new Agent({
 });
 ```
 
-Supported models include the Claude 4 family (Opus 4.7, Sonnet 4.5, Haiku 4.5)
-and the available Anthropic provider tools — see
+Supported models include the Claude 4 family (Opus 4.8, Opus 4.7, Sonnet 4.5,
+Haiku 4.5) and the available Anthropic provider tools — see
 [Provider Tools](/guide/provider-tools).
 
 ## OpenAI
@@ -44,7 +44,7 @@ const provider = openai(process.env.OPENAI_API_KEY);
 
 const agent = new Agent({
   provider,
-  model: "gpt-4o-mini",
+  model: "gpt-5-mini",
 });
 ```
 
@@ -58,7 +58,7 @@ const provider = gemini(process.env.GEMINI_API_KEY);
 
 const agent = new Agent({
   provider,
-  model: "gemini-2.5-flash",
+  model: "gemini-3.5-flash",
 });
 ```
 
@@ -78,6 +78,32 @@ const provider = chatCompletions("http://localhost:11434/v1", {
 
 const agent = new Agent({ provider, model: "llama3" });
 ```
+
+## Retry and timeout options
+
+All provider factories accept portable client options for reliability tuning:
+
+```typescript
+const provider = anthropic(process.env.ANTHROPIC_API_KEY, {
+  maxRetries: 2,
+  timeoutMs: 30_000,
+});
+```
+
+The same options work for all providers:
+
+```typescript
+openai(apiKey, { maxRetries: 3, timeoutMs: 60_000 });
+gemini(apiKey, { maxRetries: 2 });
+chatCompletions(baseUrl, { maxRetries: 1, timeoutMs: 15_000 });
+```
+
+- `maxRetries` — number of retry attempts after the first request. Set `0` to
+  disable retries entirely.
+- `timeoutMs` — request timeout in milliseconds (must be a positive integer).
+
+OpenAI, Anthropic, and Gemini map these to their respective SDK client options.
+The Chat Completions provider uses Axle's internal retry wrapper.
 
 ## Models export
 

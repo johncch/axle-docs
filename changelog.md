@@ -5,6 +5,18 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.21.0] - 2026-05-30
+
+- Added support for Claude Opus 4.8
+- Added citations support on text parts
+- Added richer thinking/reasoning format: `text` is now optional, added `summary`, `redacted`, and `continuity` fields
+- Added configurable retry and timeout options to provider factories (`maxRetries`, `timeoutMs`)
+- Added `Agent(config, session)` constructor shorthand for agent rehydration
+- Added `metadata` support on user turns via `agent.send()` and `Instruct`
+- New `TurnEvent` types: `text:citation`, `thinking:summary-delta`, `thinking:update`
+- Default model changed: OpenAI `gpt-5.4-mini` → `gpt-5-mini`, Gemini `gemini-3.1-flash-lite` → `gemini-3.5-flash`
+- See the [0.21.0 migration guide](/migration/0.21.0) for full details
+
 ## [0.20.0] - 2026-05-25
 
 - Split the library and CLI into separate packages: `@fifthrevision/axle` (library) and `@fifthrevision/axle-cli` (CLI)
