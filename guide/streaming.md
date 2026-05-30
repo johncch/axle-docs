@@ -33,6 +33,15 @@ agent.on((event) => {
     case "text:delta":
       process.stdout.write(event.delta);
       break;
+    case "text:citation":
+      console.log(`[citation] ${event.citation.source.type}`);
+      break;
+    case "thinking:delta":
+      process.stdout.write(event.delta);
+      break;
+    case "thinking:summary-delta":
+      process.stdout.write(event.delta);
+      break;
     case "action:running":
       console.log("[tool running]");
       break;
@@ -59,7 +68,10 @@ agent.on((event) => {
 | `turn:end`               | `turnId`, `status`, `usage`, `timing?`                                       | The assistant turn finished (`complete`, `cancelled`, `error`).      |
 | `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type`.                    |
 | `text:delta`             | `turnId`, `partId`, `delta`                                                  | Incremental text chunk inside the current text part.                 |
+| `text:citation`          | `turnId`, `partId`, `citation`                                               | A provider citation attached to the current text part.               |
 | `thinking:delta`         | `turnId`, `partId`, `delta`                                                  | Incremental reasoning chunk inside a thinking part.                  |
+| `thinking:summary-delta` | `turnId`, `partId`, `delta`                                                  | Incremental chunk of a provider-supplied thinking summary.           |
+| `thinking:update`        | `turnId`, `partId`, `redacted?`, `continuity?`, `providerMetadata?`          | Non-text update to a thinking part (redaction flag, continuity).     |
 | `part:end`               | `turnId`, `partId`, `timing?`                                                | The current part finished.                                           |
 | `action:args-delta`      | `turnId`, `partId`, `delta`, `accumulated`                                   | Tool/agent arguments are still streaming in.                         |
 | `action:running`         | `turnId`, `partId`, `parameters?`                                            | Local tool / sub-agent / provider tool started executing.            |
@@ -77,12 +89,52 @@ agent.on((event) => {
 `part:start` carries a `TurnPart`, discriminated by `part.type`:
 
 - `"text"` — assistant text. Subsequent `text:delta` events fill it in.
-- `"thinking"` — reasoning content. Subsequent `thinking:delta` events fill it in.
+  `text:citation` events attach source citations to the accumulated text.
+- `"thinking"` — reasoning content. Subsequent `thinking:delta` events fill in
+  renderable thinking text; `thinking:summary-delta` events fill in a
+  provider-supplied summary; `thinking:update` carries redaction flags and
+  continuity payloads. Note that `ThinkingPart.text` is optional — not every
+  provider exposes raw thinking text.
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
   `part.kind`: `"tool" | "agent" | "provider-tool"`.
 
 Callbacks are registered once and fire on every subsequent `send()`.
+
+### Citations
+
+When a provider attaches citations to text output, `text:citation` events fire
+alongside the text deltas. Each event carries a `Citation` object:
+
+```typescript
+interface Citation {
+  source: CitationSource; // web | document | search-result | retrieved-context | unknown
+  outputSpan?: { start?: number; end?: number };
+  providerMetadata?: Record<string, unknown>;
+}
+```
+
+If you use `TurnAccumulator`, citations accumulate on `TextPart.citations`
+automatically — no extra reducer work is needed.
+
+### Thinking parts
+
+`ThinkingPart.text` is optional in 0.21.0. Some providers supply a summary
+instead of raw thinking text, and others redact thinking entirely:
+
+```typescript
+agent.on((event) => {
+  if (event.type === "part:start" && event.part.type === "thinking") {
+    if (event.part.redacted) {
+      renderThinkingPlaceholder();
+    } else if (event.part.summary) {
+      renderThinkingSummary(event.part.summary);
+    } else if (event.part.text) {
+      renderThinkingText(event.part.text);
+    }
+  }
+});
+```
 
 ## stream() events
 

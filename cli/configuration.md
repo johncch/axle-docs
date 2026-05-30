@@ -49,6 +49,26 @@ provider:
   apiKeyEnv: CUSTOM_OPENAI_KEY
 ```
 
+### Retry and timeout options
+
+Set `maxRetries` and `timeoutMs` directly in the provider block to tune
+reliability on a per-job basis:
+
+```yaml
+provider:
+  type: openai
+  model: gpt-5-mini
+  maxRetries: 2
+  timeoutMs: 30000
+```
+
+- `maxRetries` — number of retry attempts after the first request. Set to `0`
+  to disable retries.
+- `timeoutMs` — request timeout in milliseconds (must be a positive integer).
+
+These fields are supported for all provider types: `openai`, `anthropic`,
+`gemini`, and `chatcompletions`.
+
 ## CI/CD
 
 In CI, set the environment variables directly in your pipeline secrets. No

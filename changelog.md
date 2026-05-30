@@ -5,6 +5,18 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.21.0] - 2026-05-30
+
+- Added citations support on text parts (`TextPart.citations`, `text:citation` events)
+- Added richer thinking/reasoning formats: optional `text`, provider summaries, redaction, and `continuity` for multi-turn state
+- Added new turn events: `text:citation`, `thinking:summary-delta`, `thinking:update`
+- Added `metadata` option to `agent.send()` and `Instruct` for stable host-owned user-turn data
+- Added `Agent` constructor shortcut for session rehydration: `new Agent(config, session)`
+- Added portable `maxRetries` and `timeoutMs` options to all provider factories
+- Added `CLAUDE_OPUS_4_8` model constant
+- Updated Gemini default model to `gemini-3.5-flash` (was `gemini-3.1-flash-lite`)
+- See the [0.21.0 migration guide](/migration/0.21.0) for full details
+
 ## [0.20.0] - 2026-05-25
 
 - Split the library and CLI into separate packages: `@fifthrevision/axle` (library) and `@fifthrevision/axle-cli` (CLI)

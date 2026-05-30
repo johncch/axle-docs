@@ -90,6 +90,23 @@ instruct.addFile(await loadFileContent("./report.pdf"));
 Axle handles MIME detection and routes the file through whichever shape the
 target provider accepts. Multi-modal output is not currently supported.
 
+## User turn metadata
+
+Pass `metadata` to attach stable, host-owned render data to the user message.
+Providers ignore it; Axle stores it in history and copies it onto the
+corresponding user `Turn`.
+
+```typescript
+const instruct = new Instruct({
+  prompt: "Review this prompt",
+  metadata: { surface: "prompt-review" },
+});
+```
+
+Use metadata for stable facts about the message origin (surface, source,
+experiment ID). Use annotations for mutable, async, or explicitly placed UI
+state.
+
 ## Vars mode
 
 `Instruct` supports a vars-only mode for variable-driven prompting (added in
