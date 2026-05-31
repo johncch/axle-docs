@@ -22,6 +22,26 @@ const g = gemini(process.env.GEMINI_API_KEY);
 const local = chatCompletions("http://localhost:11434/v1");
 ```
 
+## Retry and timeout options
+
+All provider factories accept an optional `ProviderClientOptions` object as
+their second argument. Use `maxRetries` and `timeoutMs` to tune reliability:
+
+```typescript
+const provider = openai(apiKey, {
+  maxRetries: 2,
+  timeoutMs: 30_000,
+});
+```
+
+- `maxRetries` — number of retry attempts **after** the first request. Defaults
+  to `2`; set to `0` to disable retries.
+- `timeoutMs` — request timeout in milliseconds. Omit to use the provider SDK
+  default.
+
+These options are available on every provider factory:
+`anthropic()`, `openai()`, `gemini()`, and `chatCompletions()`.
+
 ## Anthropic
 
 ```typescript
@@ -33,8 +53,8 @@ const agent = new Agent({
 });
 ```
 
-Supported models include the Claude 4 family (Opus 4.7, Sonnet 4.5, Haiku 4.5)
-and the available Anthropic provider tools — see
+Supported models include the Claude 4 family (Opus 4.8, Opus 4.7, Sonnet 4.5,
+Haiku 4.5) and the available Anthropic provider tools — see
 [Provider Tools](/guide/provider-tools).
 
 ## OpenAI
@@ -58,12 +78,12 @@ const provider = gemini(process.env.GEMINI_API_KEY);
 
 const agent = new Agent({
   provider,
-  model: "gemini-2.5-flash",
+  model: "gemini-3.5-flash",
 });
 ```
 
-Supported models include `gemini-2.5-flash`, `gemini-2.5-pro`,
-`gemini-3.5-flash`, `gemini-3-flash-preview`, and other variants available
+Supported models include `gemini-3.5-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`,
+`gemini-3-flash-preview`, and other variants available
 via the Gemini API. See the models export for the full list.
 
 ## Chat Completions (OpenAI-compatible)
@@ -78,6 +98,9 @@ const provider = chatCompletions("http://localhost:11434/v1", {
 
 const agent = new Agent({ provider, model: "llama3" });
 ```
+
+The legacy `chatCompletions(baseUrl, apiKey)` two-argument string form is still
+supported.
 
 ## Models export
 
