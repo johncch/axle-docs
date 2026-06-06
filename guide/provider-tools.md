@@ -48,6 +48,58 @@ Use the optional `config` field for provider-specific options:
 { type: "provider", name: "web_search", config: { max_results: 5 } }
 ```
 
+## OpenRouter web search
+
+The Chat Completions provider supports OpenRouter server tools when
+`providerToolVendor: "openrouter"` is set at construction. This lets the model
+decide whether and when to call web search rather than always injecting results
+via the plugin path.
+
+```typescript
+import { Agent, chatCompletions } from "@fifthrevision/axle";
+
+const provider = chatCompletions("https://openrouter.ai/api/v1", {
+  apiKey: process.env.OPENROUTER_API_KEY,
+  providerToolVendor: "openrouter",
+});
+
+const agent = new Agent({
+  provider,
+  model: "openai/gpt-4o-search-preview",
+  providerTools: [{ type: "provider", name: "web_search" }],
+});
+```
+
+With optional config to limit result count:
+
+```typescript
+providerTools: [
+  {
+    type: "provider",
+    name: "web_search",
+    config: { max_results: 3 },
+  },
+],
+```
+
+Axle maps this to the OpenRouter server tool shape:
+
+```json
+{
+  "type": "openrouter:web_search",
+  "parameters": {
+    "max_results": 3
+  }
+}
+```
+
+Function tools and OpenRouter server tools share the same `tools` array in the
+Chat Completions request. Generic OpenAI-compatible endpoints still warn and
+drop `providerTools` unless `providerToolVendor: "openrouter"` is set.
+
+Web search results from OpenRouter arrive as unanchored `CitationPart`s in the
+turn — see [Streaming](/guide/streaming#citations) for how to render them.
+
 ## Streaming events
 
 Provider tool activity surfaces as `provider-tool:start` and

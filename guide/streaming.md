@@ -28,6 +28,7 @@ agent.on((event) => {
     case "part:start":
       if (event.part.type === "text") console.log("[text started]");
       if (event.part.type === "thinking") console.log("[thinking started]");
+      if (event.part.type === "citation") console.log("[citations]");
       if (event.part.type === "action") console.log(`[tool] ${event.part.detail.name}`);
       break;
     case "text:delta":
@@ -90,6 +91,9 @@ agent.on((event) => {
 
 - `"text"` — assistant text. Subsequent `text:delta` events fill it in.
   `text:citation` events attach source citations to the accumulated text.
+- `"citation"` — unanchored source citations emitted by the provider for the
+  whole assistant turn (not tied to a specific text span). The part carries a
+  `citations` array. See [Citations](#citations) below.
 - `"thinking"` — reasoning content. Subsequent `thinking:delta` events fill in
   renderable thinking text; `thinking:summary-delta` events fill in a
   provider-supplied summary; `thinking:update` carries redaction flags and
@@ -116,6 +120,23 @@ interface Citation {
 
 If you use `TurnAccumulator`, citations accumulate on `TextPart.citations`
 automatically — no extra reducer work is needed.
+
+Some providers (such as OpenRouter web search) emit citations as a source list
+for the whole message rather than as spans inside a text block. These arrive as
+a `"citation"` part instead of `text:citation` events. Render them separately:
+
+```typescript
+for (const part of turn.parts) {
+  if (part.type === "text") {
+    renderText(part.text);
+    renderInlineCitations(part.citations ?? []);
+  }
+
+  if (part.type === "citation") {
+    renderSources(part.citations);
+  }
+}
+```
 
 ### Thinking parts
 
@@ -167,6 +188,8 @@ handle.on((event) => {
 | `text:start`              | A text block began (carries `index`).                                       |
 | `text:delta`              | Incremental text chunk.                                                     |
 | `text:end`                | Text block ended; carries the final concatenated `final` string.            |
+| `text:citation`           | A citation anchored to a specific text span (carries `citation`, `citations`). |
+| `citation`                | Unanchored citations for the whole turn (carries `index`, `citations`).     |
 | `thinking:start`          | A reasoning block began.                                                    |
 | `thinking:delta`          | Incremental reasoning chunk.                                                |
 | `thinking:end`            | Reasoning block ended; carries `final`.                                     |
