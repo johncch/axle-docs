@@ -5,6 +5,19 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.22.1] - 2026-06-07
+
+- Improved handling of Chat Completions streaming errors
+- Fixed Gemini citation handling
+
+## [0.22.0] - 2026-06-06
+
+- Added a `citation` part type (`CitationPart`) for provider citations that are not anchored to a specific text span (e.g. OpenRouter web search)
+- Added support for OpenRouter server tools via the Chat Completions provider — pass `providerToolVendor: "openrouter"` at provider construction
+- Added ordered citation stream events for unanchored sources
+- Added warning diagnostics when native providers emit citation data in unexpected positions
+- See the [0.22.0 migration guide](/migration/0.22.0) for full details
+
 ## [0.21.0] - 2026-05-30
 
 - Added citations support on text parts (`TextPart.citations`, `text:citation` events)

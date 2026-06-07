@@ -28,13 +28,14 @@ agent.on((event) => {
     case "part:start":
       if (event.part.type === "text") console.log("[text started]");
       if (event.part.type === "thinking") console.log("[thinking started]");
+      if (event.part.type === "citation") console.log("[citations]");
       if (event.part.type === "action") console.log(`[tool] ${event.part.detail.name}`);
       break;
     case "text:delta":
       process.stdout.write(event.delta);
       break;
     case "text:citation":
-      console.log(`[citation] ${event.citation.source.type}`);
+      console.log(`[inline citation] ${event.citation.source.type}`);
       break;
     case "thinking:delta":
       process.stdout.write(event.delta);
@@ -68,7 +69,7 @@ agent.on((event) => {
 | `turn:end`               | `turnId`, `status`, `usage`, `timing?`                                       | The assistant turn finished (`complete`, `cancelled`, `error`).      |
 | `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type`.                    |
 | `text:delta`             | `turnId`, `partId`, `delta`                                                  | Incremental text chunk inside the current text part.                 |
-| `text:citation`          | `turnId`, `partId`, `citation`                                               | A provider citation attached to the current text part.               |
+| `text:citation`          | `turnId`, `partId`, `citation`                                               | A provider citation anchored to the current text part.               |
 | `thinking:delta`         | `turnId`, `partId`, `delta`                                                  | Incremental reasoning chunk inside a thinking part.                  |
 | `thinking:summary-delta` | `turnId`, `partId`, `delta`                                                  | Incremental chunk of a provider-supplied thinking summary.           |
 | `thinking:update`        | `turnId`, `partId`, `redacted?`, `continuity?`, `providerMetadata?`          | Non-text update to a thinking part (redaction flag, continuity).     |
@@ -89,7 +90,10 @@ agent.on((event) => {
 `part:start` carries a `TurnPart`, discriminated by `part.type`:
 
 - `"text"` — assistant text. Subsequent `text:delta` events fill it in.
-  `text:citation` events attach source citations to the accumulated text.
+  `text:citation` events attach inline source citations to the accumulated text.
+- `"citation"` — an ordered list of unanchored citations from the provider
+  (e.g. OpenRouter web search sources). These are not attached to a specific
+  text span. Carries `citations: Citation[]`. Added in 0.22.0.
 - `"thinking"` — reasoning content. Subsequent `thinking:delta` events fill in
   renderable thinking text; `thinking:summary-delta` events fill in a
   provider-supplied summary; `thinking:update` carries redaction flags and
@@ -114,8 +118,12 @@ interface Citation {
 }
 ```
 
-If you use `TurnAccumulator`, citations accumulate on `TextPart.citations`
-automatically — no extra reducer work is needed.
+Some providers (e.g. OpenRouter web search) emit citations that are not
+anchored to a specific text span. In that case, Axle emits a `part:start`
+event with a `citation` part instead of a `text:citation` event. If you use
+`TurnAccumulator`, both kinds accumulate automatically — inline citations on
+`TextPart.citations` and unanchored citations as `CitationPart` entries in
+`turn.parts`.
 
 ### Thinking parts
 
@@ -167,6 +175,8 @@ handle.on((event) => {
 | `text:start`              | A text block began (carries `index`).                                       |
 | `text:delta`              | Incremental text chunk.                                                     |
 | `text:end`                | Text block ended; carries the final concatenated `final` string.            |
+| `text:citation`           | A citation anchored to the current text block (carries `citation`, `citations`). |
+| `citation`                | An unanchored citation list from the provider (carries `index`, `citations`). Added in 0.22.0. |
 | `thinking:start`          | A reasoning block began.                                                    |
 | `thinking:delta`          | Incremental reasoning chunk.                                                |
 | `thinking:end`            | Reasoning block ended; carries `final`.                                     |

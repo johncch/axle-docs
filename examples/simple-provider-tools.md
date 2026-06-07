@@ -28,12 +28,17 @@ agent.on((event) => {
     case "part:start":
       if (event.part.type === "text") {
         console.log(`\n[Text] started`);
+      } else if (event.part.type === "citation") {
+        console.log(`\n[Citations] ${event.part.citations.length} source(s)`);
       } else if (event.part.type === "action" && event.part.kind === "provider-tool") {
         console.log(`\n[Provider Tool] ${event.part.detail.name} started`);
       }
       break;
     case "text:delta":
       process.stdout.write(event.delta);
+      break;
+    case "text:citation":
+      console.log(`[Inline Citation] ${event.citation.source.type}`);
       break;
     case "action:complete":
       console.log(`[Provider Tool] complete ${JSON.stringify(event.result)}`);
@@ -54,4 +59,50 @@ try {
 }
 
 console.log("[Complete]");
+```
+
+## OpenRouter web search
+
+To use OpenRouter's server-side web search, pass `providerToolVendor: "openrouter"`
+at provider construction:
+
+```typescript
+import { Agent, chatCompletions } from "@fifthrevision/axle";
+
+const provider = chatCompletions("https://openrouter.ai/api/v1", {
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  providerToolVendor: "openrouter",
+});
+
+const agent = new Agent({
+  provider,
+  model: "openai/gpt-4o-search-preview",
+  providerTools: [{ type: "provider", name: "web_search", config: { max_results: 3 } }],
+});
+
+agent.on((event) => {
+  switch (event.type) {
+    case "part:start":
+      if (event.part.type === "text") {
+        console.log(`\n[Text] started`);
+      } else if (event.part.type === "citation") {
+        // Unanchored citations from OpenRouter web search
+        for (const c of event.part.citations) {
+          if (c.source.type === "web") {
+            console.log(`  [Source] ${c.source.title} — ${c.source.url}`);
+          }
+        }
+      }
+      break;
+    case "text:delta":
+      process.stdout.write(event.delta);
+      break;
+    case "error":
+      console.error(`[Error] ${JSON.stringify(event.error, null, 2)}`);
+      break;
+  }
+});
+
+const result = await agent.send("What are today's top news headlines?").final;
+console.log(`\n[Usage] in: ${result.usage.in}, out: ${result.usage.out}`);
 ```

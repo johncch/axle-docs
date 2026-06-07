@@ -102,6 +102,28 @@ const agent = new Agent({ provider, model: "llama3" });
 The legacy `chatCompletions(baseUrl, apiKey)` two-argument string form is still
 supported.
 
+### OpenRouter
+
+To use OpenRouter — including its server-side tools like web search — pass
+`providerToolVendor: "openrouter"` so Axle knows how to map provider tools:
+
+```typescript
+const provider = chatCompletions("https://openrouter.ai/api/v1", {
+  apiKey: process.env.OPENROUTER_API_KEY,
+  providerToolVendor: "openrouter",
+});
+
+const agent = new Agent({
+  provider,
+  model: "openai/gpt-4o-search-preview",
+  providerTools: [{ type: "provider", name: "web_search" }],
+});
+```
+
+Without `providerToolVendor: "openrouter"`, generic Chat Completions providers
+will warn and drop any `providerTools`. See [Provider Tools](/guide/provider-tools)
+for configuration details and citation handling.
+
 ## Models export
 
 Common model identifiers are also re-exported from `@fifthrevision/axle/models`
