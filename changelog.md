@@ -5,6 +5,12 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.22.1] - 2026-06-07
+
+- Improved handling of chat-completions streaming errors — stream chunks with `error` fields are now surfaced as error events instead of crashing the parser
+- Fixed incomplete tool-call buffering: when a stream ends without a completion signal while tool-call arguments are still buffering, Axle now emits an `IncompleteStream` error event instead of silently dropping the truncated arguments
+- Fixed Gemini citation handling — citations without a resolvable text part are now logged and skipped, instead of silently attaching to the wrong part
+
 ## [0.22.0] - 2026-06-06
 
 - Added `CitationPart` — an ordered, unanchored citation part for providers that emit source lists for the whole message rather than per text-span (e.g. OpenRouter web search)
