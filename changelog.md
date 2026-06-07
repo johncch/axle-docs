@@ -5,6 +5,11 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.22.1] - 2026-06-07
+
+- Improved handling of chat-completions streaming errors — upstream errors now produce typed error events, and incomplete tool-call argument streams now surface as `IncompleteStream` errors
+- Fixed Gemini citation handling — unanchored citations are now correctly resolved or skipped with a diagnostic warning
+
 ## [0.22.0] - 2026-06-06
 
 - Added `CitationPart` — an ordered, unanchored citation part for providers that emit source lists for the whole message rather than per text-span (e.g. OpenRouter web search)
