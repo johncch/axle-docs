@@ -53,6 +53,6 @@ console.log(result.response);
 
 ::: tip
 The script in the repo also wires up a `Tracer` with `SimpleWriter` for
-human-readable logs. Add `tracer: new Tracer().addWriter(new SimpleWriter())`
+human-readable logs. Add `span: new Tracer({ writers: [new SimpleWriter()] })`
 to either `generate()` or `stream()` to see the same output.
 :::

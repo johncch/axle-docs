@@ -5,6 +5,19 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.23.1] - 2026-06-08
+
+- Updated Anthropic thinking configuration support — Claude 4.6+ models (Opus 4.7, Opus 4.8, Sonnet 4.6) now use adaptive thinking with high effort instead of a manual token budget
+- See the [0.23.0 migration guide](/migration/0.23.0) for the observability API changes
+
+## [0.23.0] - 2026-06-08
+
+- Improved observability with a simplified span-based tracing interface (`observability.tracer` → `observability.trace`, `TracingContext` → `Span`, `Tracer` constructor ergonomics)
+- Added richer trace events, span completion details, and token/content logging for agent and streaming runs
+- Added provider tool logging and support for routing observability data to multiple sinks
+- Turn content logging now covers both streaming and non-streaming paths (text, thinking, provider-tools, citations)
+- See the [0.23.0 migration guide](/migration/0.23.0) for full details
+
 ## [0.22.1] - 2026-06-07
 
 - Improved handling of chat-completions streaming errors — stream chunks with `error` fields are now surfaced as error events instead of crashing the parser

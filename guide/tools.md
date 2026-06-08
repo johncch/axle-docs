@@ -47,7 +47,7 @@ const myTool: ExecutableTool = {
   schema: z.object({ key: z.string() }),
   async execute(input, ctx) {
     // input is fully typed from the Zod schema
-    // ctx provides signal, emit, registry, and tracer
+    // ctx provides signal, emit, registry, and span
     return "result";
   },
 };
@@ -57,7 +57,7 @@ The `ctx` parameter gives access to:
 - `ctx.signal` — `AbortSignal` for cancellation
 - `ctx.emit(chunk)` — stream progress chunks (surfaces as `action:progress` events)
 - `ctx.registry` — the live tool registry (for dynamic tool loading)
-- `ctx.tracer` — tracing context
+- `ctx.span` — tracing span
 
 ## CLI built-in tools
 
