@@ -5,6 +5,21 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.23.1] - 2026-06-08
+
+- Updated Anthropic thinking configuration — Claude 4.6+ (Opus 4.6+, Sonnet 4.6+) models use Anthropic's adaptive thinking mode with effort-based control instead of a fixed token budget
+
+## [0.23.0] - 2026-06-08
+
+- Reworked observability around a unified `observability.trace` seam: pass a `Tracer` for root-level tracing or a `Span` to nest agent runs under an existing span
+- Renamed `TracingContext` → `Span`, `ToolContext.tracer` → `ToolContext.span`, and the threaded `tracer` parameter to `span` across `generate()`, `stream()`, MCP, and tool calls
+- `log` and `trace` are now mutually exclusive on observability config; compose writers on one `Tracer` for multiple sinks (`LogWriter` is exported)
+- `Tracer` constructor now accepts `{ minLevel, writers }` options bag
+- `SpanData` timestamps are now epoch milliseconds (previously monotonic from `performance.now()`)
+- Turn content logging is now consistent across streaming and non-streaming paths
+- Added `LogWriter` export for composing writers
+- See the [0.23.0 migration guide](/migration/0.23.0) for full details
+
 ## [0.22.1] - 2026-06-07
 
 - Improved handling of chat-completions streaming errors — stream chunks with `error` fields are now surfaced as error events instead of crashing the parser

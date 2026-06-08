@@ -53,6 +53,15 @@ console.log(result.response);
 
 ::: tip
 The script in the repo also wires up a `Tracer` with `SimpleWriter` for
-human-readable logs. Add `tracer: new Tracer().addWriter(new SimpleWriter())`
-to either `generate()` or `stream()` to see the same output.
+human-readable logs. Create a tracer, start a span, and pass it as `span`:
+
+```typescript
+import { Tracer, SimpleWriter } from "@fifthrevision/axle";
+
+const tracer = new Tracer({ writers: [new SimpleWriter()] });
+// then on the call:
+//   span: tracer.startSpan("generate")
+```
+
+The same pattern works for `stream()`.
 :::
