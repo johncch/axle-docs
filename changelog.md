@@ -5,6 +5,22 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.24.0] - 2026-06-09
+
+- Added `createAgentTool` — expose a child `Agent` as a normal tool (experimental)
+- Added `parallelize` — wrap any tool in a concurrent batch variant that preserves result order and reports per-item failures (experimental)
+- Added `Instruct.addContext(content, options?)` — append host-supplied supporting material without modifying the authored prompt
+- `Stats` gains a flat `breakdown` (`UsageEntry[]`) for per-provider/model cost reconstruction (experimental); `TokenStats`, `UsageEntry`, and `mergeStats` are exported
+- `ToolContext` gains an optional `reportUsage(usage)` method for tools that spend model tokens; `emit` accepts `ToolProgressChunk` (string or structured child turn events)
+- New `StreamEvent.tool:request` carries `kind?: "tool" | "agent"`; new `tool:exec-error` event for fatal/aborted tool calls; `tool:exec-complete` carries `usage`
+- New `TurnEvent` part `SubagentAction` (`kind: "agent"`) with `detail.children`; new `action:child-event` and `action:error` events
+- `agent.on()` now returns an unsubscribe function
+- Tool results can return deferred `FileInfo` references (resolved at each provider request boundary)
+- **Behavior change:** `stream()` `onToolCall` returning `null` now falls through to the registry tool (matching `generate()`)
+- **Behavior change:** A tool-internal `AbortError` no longer aborts the run while the run's signal is live
+- **Render change:** `Instruct` text references and context sections now use valid, collision-safe Markdown fences
+- See the [0.24.0 migration guide](/migration/0.24.0) for full details
+
 ## [0.23.1] - 2026-06-08
 
 - Updated Anthropic thinking configuration — Claude 4.6+ (Opus 4.6+, Sonnet 4.6+) models use Anthropic's adaptive thinking mode with effort-based control instead of a fixed token budget

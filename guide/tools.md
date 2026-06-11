@@ -47,7 +47,7 @@ const myTool: ExecutableTool = {
   schema: z.object({ key: z.string() }),
   async execute(input, ctx) {
     // input is fully typed from the Zod schema
-    // ctx provides signal, emit, registry, and span
+    // ctx provides signal, emit, registry, reportUsage, and span
     return "result";
   },
 };
@@ -55,9 +55,65 @@ const myTool: ExecutableTool = {
 
 The `ctx` parameter gives access to:
 - `ctx.signal` — `AbortSignal` for cancellation
-- `ctx.emit(chunk)` — stream progress chunks (surfaces as `action:progress` events)
+- `ctx.emit(chunk)` — stream progress chunks (accepts `string` or structured `{ type: "turn-event", event }` chunks; surfaces as `action:progress` or `action:child-event` events)
+- `ctx.reportUsage(usage)` — report token usage from LLM-backed tools (subagents, etc.) so it rolls into the parent totals
 - `ctx.registry` — the live tool registry (for dynamic tool loading)
 - `ctx.span` — observability span for this tool execution
+
+## Subagent tools (experimental)
+
+`createAgentTool` wraps a child `Agent` as a normal tool. The parent model can
+delegate bounded work to a subagent and receive only its final response. Child
+turn events stream through the parent as `action:child-event` events, and child
+token usage rolls into `result.usage.breakdown`.
+
+```typescript
+import { createAgentTool, Agent } from "@fifthrevision/axle";
+import { z } from "zod";
+
+const researchTool = createAgentTool({
+  name: "research",
+  description: "Research a topic and return a detailed summary",
+  schema: z.object({ topic: z.string() }),
+  createAgent: () =>
+    new Agent({
+      provider,
+      model: "claude-haiku-4-5-20250929",
+      system: "You are a focused researcher. Answer concisely.",
+    }),
+  prompt: (input) => `Research the following topic and provide a summary: ${input.topic}`,
+});
+
+const agent = new Agent({
+  provider,
+  model: "claude-sonnet-4-5-20250929",
+  tools: [researchTool],
+});
+```
+
+## Parallelizing tools (experimental)
+
+`parallelize` wraps any tool in a concurrent batch variant. It calls the inner
+tool for each input item, preserves result order, and reports per-item failures
+without failing the whole batch. Fatal and abort errors still propagate.
+
+```typescript
+import { parallelize, createAgentTool } from "@fifthrevision/axle";
+
+const batchedResearch = parallelize(researchTool, {
+  maxConcurrency: 4,
+  maxItems: 50,
+});
+
+const agent = new Agent({
+  provider,
+  model,
+  tools: [batchedResearch],
+});
+```
+
+The generated batch tool has a `name` that defaults to `${tool.name}_batch` and
+a schema with a single `items` array field.
 
 ## CLI built-in tools
 
@@ -87,3 +143,11 @@ Tool `execute` receives an `AbortSignal` via `ctx.signal` as part of
 `ToolContext`. Long-running tools should respect it so `handle.cancel()`
 propagates correctly through to external processes, MCP servers, and HTTP
 requests.
+
+### Tool-internal abort errors
+
+A tool's own internal `AbortError` (e.g. a `fetch` timeout or internal
+`AbortController`) no longer terminates the run while the run's signal is
+live — the model sees it as a recoverable tool error and can retry or
+continue. To stop the run immediately, throw `AxleAbortError` (cancellation)
+or `AxleToolFatalError` (unrecoverable failure) explicitly.

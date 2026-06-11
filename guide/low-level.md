@@ -32,6 +32,30 @@ const result = await handle.final;
 if (!result.ok) throw new Error(result.error.kind);
 ```
 
+### `onToolCall` semantics (0.24.0+)
+
+`onToolCall` returning `null` or `undefined` now falls through to the
+matching registry tool — the same behavior as `generate()`. To deny a tool
+call, return an explicit error result:
+
+```typescript
+onToolCall: async (name) => {
+  if (!allowed.has(name)) {
+    return { type: "error", error: { type: "denied", message: `Tool not allowed: ${name}` } };
+  }
+  return undefined; // fall through to the registry tool
+},
+```
+
+### New stream events (0.24.0+)
+
+`stream()` emits these additional events:
+
+- `tool:request` now carries `kind?: "tool" | "agent"`
+- `tool:exec-delta` chunks are `ToolProgressChunk` (string or structured child events)
+- `tool:exec-complete` carries `usage?: Stats`
+- `tool:exec-error` fires for fatal/aborted tool calls (does **not** also emit `tool:exec-complete`)
+
 ## `generate()`
 
 `generate()` does the same but without streaming — it returns the final

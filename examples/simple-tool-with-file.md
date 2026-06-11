@@ -46,3 +46,41 @@ async function run() {
 
 run();
 ```
+
+## Deferred file references (0.24.0+)
+
+Tool results can also return deferred `FileInfo` references — the same
+`{ type: "ref" }` shape accepted by user-message file parts. The reference
+stays in message history and is resolved at each provider request boundary,
+which is ideal for short-lived signed URLs:
+
+```typescript
+const readFileTool: ExecutableTool = {
+  name: "read_file",
+  description: "Read a file from the sandbox by id",
+  schema: z.object({ id: z.string() }),
+  async execute({ id }) {
+    return [
+      {
+        type: "file",
+        file: {
+          kind: "image",
+          mimeType: "image/png",
+          name: "chart.png",
+          source: { type: "ref", ref: { id } },
+        },
+      },
+    ];
+  },
+};
+
+const agent = new Agent({
+  provider,
+  model,
+  tools: [readFileTool],
+  fileResolver: async ({ ref, accepted }) => {
+    // ref.id is the value from the tool result
+    return mintFileSource(ref, accepted);
+  },
+});
+```

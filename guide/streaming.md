@@ -23,7 +23,8 @@ or more `TurnEvent`s.
 ```typescript
 const agent = new Agent({ provider, model });
 
-agent.on((event) => {
+// agent.on() returns an unsubscribe function (0.24.0+)
+const unsubscribe = agent.on((event) => {
   switch (event.type) {
     case "part:start":
       if (event.part.type === "text") console.log("[text started]");
@@ -78,8 +79,8 @@ agent.on((event) => {
 | `action:running`         | `turnId`, `partId`, `parameters?`                                            | Local tool / sub-agent / provider tool started executing.            |
 | `action:progress`        | `turnId`, `partId`, `chunk`                                                  | Streamed output from a running action (e.g. `execTool` stdout).      |
 | `action:complete`        | `turnId`, `partId`, `result` (`ActionResult`), `timing?`                     | Action finished — inspect `result.type` for `success` vs `error`.    |
-| `action:error`           | `turnId`, `partId`, `error`, `timing?`                                       | Action failed with a typed error.                                    |
-| `action:child-event`     | `turnId`, `partId`, `event`                                                  | An event from a nested sub-agent run.                                |
+| `action:error`           | `turnId`, `partId`, `error`, `timing?`                                       | Action failed with a typed error (`"fatal"` or `"aborted"`).       |
+| `action:child-event`     | `turnId`, `partId`, `event`                                                  | An event from a nested sub-agent run (0.24.0+).                   |
 | `annotation:start`       | `target`, `annotation`                                                       | An annotation was created on a session, turn, or part.               |
 | `annotation:update`      | `target`, `annotation`                                                       | An annotation was updated.                                           |
 | `annotation:end`         | `target`, `annotation`                                                       | An annotation finished (`status` defaults to `"complete"`).          |
@@ -101,9 +102,18 @@ agent.on((event) => {
   provider exposes raw thinking text.
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
-  `part.kind`: `"tool" | "agent" | "provider-tool"`.
+  `part.kind`: `"tool" | "agent" | "provider-tool"`. A `"agent"` part
+  carries `detail.children` — the child agent's turns.
 
-Callbacks are registered once and fire on every subsequent `send()`.
+Callbacks are registered once and fire on every subsequent `send()`. To
+unregister a callback, call the return value of `agent.on()`:
+
+```typescript
+// agent.on() returns an unsubscribe function (0.24.0+)
+const unsubscribe = agent.on(handler);
+// …later
+unsubscribe();
+```
 
 ### Citations
 
@@ -172,9 +182,10 @@ handle.on((event) => {
     case "text:start":     console.log(`[text ${event.index}]`); break;
     case "text:delta":     process.stdout.write(event.delta); break;
     case "text:end":       console.log("\n[text end]"); break;
-    case "tool:request":   console.log(`[tool ${event.name}]`); break;
+    case "tool:request":   console.log(`[tool ${event.name} ${event.kind ?? "tool"}]`); break;
     case "tool:exec-start":   console.log("[exec start]"); break;
     case "tool:exec-complete":console.log("[exec complete]"); break;
+    case "tool:exec-error":   console.log("[exec error (fatal/aborted)]"); break;
     case "turn:complete":  console.log("[turn complete]"); break;
     case "error":          console.error(event.error); break;
   }
@@ -187,16 +198,17 @@ handle.on((event) => {
 | ------------------------- | --------------------------------------------------------------------------- |
 | `text:start`              | A text block began (carries `index`).                                       |
 | `text:delta`              | Incremental text chunk.                                                     |
-| `text:end`                | Text block ended; carries the final concatenated `final` string.            |
+| `text:end`               | Text block ended; carries the final concatenated `final` string.            |
 | `text:citation`           | A citation anchored to a specific text span (carries `citation`, `citations`). |
-| `citation`                | Unanchored citations for the whole turn (carries `index`, `citations`).     |
+| `citation`               | Unanchored citations for the whole turn (carries `index`, `citations`).     |
 | `thinking:start`          | A reasoning block began.                                                    |
 | `thinking:delta`          | Incremental reasoning chunk.                                                |
 | `thinking:end`            | Reasoning block ended; carries `final`.                                     |
-| `tool:request`            | Model requested a tool call. Arguments may still be streaming.              |
+| `tool:request`   | Model requested a tool call. Carries `kind?: "tool" \| "agent"` (0.24.0+). |
 | `tool:exec-start`         | Local tool execution started; carries `parameters`.                         |
-| `tool:exec-delta`         | Streamed chunk from a running tool (e.g. `execTool` stdout/stderr).         |
-| `tool:exec-complete`      | Local tool execution finished; carries the `result`.                        |
+| `tool:exec-delta`         | Streamed chunk from a running tool. Now `ToolProgressChunk` (0.24.0+).     |
+| `tool:exec-complete`      | Local tool execution finished; carries the `result` and `usage` (0.24.0+).|
+| `tool:exec-error`         | Local tool execution failed with a fatal or abort error (0.24.0+).         |
 | `provider-tool:start`     | Provider-side tool started (web search, code interp.).                      |
 | `provider-tool:complete`  | Provider-side tool finished; may carry `output`.                            |
 | `turn:complete`           | Assistant turn finished; carries the full `AxleAssistantMessage`.           |
@@ -207,6 +219,9 @@ handle.on((event) => {
 The `turn:complete` and `tool-results:complete` events carry complete
 `AxleAssistantMessage` and `AxleToolCallMessage` objects — useful for
 client-server architectures that need authoritative message boundaries.
+
+A `tool:exec-error` is terminal — it does **not** also emit
+`tool:exec-complete`. Treat either as the final event for a pending call.
 
 ## Cancellation
 

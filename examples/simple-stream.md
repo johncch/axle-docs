@@ -49,12 +49,30 @@ const handle = stream({
 
 handle.on((event) => {
   switch (event.type) {
-    case "text:start":         console.log(`\n[text ${event.index}]`); break;
-    case "text:delta":         process.stdout.write(event.delta); break;
-    case "text:end":           console.log("\n[text end]"); break;
-    case "tool:exec-start":    console.log(`[exec] ${event.name}`); break;
-    case "tool:exec-complete": console.log("[exec complete]"); break;
-    case "error":              console.error(event.error); break;
+    case "text:start":
+      console.log(`\n[text ${event.index}]`);
+      break;
+    case "text:delta":
+      process.stdout.write(event.delta);
+      break;
+    case "text:end":
+      console.log("\n[text end]");
+      break;
+    case "tool:request":
+      console.log(`[tool request] ${event.name} (kind: ${event.kind ?? "tool"})`);
+      break;
+    case "tool:exec-start":
+      console.log(`[exec] ${event.name}`);
+      break;
+    case "tool:exec-complete":
+      console.log("[exec complete]");
+      break;
+    case "tool:exec-error":
+      console.log(`[exec error] ${event.error.type}: ${event.error.message}`);
+      break;
+    case "error":
+      console.error(event.error);
+      break;
   }
 });
 
@@ -65,3 +83,13 @@ if (!result.ok) throw new Error(result.error.kind);
 Notice the events here (`text:start`, `text:end`, `tool:exec-*`) differ from
 those emitted by `agent.on()`. See [Streaming](/guide/streaming) for the
 full picture.
+
+## Event notes (0.24.0+)
+
+- `tool:request` carries `kind?: "tool" | "agent"` so renderers can
+  distinguish agent-tool delegations.
+- `tool:exec-error` fires for fatal/aborted tool calls — treat it as the
+  terminal event (it does **not** also emit `tool:exec-complete`).
+- `onToolCall` returning `null` now falls through to the registry tool,
+  matching `generate()`. Return an explicit error result to deny a call:
+  `{ type: "error", error: { type: "denied", message: "..." } }`.

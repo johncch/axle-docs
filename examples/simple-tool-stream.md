@@ -75,6 +75,8 @@ agent.on((event) => {
 
     case "action:progress":
       // Live stdout/stderr chunks from the running subprocess.
+      // chunk is now ToolProgressChunk (string | { type: "turn-event", event }).
+      // String chunks are emitted directly; structured chunks are from child agents.
       process.stdout.write(event.chunk);
       break;
 
@@ -108,4 +110,26 @@ try {
 }
 
 console.log("[Complete]");
+```
+
+## Tool context: `emit` and `reportUsage` (0.24.0+)
+
+`ctx.emit` now accepts `ToolProgressChunk` — `string | { type: "turn-event", event: TurnEvent }`.
+`ctx.emit("progress…")` still works unchanged.
+
+`ctx.reportUsage(usage)` is a new optional method. Tools that spend model
+tokens (such as LLM-backed tools or subagents) should call it so their token
+usage rolls into the parent operation's `result.usage` and `breakdown`:
+
+```typescript
+const llmBackedTool: ExecutableTool = {
+  name: "summarize",
+  description: "Summarize text with an LLM",
+  schema: z.object({ text: z.string() }),
+  async execute({ text }, ctx) {
+    const result = await generate({ provider, model: cheapModel, messages: [{ role: "user", content: text }] });
+    if (result.usage) ctx.reportUsage?.(result.usage);
+    return result.response;
+  },
+};
 ```

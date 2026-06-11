@@ -79,6 +79,35 @@ Missing required variables are reported as clear errors at render time. Use
 `.clone()` to copy an `Instruct` if you want to bind inputs without mutating
 the original.
 
+## Host-supplied context
+
+Use `addContext(content, options?)` to append supporting material without
+modifying the authored prompt. Context sections are ordered, survive
+`clone()`/`withInputs()`, and become part of the final user message after text
+references.
+
+```typescript
+const instruct = new Instruct({
+  prompt: "Inspect the current sandbox and suggest the next change.",
+});
+
+instruct.addContext("src/index.ts\npackage.json", {
+  title: "Sandbox files",
+});
+instruct.addContext("Node.js 24\nPackage manager: pnpm", {
+  title: "Environment",
+});
+```
+
+Context sections:
+- Do not perform `{{variable}}` substitution
+- Render in insertion order after text references
+- Use collision-safe Markdown fences (automatically sized to avoid fence bleed)
+
+This is ideal for manifests, environment details, retrieved context, or other
+host-owned material that should travel with the prompt but not be mistaken for
+user-authored instructions.
+
 ## File attachments
 
 ```typescript

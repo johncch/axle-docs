@@ -156,6 +156,19 @@ console.log(`Using ~${ctx.total} tokens (${ctx.free} free)`);
 ## Streaming events
 
 `agent.on(...)` registers a callback that fires for every subsequent `send()`.
+The call returns an unsubscribe function — useful for long-lived agents that
+attach per-operation listeners and want to clean them up:
+
+```typescript
+// agent.on() returns an unsubscribe function (0.24.0+)
+const unsubscribe = agent.on((event) => {
+  if (event.type === "text:delta") process.stdout.write(event.delta);
+});
+
+// …later, detach the listener
+unsubscribe();
+```
+
 See [Streaming](/guide/streaming) for the full event list.
 
 ## Session snapshot and restore

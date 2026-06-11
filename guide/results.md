@@ -42,16 +42,27 @@ Abort, fatal-tool, configuration, and unexpected execution errors still
 
 ## Usage stats
 
-`result.usage` reports token counts for the run. The `in` and `out` fields
-are always present; detail fields are included when the provider reports them:
+`result.usage` reports token counts for the run. The aggregate fields (`in`,
+`out`, etc.) are always present; detail fields appear when providers report
+them. The optional `breakdown` array attributes spending by provider and model
+so cost can be reconstructed even when subagents run on different models:
 
 ```typescript
-type Stats = {
+type TokenStats = {
   in: number;             // total input tokens
   out: number;            // total output tokens
   cachedIn?: number;      // input tokens served from cache (included in `in`)
   cacheWriteIn?: number;  // input tokens written to cache (included in `in`)
   reasoningOut?: number;  // output tokens spent on reasoning (included in `out`)
+};
+
+type UsageEntry = TokenStats & {
+  provider: string;       // provider identifier (e.g. "anthropic")
+  model: string;          // model identifier
+};
+
+type Stats = TokenStats & {
+  breakdown?: UsageEntry[]; // one entry per provider+model pair
 };
 ```
 
@@ -65,8 +76,19 @@ if (result.ok) {
   if (result.usage.reasoningOut) {
     console.log(`reasoning=${result.usage.reasoningOut}`);
   }
+
+  // Cost reconstruction with breakdown (experimental)
+  if (result.usage.breakdown) {
+    for (const entry of result.usage.breakdown) {
+      console.log(`${entry.provider}/${entry.model}: ${entry.in} in, ${entry.out} out`);
+    }
+  }
 }
 ```
+
+Breakdown entries **explain** the aggregate totals — never add them to the
+aggregates again. Use `mergeStats` to combine multiple `Stats` objects;
+`addStats` and `createStats` are also exported for custom accumulation.
 
 ## Cancellation
 
@@ -95,3 +117,11 @@ try {
 Throwing `AxleToolFatalError` from a tool's `execute` stops the run
 immediately, without retrying or exposing the error to the model. The thrown
 error carries available partial output, messages, usage, and tool context.
+
+## Tool-level abort errors
+
+A tool's own internal `AbortError` (e.g. a `fetch` timeout or internal
+`AbortController`) no longer terminates the run while the run's signal is
+live — the model receives it as an ordinary tool error and can retry or
+continue. To stop the run immediately, throw `AxleAbortError` (cancellation)
+or `AxleToolFatalError` (unrecoverable failure) explicitly.
