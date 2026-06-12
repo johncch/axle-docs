@@ -156,7 +156,49 @@ console.log(`Using ~${ctx.total} tokens (${ctx.free} free)`);
 ## Streaming events
 
 `agent.on(...)` registers a callback that fires for every subsequent `send()`.
+It now returns an unsubscribe function:
+
+```typescript
+const unsubscribe = agent.on(handler);
+// Later — stop receiving events:
+unsubscribe();
+```
+
 See [Streaming](/guide/streaming) for the full event list.
+
+## Subagent tools
+
+::: warning Experimental
+`createAgentTool` is usable today, but event and part shapes may change in a
+minor release.
+:::
+
+`createAgentTool` exposes a child Agent as a normal tool, letting a parent
+model delegate bounded work:
+
+```typescript
+import { Agent, createAgentTool } from "@fifthrevision/axle";
+import { z } from "zod";
+
+const researcher = createAgentTool({
+  name: "research",
+  description: "Delegate a research question to a focused subagent",
+  schema: z.object({ question: z.string() }),
+  createAgent: () =>
+    new Agent({
+      provider,
+      model: "claude-haiku-4-5-20251001",
+      system: "You are a focused researcher. Answer concisely.",
+    }),
+  prompt: (input) => input.question,
+});
+
+const agent = new Agent({ provider, model, tools: [researcher] });
+```
+
+Child turn events stream through the parent (`action:child-event`), and the
+child's token usage is reported into the parent's `result.usage.breakdown`.
+See [Tools](/guide/tools#subagent-tools) for full details.
 
 ## Session snapshot and restore
 

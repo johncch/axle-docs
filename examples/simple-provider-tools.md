@@ -61,6 +61,62 @@ try {
 console.log("[Complete]");
 ```
 
+## Web search fallback
+
+For providers without native web search support (e.g. generic Chat Completions
+endpoints), configure a global fallback once at startup. Axle exposes it as an
+executable `web_search` tool automatically:
+
+```typescript
+import { Agent, chatCompletions, braveWebSearch, configureAxle } from "@fifthrevision/axle";
+
+configureAxle({
+  webSearchFallback: braveWebSearch({
+    apiKey: process.env.BRAVE_API_KEY!,
+    maxResults: 5,
+    maxTokens: 4_096,
+  }),
+});
+
+const provider = chatCompletions("http://localhost:11434/v1");
+const agent = new Agent({
+  provider,
+  model: "llama3",
+  providerTools: [{ type: "provider", name: "web_search" }],
+});
+
+// Fallback search emits ordinary tool events (tool:request, tool:exec-start,
+// tool:exec-complete), not provider-tool events.
+```
+
+## Together with providerDialect
+
+Together's Chat Completions API uses a different reasoning request shape. Set
+`providerDialect: "together"` when constructing the provider:
+
+```typescript
+import { Agent, chatCompletions, braveWebSearch, configureAxle } from "@fifthrevision/axle";
+
+configureAxle({
+  webSearchFallback: braveWebSearch({ apiKey: process.env.BRAVE_API_KEY! }),
+});
+
+const together = chatCompletions("https://api.together.ai/v1", {
+  apiKey: process.env.TOGETHER_API_KEY!,
+  providerDialect: "together",
+});
+
+const agent = new Agent({
+  provider: together,
+  model: "deepseek-ai/DeepSeek-V3",
+  providerTools: [{ type: "provider", name: "web_search" }],
+});
+```
+
+Together does not support PDF file inputs; Axle rejects them locally with a
+clear error message. See the [0.25.0 migration guide](/migration/0.25.0) for
+full details.
+
 ## OpenRouter web search
 
 To use OpenRouter as the provider with model-driven web search, set

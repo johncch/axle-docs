@@ -124,6 +124,45 @@ const agent = new Agent({
 See [Provider Tools](/guide/provider-tools#openrouter-web-search) for full
 details including result-count config and citation rendering.
 
+### Together
+
+Together's Chat Completions API uses a different reasoning request shape from
+generic OpenAI-compatible providers. Set `providerDialect: "together"` when
+constructing the provider:
+
+```typescript
+const together = chatCompletions("https://api.together.ai/v1", {
+  apiKey: process.env.TOGETHER_API_KEY!,
+  providerDialect: "together",
+});
+```
+
+With the Together dialect, Axle translates `reasoning: true` to
+`{ enabled: true }` (instead of `reasoning_effort: "high"`) and PDF inputs are
+rejected locally with a clear error. See the [0.25.0 migration guide](/migration/0.25.0).
+
+## Web search fallback
+
+To use `web_search` with a provider that doesn't natively support it (such as
+generic Chat Completions endpoints), configure a global fallback once at
+startup:
+
+```typescript
+import { braveWebSearch, configureAxle } from "@fifthrevision/axle";
+
+configureAxle({
+  webSearchFallback: braveWebSearch({
+    apiKey: process.env.BRAVE_API_KEY!,
+    maxResults: 5,
+    maxTokens: 4_096,
+  }),
+});
+```
+
+Axle then exposes an executable `web_search` tool automatically when the
+selected provider lacks native search support. See
+[Provider Tools](/guide/provider-tools#web-search-fallback) for full details.
+
 ## Models export
 
 Common model identifiers are also re-exported from `@fifthrevision/axle/models`

@@ -32,6 +32,19 @@ const result = await handle.final;
 if (!result.ok) throw new Error(result.error.kind);
 ```
 
+`onToolCall` returning `null`/`undefined` now falls through to executing the
+matching registry tool (matching `generate()`'s semantics). Return an explicit
+error result to block a tool call:
+
+```typescript
+onToolCall: async (name) => {
+  if (!allowed.has(name)) {
+    return { type: "error", error: { type: "denied", message: `Tool not allowed: ${name}` } };
+  }
+  return undefined; // fall through to the registry tool
+};
+```
+
 ## `generate()`
 
 `generate()` does the same but without streaming — it returns the final
@@ -106,6 +119,25 @@ await generate({
 Provider adapters apply fields in this order: provider defaults → Axle
 normalized options → `providerOptions`. This means `providerOptions`
 intentionally wins if it conflicts with a normalized Axle field.
+
+## Provider tools
+
+Pass `providerTools` alongside `tools` for provider-managed tools like
+`web_search`:
+
+```typescript
+await generate({
+  provider,
+  model,
+  messages,
+  tools: [myTool],
+  providerTools: [{ type: "provider", name: "web_search" }],
+});
+```
+
+For providers without native web search (generic Chat Completions endpoints),
+configure a global fallback with `configureAxle({ webSearchFallback })`.
+See [Provider Tools](/guide/provider-tools#web-search-fallback) for full details.
 
 ## Passing an Instruct
 

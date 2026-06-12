@@ -29,7 +29,13 @@ agent.on((event) => {
       if (event.part.type === "text") console.log("[text started]");
       if (event.part.type === "thinking") console.log("[thinking started]");
       if (event.part.type === "citation") console.log("[citations]");
-      if (event.part.type === "action") console.log(`[tool] ${event.part.detail.name}`);
+      if (event.part.type === "action") {
+        if (event.part.kind === "agent") {
+          console.log(`[subagent] ${event.part.detail.name}`);
+        } else {
+          console.log(`[tool] ${event.part.detail.name}`);
+        }
+      }
       break;
     case "text:delta":
       process.stdout.write(event.delta);
@@ -46,8 +52,14 @@ agent.on((event) => {
     case "action:running":
       console.log("[tool running]");
       break;
+    case "action:child-event":
+      // Forwarded event from a nested sub-agent
+      break;
     case "action:complete":
       console.log("[tool complete]");
+      break;
+    case "action:error":
+      console.log("[tool error]", event.error);
       break;
     case "turn:end":
       console.log(`[turn done: ${event.status}]`);
@@ -59,6 +71,14 @@ agent.on((event) => {
 });
 ```
 
+`agent.on()` now returns an unsubscribe function:
+
+```typescript
+const unsubscribe = agent.on(handler);
+// Later:
+unsubscribe();
+```
+
 ### Event types
 
 | Event                    | Carries                                                                      | Description                                                          |
@@ -67,7 +87,7 @@ agent.on((event) => {
 | `turn:user`              | `turn`                                                                       | A user turn was appended to history.                                 |
 | `turn:start`             | `turnId`, `timing?`                                                          | A new assistant turn began.                                          |
 | `turn:end`               | `turnId`, `status`, `usage`, `timing?`                                       | The assistant turn finished (`complete`, `cancelled`, `error`).      |
-| `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type`.                    |
+| `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type` and `part.kind`.    |
 | `text:delta`             | `turnId`, `partId`, `delta`                                                  | Incremental text chunk inside the current text part.                 |
 | `text:citation`          | `turnId`, `partId`, `citation`                                               | A provider citation attached to the current text part.               |
 | `thinking:delta`         | `turnId`, `partId`, `delta`                                                  | Incremental reasoning chunk inside a thinking part.                  |
@@ -78,7 +98,7 @@ agent.on((event) => {
 | `action:running`         | `turnId`, `partId`, `parameters?`                                            | Local tool / sub-agent / provider tool started executing.            |
 | `action:progress`        | `turnId`, `partId`, `chunk`                                                  | Streamed output from a running action (e.g. `execTool` stdout).      |
 | `action:complete`        | `turnId`, `partId`, `result` (`ActionResult`), `timing?`                     | Action finished — inspect `result.type` for `success` vs `error`.    |
-| `action:error`           | `turnId`, `partId`, `error`, `timing?`                                       | Action failed with a typed error.                                    |
+| `action:error`           | `turnId`, `partId`, `error`, `timing?`                                       | Action failed with a typed error (fatal or aborted).                  |
 | `action:child-event`     | `turnId`, `partId`, `event`                                                  | An event from a nested sub-agent run.                                |
 | `annotation:start`       | `target`, `annotation`                                                       | An annotation was created on a session, turn, or part.               |
 | `annotation:update`      | `target`, `annotation`                                                       | An annotation was updated.                                           |
@@ -101,7 +121,8 @@ agent.on((event) => {
   provider exposes raw thinking text.
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
-  `part.kind`: `"tool" | "agent" | "provider-tool"`.
+  `part.kind`: `"tool" | "agent" | "provider-tool"`. Subagent parts carry
+  `detail.children` — the nested child turns.
 
 Callbacks are registered once and fire on every subsequent `send()`.
 
@@ -169,14 +190,18 @@ const handle = stream({ provider, model, messages });
 
 handle.on((event) => {
   switch (event.type) {
-    case "text:start":     console.log(`[text ${event.index}]`); break;
-    case "text:delta":     process.stdout.write(event.delta); break;
-    case "text:end":       console.log("\n[text end]"); break;
-    case "tool:request":   console.log(`[tool ${event.name}]`); break;
-    case "tool:exec-start":   console.log("[exec start]"); break;
-    case "tool:exec-complete":console.log("[exec complete]"); break;
-    case "turn:complete":  console.log("[turn complete]"); break;
-    case "error":          console.error(event.error); break;
+    case "text:start":       console.log(`[text ${event.index}]`); break;
+    case "text:delta":       process.stdout.write(event.delta); break;
+    case "text:end":         console.log("\n[text end]"); break;
+    case "tool:request":     console.log(`[tool ${event.name}] kind=${event.kind}`); break;
+    case "tool:exec-start":  console.log("[exec start]"); break;
+    case "tool:exec-delta":  console.log("[exec delta]"); break;
+    case "tool:exec-complete": console.log("[exec complete]"); break;
+    case "tool:exec-error":  console.log("[exec error]"); break;
+    case "provider-tool:start":    console.log("[provider tool start]"); break;
+    case "provider-tool:complete": console.log("[provider tool complete]"); break;
+    case "turn:complete":    console.log("[turn complete]"); break;
+    case "error":            console.error(event.error); break;
   }
 });
 ```
@@ -193,16 +218,20 @@ handle.on((event) => {
 | `thinking:start`          | A reasoning block began.                                                    |
 | `thinking:delta`          | Incremental reasoning chunk.                                                |
 | `thinking:end`            | Reasoning block ended; carries `final`.                                     |
-| `tool:request`            | Model requested a tool call. Arguments may still be streaming.              |
+| `tool:request`            | Model requested a tool call. Carries `kind?: "tool" | "agent"`.             |
 | `tool:exec-start`         | Local tool execution started; carries `parameters`.                         |
-| `tool:exec-delta`         | Streamed chunk from a running tool (e.g. `execTool` stdout/stderr).         |
-| `tool:exec-complete`      | Local tool execution finished; carries the `result`.                        |
+| `tool:exec-delta`         | Streamed chunk from a running tool (carries `ToolProgressChunk`).            |
+| `tool:exec-complete`      | Local tool execution finished; carries `result` and `usage?: Stats`.         |
+| `tool:exec-error`         | Local tool execution failed fatally or was aborted. No `exec-complete` follows. |
 | `provider-tool:start`     | Provider-side tool started (web search, code interp.).                      |
 | `provider-tool:complete`  | Provider-side tool finished; may carry `output`.                            |
 | `turn:complete`           | Assistant turn finished; carries the full `AxleAssistantMessage`.           |
 | `tool-results:start`      | Tool-results message is about to be sent back to the model.                 |
 | `tool-results:complete`   | Tool-results message committed; carries the `AxleToolCallMessage`.          |
 | `error`                   | Error event during the run.                                                 |
+
+A tool call that ends in `tool:exec-error` does **not** also emit
+`tool:exec-complete`. Treat either as terminal when tracking pending calls.
 
 The `turn:complete` and `tool-results:complete` events carry complete
 `AxleAssistantMessage` and `AxleToolCallMessage` objects — useful for

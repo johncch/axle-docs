@@ -52,8 +52,13 @@ type Stats = {
   cachedIn?: number;      // input tokens served from cache (included in `in`)
   cacheWriteIn?: number;  // input tokens written to cache (included in `in`)
   reasoningOut?: number;  // output tokens spent on reasoning (included in `out`)
+  breakdown?: UsageEntry[]; // per-provider/model attribution
 };
 ```
+
+`UsageEntry` extends `TokenStats` with `provider` and `model` fields. Entries
+sum exactly to the aggregate fields, and they are merged by provider+model key
+across multi-agent or multi-model operations.
 
 ```typescript
 const result = await agent.send("Hello").final;
@@ -65,8 +70,17 @@ if (result.ok) {
   if (result.usage.reasoningOut) {
     console.log(`reasoning=${result.usage.reasoningOut}`);
   }
+  // Cost reconstruction across models:
+  if (result.usage.breakdown) {
+    for (const entry of result.usage.breakdown) {
+      console.log(`${entry.provider}/${entry.model}: ${entry.in} in, ${entry.out} out`);
+    }
+  }
 }
 ```
+
+Breakdown entries are attribution metadata — they explain the totals, not
+additional usage. Never add them to the top-level `in`/`out` fields.
 
 ## Cancellation
 
@@ -95,3 +109,8 @@ try {
 Throwing `AxleToolFatalError` from a tool's `execute` stops the run
 immediately, without retrying or exposing the error to the model. The thrown
 error carries available partial output, messages, usage, and tool context.
+
+A tool that throws an error merely named `AbortError` (e.g. an internal
+`fetch` timeout) while the run's signal is live is now reported as an ordinary
+tool error so the model can retry or continue. See the
+[0.24.0 migration guide](/migration/0.24.0) for details.

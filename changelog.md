@@ -5,6 +5,43 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.25.0] - 2026-06-12
+
+- Added a native-first web search fallback for more reliable search behavior.
+  `configureAxle({ webSearchFallback })` configures a process-wide search backend.
+- `braveWebSearch()` provides the first bundled fallback backend using Brave
+  Search's LLM Context endpoint.
+- `web_search` stays provider-native when the selected provider supports it;
+  providers without native search receive an ordinary executable `web_search` tool.
+- Improved handling of non-text tool results.
+- `chatCompletions()` gains `providerDialect: "together"` for Together's reasoning
+  request shape.
+- Together PDF inputs now fail locally with a clear unsupported-input error.
+- See the [0.25.0 migration guide](/migration/0.25.0) for full details.
+
+## [0.24.0] - 2026-06-11
+
+- Added experimental subagent tools (`createAgentTool`) for delegating bounded
+  work to other agents.
+- Added experimental parallel tool execution (`parallelize`) for running batched
+  tool calls concurrently.
+- Added `ctx.reportUsage` to `ToolContext` and a flat per-provider/model
+  `Stats.breakdown` for cost reconstruction across models.
+- Added child turn-event forwarding for subagent tools (`action:child-event`,
+  rendered as agent action parts).
+- Added `tool:exec-error` stream event for fatal/aborted tool calls.
+- `Agent.on()` now returns an unsubscribe function.
+- `Instruct.addContext` appends host-supplied supporting context without modifying
+  the authored prompt.
+- Tool results can now return deferred file references and resolve them at each
+  provider request.
+- **Behavior change:** in `stream()`, a user-provided `onToolCall` returning
+  `null`/`undefined` now falls through to executing the matching registry tool.
+- **Behavior change:** a tool throwing an error merely named `AbortError` while
+  the run's signal is live is now reported to the model as an ordinary tool error
+  instead of aborting the run.
+- See the [0.24.0 migration guide](/migration/0.24.0) for full details.
+
 ## [0.23.1] - 2026-06-08
 
 - Updated Anthropic thinking configuration — Claude 4.6+ (Opus 4.6+, Sonnet 4.6+) models use Anthropic's adaptive thinking mode with effort-based control instead of a fixed token budget

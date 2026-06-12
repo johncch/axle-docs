@@ -1,12 +1,13 @@
 ---
 title: Instruct
-description: Rich messages — structured output, file inputs, templated prompts.
+description: Rich messages — structured output, file inputs, templated prompts, and host-supplied context.
 ---
 
 # Instruct
 
 `Instruct` is a rich message. Use it when you need structured output, file
-attachments, bound template inputs, or additional instructions.
+attachments, bound template inputs, additional instructions, or host-supplied
+supporting context.
 
 ```typescript
 import { Instruct } from "@fifthrevision/axle";
@@ -20,6 +21,9 @@ const instruct = new Instruct({
   }),
 }).withInputs({ topic: "document" });
 
+instruct.addContext("Files available: report.pdf", {
+  title: "Sandbox manifest",
+});
 instruct.addFile(await loadFileContent("./report.pdf"));
 
 const result = await agent.send(instruct).final;
@@ -78,6 +82,35 @@ const b = summarize.withInputs({ kind: "memo", audience: "general" });
 Missing required variables are reported as clear errors at render time. Use
 `.clone()` to copy an `Instruct` if you want to bind inputs without mutating
 the original.
+
+## Supporting context
+
+Use `addContext` for host-supplied information that should remain separate from
+the user-authored prompt until final rendering. Typical examples include a
+sandbox file manifest, environment details, or retrieved records:
+
+```typescript
+const instruct = new Instruct({
+  prompt: "Review the sandbox and propose the next change.",
+});
+
+instruct
+  .addContext("src/index.ts\nsrc/server.ts\npackage.json", {
+    title: "Sandbox files",
+  })
+  .addContext("Node.js 24\nPackage manager: pnpm", {
+    title: "Environment",
+  });
+```
+
+Context sections are ordered, survive `clone()`/`withInputs()`, and do not
+perform `{{variable}}` substitution. They become part of the same final
+user-message text as the prompt — `addContext` provides composition and
+ownership semantics, not a separate model instruction priority.
+
+Text references and context sections are rendered inside a collision-safe
+Markdown fence. The fence avoids accidental closure by embedded triple-backtick
+code blocks.
 
 ## File attachments
 
