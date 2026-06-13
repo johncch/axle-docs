@@ -64,8 +64,10 @@ console.log("[Complete]");
 ## OpenRouter web search
 
 To use OpenRouter as the provider with model-driven web search, set
-`providerToolVendor: "openrouter"` on the `chatCompletions` provider. Axle
-will map `web_search` to the OpenRouter server tool format.
+`vendor: "openrouter"` on the `chatCompletions` provider. Axle auto-detects
+OpenRouter's official hostname; the explicit `vendor` option is needed only
+for proxies and gateways with a different hostname. Axle maps `web_search`
+to the OpenRouter server tool format.
 
 Web search results from OpenRouter arrive as unanchored `citation` parts —
 handle them alongside text parts when rendering:
@@ -75,7 +77,7 @@ import { Agent, chatCompletions } from "@fifthrevision/axle";
 
 const provider = chatCompletions("https://openrouter.ai/api/v1", {
   apiKey: process.env.OPENROUTER_API_KEY!,
-  providerToolVendor: "openrouter",
+  vendor: "openrouter",
 });
 
 const agent = new Agent({

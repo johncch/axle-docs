@@ -102,16 +102,35 @@ const agent = new Agent({ provider, model: "llama3" });
 The legacy `chatCompletions(baseUrl, apiKey)` two-argument string form is still
 supported.
 
+### Vendor auto-detection
+
+Axle recognizes the official OpenRouter and Together endpoint hostnames and
+applies their request differences automatically. Set `vendor` explicitly only
+when using a proxy or gateway with a different hostname:
+
+```typescript
+import { chatCompletions } from "@fifthrevision/axle";
+
+// Auto-detected — no vendor option needed
+const openRouter = chatCompletions("https://openrouter.ai/api/v1", {
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+// Proxy — vendor must be explicit
+const viaProxy = chatCompletions("https://gateway.example.test/v1", {
+  apiKey: process.env.OPENROUTER_API_KEY,
+  vendor: "openrouter",
+});
+```
+
 ### OpenRouter
 
-To use OpenRouter with provider-managed tools such as web search, set
-`providerToolVendor: "openrouter"`. This enables Axle to translate
-`providerTools` into OpenRouter server tools:
+To use OpenRouter with provider-managed tools such as web search:
 
 ```typescript
 const provider = chatCompletions("https://openrouter.ai/api/v1", {
   apiKey: process.env.OPENROUTER_API_KEY,
-  providerToolVendor: "openrouter",
+  // vendor: "openrouter" is auto-detected from the hostname
 });
 
 const agent = new Agent({
@@ -123,6 +142,19 @@ const agent = new Agent({
 
 See [Provider Tools](/guide/provider-tools#openrouter-web-search) for full
 details including result-count config and citation rendering.
+
+### Together
+
+```typescript
+const provider = chatCompletions("https://api.together.ai/v1", {
+  apiKey: process.env.TOGETHER_API_KEY,
+  // vendor: "together" is auto-detected from the hostname
+});
+```
+
+Together uses a vendor-specific reasoning shape and does not accept PDF file
+inputs via the Chat Completions file part. See the [0.25.0 migration guide](/migration/0.25.0#together-chat-completions-vendor)
+for details.
 
 ## Models export
 

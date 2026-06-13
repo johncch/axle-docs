@@ -51,16 +51,17 @@ Use the optional `config` field for provider-specific options:
 ## OpenRouter web search
 
 The Chat Completions provider supports OpenRouter server tools when
-`providerToolVendor: "openrouter"` is set at construction. This lets the model
-decide whether and when to call web search rather than always injecting results
-via the plugin path.
+`vendor: "openrouter"` is set at construction. Axle auto-detects OpenRouter's
+official hostname; the explicit `vendor` option is needed only for proxies
+and gateways. This lets the model decide whether and when to call web search
+rather than always injecting results via the plugin path.
 
 ```typescript
 import { Agent, chatCompletions } from "@fifthrevision/axle";
 
 const provider = chatCompletions("https://openrouter.ai/api/v1", {
   apiKey: process.env.OPENROUTER_API_KEY,
-  providerToolVendor: "openrouter",
+  vendor: "openrouter",
 });
 
 const agent = new Agent({
@@ -95,7 +96,7 @@ Axle maps this to the OpenRouter server tool shape:
 
 Function tools and OpenRouter server tools share the same `tools` array in the
 Chat Completions request. Generic OpenAI-compatible endpoints still warn and
-drop `providerTools` unless `providerToolVendor: "openrouter"` is set.
+drop `providerTools` unless `vendor: "openrouter"` is set.
 
 Web search results from OpenRouter arrive as unanchored `CitationPart`s in the
 turn — see [Streaming](/guide/streaming#citations) for how to render them.

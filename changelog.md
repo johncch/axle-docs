@@ -5,6 +5,30 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.25.1] - 2026-06-13
+
+- Consolidated Chat Completions vendor options: `providerDialect` and `providerToolVendor` are replaced by a single `vendor` option (`"openrouter"` | `"together"`). Axle now auto-detects the vendor from the official endpoint hostname; use `vendor` explicitly for proxies and gateways.
+- Exported `ChatCompletionsVendor` type.
+
+## [0.25.0] - 2026-06-12
+
+- Added a web search fallback (`configureAxle({ webSearchFallback })`) with a bundled Brave Search backend (`braveWebSearch()`). `web_search` stays provider-native when the provider supports it; otherwise the fallback is used as an ordinary executable tool.
+- Added `chatCompletions()` vendor auto-detection for OpenRouter and Together official endpoint hostnames, with a `vendor` override for proxies and gateways.
+- Together Chat Completions reasoning now uses the vendor-specific shape; Together PDF inputs are rejected locally with a clear error.
+- Improved handling of non-text tool results.
+- See the [0.25.0 migration guide](/migration/0.25.0) for full details.
+
+## [0.24.0] - 2026-06-11
+
+- Added experimental subagent tools (`createAgentTool`) for delegating bounded work to other agents.
+- Added experimental parallel tool execution (`parallelize`) for running batched tool calls concurrently.
+- Added `ctx.reportUsage` to `ToolContext` and a flat per-provider/model `Stats.breakdown` for cost reconstruction across models.
+- Added `Instruct.addContext` for appending host-supplied supporting context without modifying the authored prompt.
+- Added deferred file references in tool results, and new stream/turn events for subagent progress and terminal tool errors.
+- Behavior change: `stream()` `onToolCall` returning `null` now falls through to the registry tool (matching `generate()` semantics).
+- Behavior change: tool-internal `AbortError`s no longer abort the run while the signal is live.
+- See the [0.24.0 migration guide](/migration/0.24.0) for full details.
+
 ## [0.23.1] - 2026-06-08
 
 - Updated Anthropic thinking configuration — Claude 4.6+ (Opus 4.6+, Sonnet 4.6+) models use Anthropic's adaptive thinking mode with effort-based control instead of a fixed token budget
@@ -107,3 +131,53 @@ description: Notable changes by release.
 - Fatal tool errors now preserve available partial output, messages, usage, and tool context for easier handling by applications
 
 ## [0.15.0] - 2026-05-08
+
+- Abort operations now throw errors, making cancellation behavior easier to detect and handle
+
+## [0.14.0] - 2026-05-07
+
+- Simplified the Agent and Instruct APIs for easier use and better TypeScript support
+- Added support for binding inputs to Instruct templates with `withInputs`, `withInput`, and `clone`
+- Improved template variable handling by consistently reporting missing required variables
+
+## [0.13.0] - 2026-05-06
+
+- Added provider tool registries for configuring and organizing available tools
+- Added streaming support for tool outputs and tool arguments
+- Improved tool execution with abort-signal support and streamed command output
+- Updated available models
+
+## [0.12.0] - 2026-04-30
+
+- Added basic thinking/reasoning support to the generation API
+- Added file support improvements: better `FileInfo` types, improved image type checks, file data support in chat completions, and new usage examples
+- Removed `instructions` as a concept from `Instruct`, simplifying the interface
+
+## [0.11.0] - 2026-04-24
+
+- Added support for OpenAI models
+- Provider models are now exported from the package
+
+## [0.10.2] - 2026-04-24
+
+- Added timing information to agent/generation output
+- Added support for Claude Opus 4.7
+
+## [0.10.1] - 2026-04-07
+
+- Update distribution artifacts and config
+
+## [0.10.0] - 2026-04-05
+
+- Agent now emits Turns, with an updated agent interface to match
+- Agent history now carries both Turn and Message parts in parallel, improving fidelity when converting between representations
+- Added configuration support to hooks
+- Improved error semantics and error reporting for tool-call not found cases
+- Fixed a bug where history could be incorrectly committed when a cancellation was in flight
+- Updated to latest dependencies and models
+
+## [0.9.0] - 2026-02-22
+
+- Added procedural memory support, allowing agents to retain and recall information across interactions
+- Made the tool call callback optional when using `generate`, reducing boilerplate for simple use cases
+- Simplified tracing interfaces for easier integration and usage
