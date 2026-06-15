@@ -104,14 +104,13 @@ supported.
 
 ### OpenRouter
 
-To use OpenRouter with provider-managed tools such as web search, set
-`providerToolVendor: "openrouter"`. This enables Axle to translate
-`providerTools` into OpenRouter server tools:
+To use OpenRouter with provider-managed tools such as web search, Axle
+auto-detects the official endpoint hostname. No explicit vendor option is
+needed when using `https://openrouter.ai/api/v1`:
 
 ```typescript
 const provider = chatCompletions("https://openrouter.ai/api/v1", {
   apiKey: process.env.OPENROUTER_API_KEY,
-  providerToolVendor: "openrouter",
 });
 
 const agent = new Agent({
@@ -121,10 +120,62 @@ const agent = new Agent({
 });
 ```
 
+When routing through a proxy or gateway with a different hostname, set
+`vendor: "openrouter"` explicitly:
+
+```typescript
+const provider = chatCompletions("https://gateway.example.com/v1", {
+  apiKey: process.env.OPENROUTER_API_KEY,
+  vendor: "openrouter",
+});
+```
+
 See [Provider Tools](/guide/provider-tools#openrouter-web-search) for full
 details including result-count config and citation rendering.
+
+### Together
+
+Axle auto-detects Together's official endpoint hostnames (`api.together.ai`,
+`api.together.xyz`). When detected or set via `vendor: "together"`, Axle
+sends reasoning controls in Together's expected shape and rejects PDF file
+parts locally with a clear error:
+
+```typescript
+const provider = chatCompletions("https://api.together.ai/v1", {
+  apiKey: process.env.TOGETHER_API_KEY!,
+});
+
+const agent = new Agent({ provider, model: "Qwen/Qwen3.5-9B" });
+```
+
+Together's Chat Completions API does not support PDF file parts. Image support
+is model-specific — qualify the exact provider/model pair before relying on
+image workflows.
+
+For Together, the `web_search` provider tool uses the [configured fallback
+backend](/guide/provider-tools#web-search-fallback) since Together has no
+native search. Make sure to configure `webSearchFallback` if you request
+`web_search` with a Together provider.
 
 ## Models export
 
 Common model identifiers are also re-exported from `@fifthrevision/axle/models`
 for convenience.
+
+## Web search fallback
+
+Axle can use a process-wide web search fallback backend for providers that
+don't natively support `web_search`. Configure it once at startup:
+
+```typescript
+import { braveWebSearch, configureAxle } from "@fifthrevision/axle";
+
+configureAxle({
+  webSearchFallback: braveWebSearch({
+    apiKey: process.env.BRAVE_API_KEY!,
+  }),
+});
+```
+
+See [Provider Tools](/guide/provider-tools#web-search-fallback) for the full
+API and custom backends.

@@ -61,21 +61,64 @@ try {
 console.log("[Complete]");
 ```
 
+## Web search fallback
+
+For generic Chat Completions providers without native web search, configure a
+process-wide fallback:
+
+```typescript
+import { braveWebSearch, chatCompletions, configureAxle } from "@fifthrevision/axle";
+
+configureAxle({
+  webSearchFallback: braveWebSearch({
+    apiKey: process.env.BRAVE_API_KEY!,
+    maxResults: 5,
+  }),
+});
+
+const provider = chatCompletions("https://api.together.ai/v1", {
+  apiKey: process.env.TOGETHER_API_KEY!,
+});
+
+const agent = new Agent({
+  provider,
+  model: "Qwen/Qwen3.5-9B",
+  providerTools: [{ type: "provider", name: "web_search" }],
+});
+
+agent.on((event) => {
+  switch (event.type) {
+    case "part:start":
+      if (event.part.type === "action") {
+        console.log(`\n[Tool] ${event.part.detail.name} started`);
+      }
+      break;
+    case "text:delta":
+      process.stdout.write(event.delta);
+      break;
+    case "action:complete":
+      console.log(`\n[Tool] ${event.part.detail.name} complete`);
+      break;
+  }
+});
+
+await agent.send("What are today's top news headlines?").final;
+```
+
+Fallback search produces ordinary tool events (`action:running`,
+`action:complete`) rather than provider-tool events. The results include
+`title`, `url`, and relevant `snippets` from the search backend.
+
 ## OpenRouter web search
 
-To use OpenRouter as the provider with model-driven web search, set
-`providerToolVendor: "openrouter"` on the `chatCompletions` provider. Axle
-will map `web_search` to the OpenRouter server tool format.
-
-Web search results from OpenRouter arrive as unanchored `citation` parts —
-handle them alongside text parts when rendering:
+Axle auto-detects the official OpenRouter endpoint hostname. To use OpenRouter
+as the provider with model-driven web search, no extra option is needed:
 
 ```typescript
 import { Agent, chatCompletions } from "@fifthrevision/axle";
 
 const provider = chatCompletions("https://openrouter.ai/api/v1", {
   apiKey: process.env.OPENROUTER_API_KEY!,
-  providerToolVendor: "openrouter",
 });
 
 const agent = new Agent({
@@ -114,3 +157,6 @@ try {
   console.error(e);
 }
 ```
+
+When routing through a proxy or gateway with a different hostname, set
+`vendor: "openrouter"` explicitly.

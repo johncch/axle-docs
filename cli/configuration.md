@@ -16,6 +16,9 @@ other config file.
 OPENAI_API_KEY=...
 ANTHROPIC_API_KEY=...
 GEMINI_API_KEY=...
+OPENROUTER_API_KEY=...
+TOGETHER_API_KEY=...
+BRAVE_API_KEY=...
 
 # Optional model overrides
 OPENAI_MODEL=gpt-4.1
@@ -68,6 +71,24 @@ provider:
 
 These fields are supported for all provider types: `openai`, `anthropic`,
 `gemini`, and `chatcompletions`.
+
+### Chat Completions vendor
+
+For Chat Completions providers routing through a proxy or gateway with a
+different hostname, set `vendor` to tell Axle which upstream provider you're
+targeting:
+
+```yaml
+provider:
+  type: chatcompletions
+  base-url: https://gateway.example.com/v1
+  model: openai/gpt-5.4-mini
+  vendor: openrouter
+```
+
+Supported values: `openrouter`, `together`. Omit `vendor` when using the
+official endpoint hostname — Axle auto-detects OpenRouter and Together
+endpoints automatically.
 
 ## CI/CD
 
