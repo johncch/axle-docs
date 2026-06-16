@@ -51,16 +51,16 @@ Use the optional `config` field for provider-specific options:
 ## OpenRouter web search
 
 The Chat Completions provider supports OpenRouter server tools when
-`providerToolVendor: "openrouter"` is set at construction. This lets the model
-decide whether and when to call web search rather than always injecting results
-via the plugin path.
+`vendor: "openrouter"` is set at construction (auto-detected by default).
+This lets the model decide whether and when to call web search rather than
+always injecting results via the plugin path.
 
 ```typescript
 import { Agent, chatCompletions } from "@fifthrevision/axle";
 
 const provider = chatCompletions("https://openrouter.ai/api/v1", {
   apiKey: process.env.OPENROUTER_API_KEY,
-  providerToolVendor: "openrouter",
+  vendor: "openrouter",
 });
 
 const agent = new Agent({
@@ -95,10 +95,63 @@ Axle maps this to the OpenRouter server tool shape:
 
 Function tools and OpenRouter server tools share the same `tools` array in the
 Chat Completions request. Generic OpenAI-compatible endpoints still warn and
-drop `providerTools` unless `providerToolVendor: "openrouter"` is set.
+drop `providerTools` unless `vendor` is set.
 
 Web search results from OpenRouter arrive as unanchored `CitationPart`s in the
 turn — see [Streaming](/guide/streaming#citations) for how to render them.
+
+## Web search fallback
+
+When a provider does not natively support `web_search`, you can configure Axle
+to execute web search on its own via a fallback backend. Call `configureAxle()`
+once at startup, before creating any agents:
+
+```typescript
+import { configureAxle, braveWebSearch } from "@fifthrevision/axle";
+
+configureAxle({
+  webSearchFallback: braveWebSearch({ apiKey: process.env.BRAVE_API_KEY! }),
+});
+```
+
+With this configured, any provider can use `web_search` — Axle runs the search
+client-side and passes results back to the model as a tool result. A native
+`web_search` on the provider always takes priority over the fallback.
+
+`braveWebSearch()` wraps the Brave Search [LLM Context
+API](https://api.search.brave.com/res/v1/llm/context) and accepts these
+options:
+
+```typescript
+braveWebSearch({
+  apiKey: string;        // required
+  endpoint?: string;     // defaults to Brave's LLM Context endpoint
+  maxResults?: number;   // 1–50, default 5
+  maxTokens?: number;    // 1–32768, default 4096
+  maxSnippets?: number;  // 1–256
+  freshness?: "pd" | "pw" | "pm" | "py" | `${string}to${string}`;
+  timeoutMs?: number;
+  // ...additional options for result tuning
+});
+```
+
+To build a custom fallback, implement the `WebSearchBackend` interface:
+
+```typescript
+import type { WebSearchBackend } from "@fifthrevision/axle";
+
+const myBackend: WebSearchBackend = {
+  name: "my-search",
+  async search(request, context) {
+    // request.query — the search string
+    // context.signal — AbortSignal for cancellation
+    // context.span — observability span
+    return {
+      results: [{ title: "...", url: "https://...", snippets: ["..."] }],
+    };
+  },
+};
+```
 
 ## Streaming events
 

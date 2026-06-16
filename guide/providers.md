@@ -105,13 +105,14 @@ supported.
 ### OpenRouter
 
 To use OpenRouter with provider-managed tools such as web search, set
-`providerToolVendor: "openrouter"`. This enables Axle to translate
+`vendor: "openrouter"`. Axle auto-detects OpenRouter from the hostname, so in
+most cases this is optional. When set explicitly it enables Axle to translate
 `providerTools` into OpenRouter server tools:
 
 ```typescript
 const provider = chatCompletions("https://openrouter.ai/api/v1", {
   apiKey: process.env.OPENROUTER_API_KEY,
-  providerToolVendor: "openrouter",
+  vendor: "openrouter",
 });
 
 const agent = new Agent({
@@ -123,6 +124,18 @@ const agent = new Agent({
 
 See [Provider Tools](/guide/provider-tools#openrouter-web-search) for full
 details including result-count config and citation rendering.
+
+### Together
+
+Axle auto-detects the Together API (`https://api.together.ai/v1`) and
+translates `reasoning` into Together's native format (`reasoning.enabled`).
+PDF file parts are not supported by Together and will throw.
+
+```typescript
+const provider = chatCompletions("https://api.together.ai/v1", {
+  apiKey: process.env.TOGETHER_API_KEY,
+});
+```
 
 ## Models export
 
