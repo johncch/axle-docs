@@ -5,6 +5,37 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.25.3] - 2026-06-16
+
+- Fixed OpenAI file handling so filenames and URLs are resolved correctly.
+
+## [0.25.2] - 2026-06-15
+
+- Fixed tool calls with syntactically invalid JSON parameters so they are handled gracefully instead of failing — Axle now surfaces them as tool-call argument errors via stream events rather than throwing.
+
+## [0.25.1] - 2026-06-13
+
+- Consolidated Chat Completions vendor options. The `providerToolVendor` option on the `chatCompletions` provider is renamed to `vendor`, and Axle now auto-detects the vendor from the base URL for OpenRouter and Together.
+
+## [0.25.0] - 2026-06-12
+
+- Added a web search fallback via `configureAxle({ webSearchFallback })`. When a provider does not natively support `web_search`, Axle can execute web search on its own using a configured backend (e.g., Brave). The `braveWebSearch()` helper builds a Brave Search LLM-context backend.
+- Added `AxleConfiguration` with `configureAxle()` / `getAxleConfiguration()` for library-wide settings.
+- Improved handling of non-text tool results — unsupported file parts in Chat Completions tool results now produce a descriptive placeholder instead of throwing.
+- Added Together vendor support to the Chat Completions provider, with auto-detection from the Together API hostname and proper reasoning translation.
+
+## [0.24.0] - 2026-06-11
+
+- Added experimental sub-agent tools (`createAgentTool`) for delegating bounded work to other agents.
+- Added experimental parallel tool execution (`parallelize`) for running batched tool calls concurrently.
+- Added tool context helpers: `ctx.reportUsage` for reporting usage and a flat per-provider/model `Stats.breakdown` for cost reconstruction.
+- Added child turn-event forwarding for sub-agent tools (`action:child-event`, rendered as agent action parts).
+- Added `tool:exec-error` stream event for fatal/aborted tool calls.
+- In `stream()`, a user-provided `onToolCall` returning `null`/`undefined` now falls through to executing the matching registry tool (matching `generate()`'s existing semantics) instead of producing a `not-found` result.
+- A tool throwing an error merely named `AbortError` (e.g. an internal fetch timeout) while the run's signal is live is now reported to the model as an ordinary tool error instead of aborting the run.
+- Improved streaming/tool-call behavior and error reporting.
+- Fixed output fencing in generated content.
+
 ## [0.23.1] - 2026-06-08
 
 - Updated Anthropic thinking configuration — Claude 4.6+ (Opus 4.6+, Sonnet 4.6+) models use Anthropic's adaptive thinking mode with effort-based control instead of a fixed token budget
