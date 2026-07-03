@@ -54,7 +54,7 @@ const agent = new Agent({
 ```
 
 Supported models include the Claude 4 family (Opus 4.8, Opus 4.7, Sonnet 4.5,
-Haiku 4.5) and the available Anthropic provider tools — see
+Haiku 4.5), Claude 5 (Sonnet 5, Fable 5), and the available Anthropic provider tools — see
 [Provider Tools](/guide/provider-tools).
 
 ## OpenAI
@@ -82,7 +82,7 @@ const agent = new Agent({
 });
 ```
 
-Supported models include `gemini-3.5-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`,
+Supported models include `gemini-3.5-pro`, `gemini-3.5-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`,
 `gemini-3-flash-preview`, and other variants available
 via the Gemini API. See the models export for the full list.
 

@@ -7,7 +7,7 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'Axle',
     nav: [
-      { text: 'v0.25.3', link: '/changelog' },
+      { text: 'v0.25.5', link: '/changelog' },
     ],
     sidebar: [
       {

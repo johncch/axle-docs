@@ -5,6 +5,15 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.25.5] - 2026-07-03
+
+- Added Claude Fable 5 and Claude Sonnet 5 models (`claude-fable-5`, `claude-sonnet-5`) with 128K output token support.
+- Added Gemini 3.5 Pro model (`gemini-3.5-pro`).
+
+## [0.25.4] - 2026-06-17
+
+- Improved `parallelize` handling for more reliable batched tool execution, including a new `maxResultBytes` option (defaults to 20 MiB) to cap the total byte size returned from one batch.
+
 ## [0.25.3] - 2026-06-16
 
 - Fixed OpenAI file handling so filenames and URLs are resolved correctly.
