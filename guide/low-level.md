@@ -65,6 +65,8 @@ await generate({
   temperature: 0.2,
   topP: 0.9,
   maxOutputTokens: 500,
+  maxIterations: 10,
+  maxContextTokens: 100_000,
   stop: ["END"],
   reasoning: true,
 });
@@ -76,6 +78,8 @@ The full normalized option surface (`AxleModelRequestOptions`):
 | ------------------- | ------------------------ | ----------------------------------------------------------- |
 | `reasoning`         | `boolean`                | Enable/disable provider reasoning or thinking mode.         |
 | `maxOutputTokens`   | `number`                 | Maximum output tokens to request.                           |
+| `maxIterations`     | `number`                 | Maximum tool-loop iterations; exceeded → `stopped`.         |
+| `maxContextTokens`  | `number`                 | Token budget for the tool loop; exceeded → `stopped`.       |
 | `temperature`       | `number`                 | Sampling temperature.                                       |
 | `topP`              | `number`                 | Nucleus sampling value.                                     |
 | `stop`              | `string \| string[]`     | Stop sequence(s) for text generation.                       |

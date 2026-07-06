@@ -158,7 +158,7 @@ console.log(`Using ~${ctx.total} tokens (${ctx.free} free)`);
 `agent.on(...)` registers a callback that fires for every subsequent `send()`.
 See [Streaming](/guide/streaming) for the full event list.
 
-## Session snapshot and restore
+## Session snapshot and resume
 
 `Agent` supports serializable session state for save/resume workflows.
 
@@ -166,27 +166,52 @@ See [Streaming](/guide/streaming) for the full event list.
 // Save the current session
 const saved: SavedAgent = {
   definition: myAgentDefinition, // AgentDefinition (serializable recipe)
-  session: agent.snapshot(),     // AgentSession (messages, turns, sessionId)
+  session: await agent.snapshot(),     // AgentSession (messages, turns, sessionId)
 };
 
-// Restore from a saved session — constructor form (0.21.0+)
+// Resume from a saved session — constructor form
 const config = await createAgentConfig(saved.definition, resolver);
 const restoredAgent = new Agent(config, saved.session);
-
-// Alternatively, use the explicit restore() method
-const restoredAgent2 = new Agent(config);
-restoredAgent2.restore(saved.session);
 ```
 
-Both forms are equivalent. When both `config.sessionId` and
-`session.sessionId` are supplied, the restored session id wins.
+Session restore only happens at construction. Pass the saved `AgentSession` as
+the second argument to `new Agent(config, session)`.
 
 `AgentDefinition` is a serializable recipe — it describes the provider, model,
 tools, and request defaults in a form that can be stored in a database or sent
 over the wire. Hosts resolve it into a runtime `AgentConfig` using
 `createAgentConfig(definition, resolver)`.
 
-`AgentSession` holds continuation state: the model-facing message history,
-renderable turns, session annotations, and the stable `sessionId`.
+`AgentSession` holds continuation state: the model-facing message history
+(`messages`), renderable turns, raw append-only archive, compaction receipts,
+session annotations, and the stable `sessionId`.
 
 See [Hosting & Sessions](/guide/hosting) for the full pattern.
+
+## Compaction (experimental)
+
+```typescript
+agent.onCompaction(async ({ messages }, { usage, signal }) => {
+  if (usage.total < 100_000) return null; // decline
+
+  const summary = await generate({
+    provider,
+    model,
+    signal,
+    messages: [{ role: "user", content: `Summarize:\n${render(messages)}` }],
+  });
+  if (!summary.ok) return null;
+  return [{ role: "user", content: `Summary so far: ${text(summary)}` }];
+});
+
+const record = await agent.compact(); // CompactionRecord | null
+```
+
+- The returned messages become the entire active conversation. Return `null` to
+  decline and leave everything untouched.
+- `agent.history.messages` is the active conversation;
+  `agent.history.archive` keeps the raw append-only log;
+  `agent.history.compactions` records receipts.
+- Compaction never interleaves with an in-flight `send()`.
+- `agent.context()` returns the current `ContextUsage` estimate for deciding
+  outside the callback.

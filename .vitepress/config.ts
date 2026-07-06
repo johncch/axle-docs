@@ -7,7 +7,7 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'Axle',
     nav: [
-      { text: 'v0.25.3', link: '/changelog' },
+      { text: 'v0.26.0', link: '/changelog' },
     ],
     sidebar: [
       {
@@ -68,6 +68,7 @@ export default defineConfig({
         text: 'Reference',
         items: [
           { text: 'Changelog', link: '/changelog' },
+          { text: 'Migration: 0.26.0', link: '/migration/0.26.0' },
           { text: 'Migration: 0.25.0', link: '/migration/0.25.0' },
           { text: 'Migration: 0.24.0', link: '/migration/0.24.0' },
           { text: 'Migration: 0.23.0', link: '/migration/0.23.0' },

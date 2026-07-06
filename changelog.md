@@ -5,6 +5,19 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.26.0] - 2026-07-06
+
+- Added experimental context compaction: `agent.onCompaction(callback)` supplies the policy and strategy, `await agent.compact()` triggers it. Active history is replaced; `agent.history` now exposes `messages` (active), `archive` (raw append-only), and `compactions` (receipts). Compaction renders as an agent turn containing a new `compaction` part and emits `compaction:start`/`compaction:end` turn events.
+- Added `maxContextTokens` to `stream()`/`generate()`: a token budget for the tool loop, checked after each turn settles.
+- **Behavior change:** loop limits are stops, not errors. `maxIterations` and `maxContextTokens` return `ok: true` with `stopped: "max-iterations" | "token-limit"` instead of an error result. Non-positive limits throw at call time.
+- **Breaking:** `agent.history.log` is now `agent.history.messages`.
+- **Breaking:** `agent.snapshot()` is now async; it waits for in-flight work to settle so snapshots are always at rest.
+- **Breaking:** removed `Agent.restore()`; resume with `new Agent(config, session)`.
+- **Breaking:** removed `index` from `StreamEvent`. Correlate tool events by `id`; text/thinking deltas belong to the most recently opened part.
+- **Breaking:** removed the `createHandle` export.
+- Added an `agent-compaction` baseline check exercising compaction end to end against live providers.
+- See the [0.26.0 migration guide](/migration/0.26.0) for full details.
+
 ## [0.25.3] - 2026-06-16
 
 - Fixed OpenAI file handling so filenames and URLs are resolved correctly.

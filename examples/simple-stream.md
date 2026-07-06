@@ -49,7 +49,7 @@ const handle = stream({
 
 handle.on((event) => {
   switch (event.type) {
-    case "text:start":         console.log(`\n[text ${event.index}]`); break;
+    case "text:start":         console.log("[text start]"); break;
     case "text:delta":         process.stdout.write(event.delta); break;
     case "text:end":           console.log("\n[text end]"); break;
     case "tool:exec-start":    console.log(`[exec] ${event.name}`); break;

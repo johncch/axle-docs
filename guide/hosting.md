@@ -58,10 +58,10 @@ const definition: AgentDefinition = {
 const agent = new Agent(await createAgentConfig(definition, myResolver));
 await agent.send("Hello").final;
 
-// Snapshot the current session
+// Snapshot the current session (async — waits for in-flight work)
 const saved: SavedAgent = {
   definition,
-  session: agent.snapshot(),
+  session: await agent.snapshot(),
 };
 
 // Persist `saved` (JSON-serializable)
@@ -77,8 +77,7 @@ const saved = await db.loadAgent(userId);
 
 // Host resolves the definition into executable dependencies
 const config = await createAgentConfig(saved.definition, myResolver);
-const agent = new Agent(config);
-agent.restore(saved.session);
+const agent = new Agent(config, saved.session);
 
 // Continue the conversation — history is fully restored
 await agent.send("What did we discuss before?").final;

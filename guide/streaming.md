@@ -80,6 +80,8 @@ agent.on((event) => {
 | `action:complete`        | `turnId`, `partId`, `result` (`ActionResult`), `timing?`                     | Action finished — inspect `result.type` for `success` vs `error`.    |
 | `action:error`           | `turnId`, `partId`, `error`, `timing?`                                       | Action failed with a typed error.                                    |
 | `action:child-event`     | `turnId`, `partId`, `event`                                                  | An event from a nested sub-agent run.                                |
+| `compaction:start`       | `turnId`                                                                     | Compaction began (the callback supplied via `onCompaction` runs).    |
+| `compaction:end`         | `turnId`, `record`                                                           | Compaction finished; `record` is `CompactionRecord | null`.          |
 | `annotation:start`       | `target`, `annotation`                                                       | An annotation was created on a session, turn, or part.               |
 | `annotation:update`      | `target`, `annotation`                                                       | An annotation was updated.                                           |
 | `annotation:end`         | `target`, `annotation`                                                       | An annotation finished (`status` defaults to `"complete"`).          |
@@ -102,6 +104,8 @@ agent.on((event) => {
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
   `part.kind`: `"tool" | "agent" | "provider-tool"`.
+- `"compaction"` — a compaction receipt (experimental). Appears as an agent turn
+  containing a single compaction part when `agent.compact()` completes.
 
 Callbacks are registered once and fire on every subsequent `send()`.
 
@@ -169,7 +173,7 @@ const handle = stream({ provider, model, messages });
 
 handle.on((event) => {
   switch (event.type) {
-    case "text:start":     console.log(`[text ${event.index}]`); break;
+    case "text:start":     console.log("[text start]"); break;
     case "text:delta":     process.stdout.write(event.delta); break;
     case "text:end":       console.log("\n[text end]"); break;
     case "tool:request":   console.log(`[tool ${event.name}]`); break;
@@ -185,11 +189,11 @@ handle.on((event) => {
 
 | Event                     | Description                                                                 |
 | ------------------------- | --------------------------------------------------------------------------- |
-| `text:start`              | A text block began (carries `index`).                                       |
+| `text:start`              | A text block began.                                                         |
 | `text:delta`              | Incremental text chunk.                                                     |
 | `text:end`                | Text block ended; carries the final concatenated `final` string.            |
 | `text:citation`           | A citation anchored to a specific text span (carries `citation`, `citations`). |
-| `citation`                | Unanchored citations for the whole turn (carries `index`, `citations`).     |
+| `citation`                | Unanchored citations for the whole turn (carries `citations`).               |
 | `thinking:start`          | A reasoning block began.                                                    |
 | `thinking:delta`          | Incremental reasoning chunk.                                                |
 | `thinking:end`            | Reasoning block ended; carries `final`.                                     |

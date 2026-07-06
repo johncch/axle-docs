@@ -30,6 +30,33 @@ result.response; // always present when ok is true
 | `agent.send(instruct)` (schema)   | Parsed schema value (typed).              |
 | `agent.send(instruct)` (no schema)| Assistant text.                           |
 
+## Stopped results
+
+When `maxIterations` or `maxContextTokens` limits are hit, the result is still
+`ok: true` and includes everything accumulated so far. Inspect `stopped`:
+
+```typescript
+const result = await generate({
+  provider,
+  model,
+  messages,
+  tools: [myTool],
+  maxIterations: 5,
+  maxContextTokens: 100_000,
+});
+
+if (result.ok) {
+  if (result.stopped === "max-iterations") {
+    console.log("Hit iteration limit");
+  } else if (result.stopped === "token-limit") {
+    console.log("Hit context token budget");
+  }
+  // result.messages and result.response are complete through the last turn
+}
+```
+
+Non-positive values for either limit throw at call time.
+
 ## Failure kinds
 
 - `model` — the provider returned an error or refusal.
