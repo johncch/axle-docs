@@ -102,6 +102,9 @@ agent.on((event) => {
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
   `part.kind`: `"tool" | "agent" | "provider-tool"`.
+- `"compaction"` — marks a compaction of the model-facing conversation
+  (experimental). The turn contains this single part with a `record` once
+  complete. Skipped compactions leave no turn.
 
 Callbacks are registered once and fire on every subsequent `send()`.
 
@@ -169,7 +172,7 @@ const handle = stream({ provider, model, messages });
 
 handle.on((event) => {
   switch (event.type) {
-    case "text:start":     console.log(`[text ${event.index}]`); break;
+    case "text:start":     console.log("[text start]"); break;
     case "text:delta":     process.stdout.write(event.delta); break;
     case "text:end":       console.log("\n[text end]"); break;
     case "tool:request":   console.log(`[tool ${event.name}]`); break;
@@ -185,18 +188,22 @@ handle.on((event) => {
 
 | Event                     | Description                                                                 |
 | ------------------------- | --------------------------------------------------------------------------- |
-| `text:start`              | A text block began (carries `index`).                                       |
+| `text:start`              | A text block began.                                                         |
 | `text:delta`              | Incremental text chunk.                                                     |
 | `text:end`                | Text block ended; carries the final concatenated `final` string.            |
 | `text:citation`           | A citation anchored to a specific text span (carries `citation`, `citations`). |
-| `citation`                | Unanchored citations for the whole turn (carries `index`, `citations`).     |
+| `citation`                | Unanchored citations for the whole turn (carries `citations`).              |
 | `thinking:start`          | A reasoning block began.                                                    |
 | `thinking:delta`          | Incremental reasoning chunk.                                                |
+| `thinking:summary-delta`  | Incremental chunk of a provider-supplied thinking summary.                  |
+| `thinking:update`         | Non-text update to a thinking part (redaction flag, continuity).            |
 | `thinking:end`            | Reasoning block ended; carries `final`.                                     |
-| `tool:request`            | Model requested a tool call. Arguments may still be streaming.              |
+| `tool:request`            | Model requested a tool call (correlated by `id`). Arguments may still be streaming. |
+| `tool:args-delta`         | Incremental chunk of streaming tool arguments.                              |
 | `tool:exec-start`         | Local tool execution started; carries `parameters`.                         |
 | `tool:exec-delta`         | Streamed chunk from a running tool (e.g. `execTool` stdout/stderr).         |
 | `tool:exec-complete`      | Local tool execution finished; carries the `result`.                        |
+| `tool:exec-error`         | Tool execution failed with a fatal or aborted error.                        |
 | `provider-tool:start`     | Provider-side tool started (web search, code interp.).                      |
 | `provider-tool:complete`  | Provider-side tool finished; may carry `output`.                            |
 | `turn:complete`           | Assistant turn finished; carries the full `AxleAssistantMessage`.           |

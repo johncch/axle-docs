@@ -163,30 +163,23 @@ See [Streaming](/guide/streaming) for the full event list.
 `Agent` supports serializable session state for save/resume workflows.
 
 ```typescript
-// Save the current session
+// Save the current session (async — waits for in-flight work to settle)
 const saved: SavedAgent = {
   definition: myAgentDefinition, // AgentDefinition (serializable recipe)
-  session: agent.snapshot(),     // AgentSession (messages, turns, sessionId)
+  session: await agent.snapshot(), // AgentSession (messages, archive, compactions, turns, sessionId)
 };
 
-// Restore from a saved session — constructor form (0.21.0+)
+// Restore from a saved session — pass session as second constructor arg (0.26.0+)
 const config = await createAgentConfig(saved.definition, resolver);
 const restoredAgent = new Agent(config, saved.session);
-
-// Alternatively, use the explicit restore() method
-const restoredAgent2 = new Agent(config);
-restoredAgent2.restore(saved.session);
 ```
 
-Both forms are equivalent. When both `config.sessionId` and
-`session.sessionId` are supplied, the restored session id wins.
+When both `config.sessionId` and `session.sessionId` are supplied, the restored
+session id wins.
 
-`AgentDefinition` is a serializable recipe — it describes the provider, model,
-tools, and request defaults in a form that can be stored in a database or sent
-over the wire. Hosts resolve it into a runtime `AgentConfig` using
-`createAgentConfig(definition, resolver)`.
-
-`AgentSession` holds continuation state: the model-facing message history,
-renderable turns, session annotations, and the stable `sessionId`.
+`AgentSession` holds continuation state: the active model-facing message
+history (`messages`), the full append-only archive (`archive`), compaction
+receipts (`compactions`), renderable turns, session annotations, and the stable
+`sessionId`.
 
 See [Hosting & Sessions](/guide/hosting) for the full pattern.

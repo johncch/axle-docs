@@ -5,6 +5,24 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.26.1] - 2026-07-09
+
+- Fixed Chat Completions tool schemas with optional properties: strict mode is now disabled when any property is optional, so providers that reject `strict: true` on such schemas no longer fail.
+- Renamed `GenerateError` to `AxleFailure` in the public API and added a `message` field to model errors for easier diagnostics.
+- Fixed a crash when `stream()` hits a max-iterations limit: the stream now emits an error event instead of a raw throw.
+- Fixed `stream()` error handling so model errors after limit-exhausted stops now complete with `ok: false` instead of crashing.
+
+## [0.26.0] - 2026-07-07
+
+- Added experimental context compaction: `agent.onCompaction(callback)` and `await agent.compact()` let hosts replace the active conversation with a shorter one when token budgets run low.
+- `agent.history` now exposes `messages` (active conversation), `archive` (full append-only log), and `compactions` (receipts). The old `history.log` is gone — use `history.messages`.
+- `maxContextTokens` bounds the tool loop by token budget. Both `maxContextTokens` and `maxIterations` now return `ok: true` with a `stopped` reason instead of `ok: false` errors.
+- `agent.snapshot()` is now async; `agent.restore()` is removed — resume via `new Agent(config, session)`.
+- Stream events no longer carry `index`; correlate by `id` for tool events and arrival order for text/thinking.
+- `TurnPart` gains a `compaction` member; compaction renders as an agent turn containing a single compaction part.
+- `createHandle` export removed; the `Handle` type remains.
+- See the [0.26.0 migration guide](/migration/0.26.0) for full details.
+
 ## [0.25.3] - 2026-06-16
 
 - Fixed OpenAI file handling so filenames and URLs are resolved correctly.

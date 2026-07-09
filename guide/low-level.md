@@ -29,7 +29,13 @@ handle.on((event) => {
 });
 
 const result = await handle.final;
-if (!result.ok) throw new Error(result.error.kind);
+if (result.ok) {
+  if (result.stopped) {
+    // "max-iterations" or "token-limit" — everything accumulated so far is
+    // in result.messages; resume by passing them back in.
+    console.log(`Stopped: ${result.stopped}`);
+  }
+}
 ```
 
 ## `generate()`
@@ -49,6 +55,9 @@ const result = await generate({
 });
 
 if (!result.ok) throw new Error(result.error.kind);
+if (result.stopped) {
+  // "max-iterations" or "token-limit" — result.messages is the complete exchange.
+}
 result.response; // final assistant message
 ```
 
@@ -83,6 +92,8 @@ The full normalized option surface (`AxleModelRequestOptions`):
 | `parallelToolCalls` | `boolean`                | Request that the provider avoid parallel tool calls.        |
 | `providerOptions`   | `ProviderOptions`        | Raw provider-specific fields applied after normalized ones. |
 | `signal`            | `AbortSignal`            | Abort signal for cancellation.                              |
+| `maxIterations`     | `number`                 | Maximum tool-call loop iterations.                          |
+| `maxContextTokens`  | `number`                 | Context budget for the tool loop in tokens.                 |
 
 `ToolChoice` can be `"auto"`, `"none"`, `"required"`, or `{ type: "tool", name: string }`.
 
