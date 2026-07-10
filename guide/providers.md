@@ -139,5 +139,39 @@ const provider = chatCompletions("https://api.together.ai/v1", {
 
 ## Models export
 
-Common model identifiers are also re-exported from `@fifthrevision/axle/models`
-for convenience.
+Model constants and metadata are available from the dedicated entry point
+`@fifthrevision/axle/models`. They use publisher-qualified IDs:
+
+```typescript
+import { ModelInfo, Models } from "@fifthrevision/axle/models";
+
+const model = Models.OpenAI.GPT_5_4_MINI;  // "openai/gpt-5.4-mini"
+const limits = ModelInfo[model];
+// { contextWindow: ..., maxOutputTokens: ..., multimodal: true }
+```
+
+Publisher-qualified IDs are accepted by first-party providers (the publisher
+prefix is stripped before sending to the SDK), and unqualified IDs continue to
+work for direct use:
+
+```typescript
+const agent = new Agent({
+  provider: openai(apiKey),
+  model: Models.OpenAI.GPT_5_4_MINI,  // "openai/gpt-5.4-mini" — SDK receives "gpt-5.4-mini"
+});
+
+// Or pass a bare string directly:
+const agent2 = new Agent({
+  provider: openai(apiKey),
+  model: "gpt-4.1",
+});
+```
+
+`Models` is organized by publisher — `Models.OpenAI`, `Models.Anthropic`,
+`Models.Google`, `Models.DeepSeek`, `Models.Mistral`, `Models.Qwen`,
+`Models.MiniMax`, `Models.Moonshot`, and `Models.ZAI`. The `ModelInfo` record
+provides context window, max output tokens, and multimodal support for any
+registered model.
+
+Chat Completions endpoints do not strip the publisher prefix — send the model
+ID that your endpoint expects:

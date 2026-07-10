@@ -5,7 +5,50 @@ description: Notable changes by release.
 
 # Changelog
 
-## [0.25.3] - 2026-06-16
+## [0.27.0] - 2026-07-10
+
+- Replaced provider-local model enumerations with a single generated model
+  registry (`@fifthrevision/axle/models`). Model constants now use
+  publisher-qualified strings (`openai/gpt-5.4-mini`).
+- Removed `OpenAI`, `Anthropic`, and `Gemini` object exports from the main
+  entry point. Import `{ Models, ModelInfo }` from `@fifthrevision/axle/models`
+  instead.
+- Removed library-owned default models (`OpenAI.DefaultModel`, etc.).
+  Applications should set their own defaults.
+- Added `GenerateResult` as a first-class export type.
+- See the [0.27.0 migration guide](/migration/0.27.0) for full details.
+
+## [0.26.1] - 2026-07-09
+
+- Fixed OpenAI tool schemas so optional properties are accepted correctly.
+- Improved generation failure handling and exposed the clearer `AxleFailure`
+  name while keeping `GenerateError` as an alias.
+- Improved stream turn accumulation error handling for more reliable failures.
+- Removed the Gemini 3.5 Pro model option.
+
+## [0.26.0] - 2026-07-06
+
+- Added experimental context compaction: `agent.onCompaction(callback)` supplies
+  the policy and strategy, `await agent.compact()` triggers it. Active history
+  is replaced; `agent.history` now exposes `messages` (active), `archive` (raw
+  append-only), and `compactions` (receipts). Compaction renders as an agent turn
+  containing a new `compaction` part and emits `compaction:start`/`compaction:end`
+  turn events.
+- Added `maxContextTokens` to `stream()`/`generate()`: a token budget for the
+  tool loop, checked after each turn settles.
+- **Behavior change:** loop limits are stops, not errors. `maxIterations` and
+  `maxContextTokens` return `ok: true` with `stopped: "max-iterations" |
+  "token-limit"` instead of an error result. Non-positive limits throw at call
+  time.
+- **Breaking:** `agent.history.log` is now `agent.history.messages`.
+- **Breaking:** `agent.snapshot()` is now async; it waits for in-flight work to
+  settle so snapshots are always at rest.
+- **Breaking:** removed `Agent.restore()`; resume with `new Agent(config, session)`.
+- **Breaking:** removed `index` from `StreamEvent`. Correlate tool events by
+  `id`; text/thinking deltas belong to the most recently opened part.
+- **Breaking:** removed the `createHandle` export.
+- Added an `agent-compaction` baseline check exercising compaction end to end
+  against live providers.
 
 - Fixed OpenAI file handling so filenames and URLs are resolved correctly.
 
