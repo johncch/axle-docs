@@ -5,6 +5,25 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.28.0] - 2026-07-27
+
+- Added `agent.stop()` to stop an active turn at the next tool-batch boundary
+  without interrupting in-flight work.
+- Added `agent.clear()` to cancel queued agent operations while leaving the
+  active turn untouched.
+- Added `PromptCompactor` and automatic before/after-turn compaction triggers
+  for easier long-session management.
+- Added `StreamHandle.onToolBatchComplete(callback)` for reacting to completed
+  tool batches.
+- Replaced `agent.onCompaction(callback)` with `agent.setCompaction({ compact, triggers })`.
+  `agent.compact({ signal })` cancellation now rejects instead of resolving `null`.
+- Improved compaction cancellation, history handling, and messages for repeated
+  compactions.
+- Updated available model definitions: added Claude Opus 5, Gemini 3.5 Flash Lite,
+  Gemini 3.6 Flash; deprecated older Gemini and OpenAI models.
+- Fixed Gemini thinking configuration for newer Gemini 3.x models.
+- See the [0.28.0 migration guide](/migration/0.28.0) for full details.
+
 ## [0.27.1] - 2026-07-17
 
 - Added support for the Kimi K3 model.

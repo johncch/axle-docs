@@ -6,8 +6,9 @@ description: The primary interface for building multi-turn agents.
 # Agent
 
 `Agent` is the primary interface. It owns the provider, model, system prompt,
-tools, and conversation history. `send()` is the only verb — it accepts either
-a plain string or an [`Instruct`](/guide/instruct).
+tools, and conversation history. `send()` starts immediately when the agent is
+idle and otherwise queues FIFO. It accepts either a plain string or an
+[`Instruct`](/guide/instruct).
 
 ```typescript
 import { Agent, anthropic } from "@fifthrevision/axle";
@@ -121,11 +122,62 @@ await agent.send("What's my name?").final;
 // → "Your name is Ana."
 ```
 
+## Stopping and clearing
+
+### `agent.stop()`
+
+`stop()` asks the active turn to finish at its next complete tool-batch
+boundary. Every tool in the in-flight batch completes (including parallel
+calls), commits, and then the handle settles without another provider
+request. A turn whose response requests no tools completes normally.
+
+```typescript
+const h1 = agent.send("Build the feature.");
+
+// later, from an event handler while h1 is executing:
+agent.stop(); // returns false if no turn is executing yet
+const h2 = agent.send("Make the button blue.");
+```
+
+`stop()` returns `false` when no turn is executing. It never affects queued
+sends — they run afterward in FIFO order.
+
+Each handle resolves only its own result: `h1` settles at the stop boundary
+and does not absorb `h2`'s response. A stopped turn ends on its tool-call
+exchange, so a plain send resolves with whatever text that turn produced
+(often empty) and an `Instruct` send may resolve `ok: false` with a parse
+error — no final answer exists yet by design.
+
+`stop()` never interrupts a running provider request or tool batch; use
+cancellation when a hard stop is required.
+
+### `agent.clear()`
+
+`clear()` cancels every queued operation without touching the active turn.
+Each cleared handle rejects with an `AxleAgentAbortError`, committing
+nothing. It returns the number of operations cleared.
+
+Together, `stop()` and `clear()` recover full takeover:
+
+```typescript
+agent.stop();  // active turn settles at its tool-batch boundary
+agent.clear(); // queued sends are dropped
+agent.send("Make the button blue."); // runs as the very next turn
+```
+
 ## Cancellation
 
-`send()` returns a handle. Call `handle.cancel(reason)` to abort mid-stream.
-`handle.final` then rejects with an `AbortError` that preserves `reason`,
-`usage`, `turn`, and any partial output.
+`send()` returns a handle. Call `handle.cancel(reason)` to abort that handle
+only — other queued handles are unaffected.
+
+Cancellation is handle-local. The user message commits when the provider
+request is made, so:
+
+- Cancelling a queued handle removes it without committing its user message.
+- Cancelling the running handle before its provider request (during setup or
+  automatic compaction) also commits nothing.
+- Cancelling after the provider request aborts the active work; the
+  committed user message remains and the agent turn is marked cancelled.
 
 ```typescript
 const handle = agent.send("Long task...");
@@ -135,11 +187,22 @@ try {
   const result = await handle.final;
 } catch (err) {
   if (err instanceof Error && err.name === "AbortError") {
-    // handle cancellation
+    // handle cancellation; partial state is on err
   } else {
     throw err;
   }
 }
+```
+
+To cancel a group, give every operation the same external signal:
+
+```typescript
+const controller = new AbortController();
+
+const h1 = agent.send("Build the feature.", { signal: controller.signal });
+const h2 = agent.send("Make the button blue.", { signal: controller.signal });
+
+controller.abort("cancel the run");
 ```
 
 ## Context counter
@@ -152,6 +215,104 @@ const ctx = agent.context();
 console.log(`Using ~${ctx.total} tokens (${ctx.free} free)`);
 // { total, system, messages, tools, mcpTools, providerTools, limit?, free? }
 ```
+
+## Compaction (experimental)
+
+Compaction replaces the agent's active conversation with a shorter one — for
+example a summary — so long sessions can continue past the model's context
+limit. The API is experimental and may change in any release.
+
+### Built-in `PromptCompactor`
+
+Axle ships a prompt-based implementation for the common case:
+
+```typescript
+import { Agent, PromptCompactor } from "@fifthrevision/axle";
+
+const compactor = new PromptCompactor({
+  provider,
+  model,
+  prompt:
+    "Create a continuation summary. Preserve decisions, constraints, completed work, and open tasks.",
+  thresholdTokens: 100_000,
+  targetTokens: 20_000,
+});
+
+agent.setCompaction({
+  compact: compactor.compact,
+  triggers: {
+    beforeTurn: true,
+  },
+});
+```
+
+`PromptCompactor` returns one user message containing a model-written summary
+followed by the latest 10 user messages in oldest-to-newest order. The target
+is an approximate budget for that complete message, including the recent
+message appendix. Set `recentUserMessages` to change the count.
+
+For `PromptCompactor`, automatic triggers decline while usage is below
+`thresholdTokens`, while a manual `agent.compact()` bypasses that threshold.
+
+### Manual compaction
+
+```typescript
+const record = await agent.compact(); // CompactionRecord | null when declined
+const record = await agent.compact({ signal }); // can be aborted
+```
+
+`agent.compact({ signal })` follows the same cancellation contract as every
+other operation: aborting rejects with an error whose `name` is
+`"AbortError"`. `null` strictly means no compaction happened by choice — no
+callback configured, or the callback declined.
+
+### Custom configuration
+
+```typescript
+agent.setCompaction({
+  compact: async ({ messages }, { usage, signal, trigger, lastCompaction }) => {
+    if (trigger !== "manual" && usage.total < 100_000) return null;
+    return summarize(messages, signal);
+  },
+  triggers: {
+    beforeTurn: true,
+    afterTurn: true,
+  },
+});
+```
+
+The callback receives a `trigger` field (`"manual" | "beforeTurn" | "afterTurn"`).
+`lastCompaction.messageCount` marks how many leading messages are carried-over
+compacted content.
+
+Omitting `triggers` makes compaction manual-only. `beforeTurn` invokes the
+callback before the next `send()` commits its user message; `afterTurn`
+invokes it after a successful turn is committed and before that handle
+resolves.
+
+### Compaction callback holds the scheduler
+
+Like tool callbacks, the compaction callback runs while the agent's scheduler
+is held: scheduling more work on the same agent from inside it queues behind
+the current operation, so awaiting that work from inside the callback
+deadlocks. Fire-and-forget scheduling is safe.
+
+### History
+
+Compaction is destructive at the message layer: the returned messages become
+the entire active conversation. Nothing is lost:
+
+- `history.messages` — the active conversation sent to the model.
+- `history.archive` — the raw append-only log; compaction never touches it.
+- `history.compactions` — receipts (`{ id, at, messageCount }`) for each
+  compaction; `messageCount` marks how many leading messages are
+  carried-over compacted content.
+
+Compaction emits `compaction:start` / `compaction:end` events and lands in
+`history.turns` as an agent turn containing a single `compaction` part.
+
+See [Migrating to Axle 0.28.0](/migration/0.28.0) for the `onCompaction()`
+migration and detailed `stop()` semantics.
 
 ## Streaming events
 
