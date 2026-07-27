@@ -72,11 +72,14 @@ if (result.ok) {
 
 Cancellation follows standard JavaScript abort semantics:
 
-- `handle.cancel(reason)` aborts a `stream()` or `agent.send()` handle.
-- `stream().final`, `generate(...)`, and `agent.send(...).final` reject with
-  an error whose `name` is `"AbortError"`.
+- `handle.cancel(reason)` aborts that stream or send handle only.
+- A cancelled Agent handle commits no user turn unless its provider request
+  was already made; after that point the committed user turn remains and the
+  agent turn is marked cancelled.
+- `stream().final`, `generate(...)`, and Agent handle finals reject with an
+  error whose `name` is `"AbortError"`.
 - Axle abort errors preserve `reason`, `usage`, and partial state where
-  available (`messages`, `partial`, and for `Agent.send`, `turn`).
+  available (`messages`, `partial`, and for Agent handles, `turn`).
 
 ```typescript
 try {

@@ -208,6 +208,26 @@ The `turn:complete` and `tool-results:complete` events carry complete
 `AxleAssistantMessage` and `AxleToolCallMessage` objects — useful for
 client-server architectures that need authoritative message boundaries.
 
+### Tool-batch boundary callback
+
+`StreamHandle` exposes `onToolBatchComplete(callback)`, an awaited hook
+called after a complete tool batch has executed and its tool-result message
+has been committed:
+
+```typescript
+const handle = stream({ provider, model, messages, tools });
+
+handle.onToolBatchComplete(async (toolResultsMessage) => {
+  await persist(toolResultsMessage);
+  return shouldHandoff() ? "finish" : "continue";
+});
+```
+
+Return `"finish"` to resolve successfully without starting another provider
+request, or `"continue"` to resume the tool loop. The callback receives one
+`AxleToolCallMessage` containing the whole batch. Agent uses this hook
+internally for `stop()`.
+
 ## Cancellation
 
 Both event streams share the same cancellation semantics:
