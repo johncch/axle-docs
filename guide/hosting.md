@@ -12,7 +12,7 @@ concerns in your host application on top of:
 - `Agent` and `agent.on(...)`
 - The streamed turn events Axle emits (see [Streaming](/guide/streaming))
 - The complete `AxleAssistantMessage` and `AxleToolCallMessage` objects
-  carried on `turn:complete` and `tool-results:complete` — useful as
+  carried on `step:complete` and `tool-results:complete` — useful as
   authoritative message boundaries for client-server architectures.
 
 ## Typical host responsibilities

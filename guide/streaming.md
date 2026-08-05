@@ -175,7 +175,7 @@ handle.on((event) => {
     case "tool:request":   console.log(`[tool ${event.name}]`); break;
     case "tool:exec-start":   console.log("[exec start]"); break;
     case "tool:exec-complete":console.log("[exec complete]"); break;
-    case "turn:complete":  console.log("[turn complete]"); break;
+    case "step:complete":  console.log("[step complete]"); break;
     case "error":          console.error(event.error); break;
   }
 });
@@ -199,12 +199,12 @@ handle.on((event) => {
 | `tool:exec-complete`      | Local tool execution finished; carries the `result`.                        |
 | `provider-tool:start`     | Provider-side tool started (web search, code interp.).                      |
 | `provider-tool:complete`  | Provider-side tool finished; may carry `output`.                            |
-| `turn:complete`           | Assistant turn finished; carries the full `AxleAssistantMessage`.           |
+| `step:complete`           | Assistant step finished; carries the full `AxleAssistantMessage`.           |
 | `tool-results:start`      | Tool-results message is about to be sent back to the model.                 |
 | `tool-results:complete`   | Tool-results message committed; carries the `AxleToolCallMessage`.          |
 | `error`                   | Error event during the run.                                                 |
 
-The `turn:complete` and `tool-results:complete` events carry complete
+The `step:complete` and `tool-results:complete` events carry complete
 `AxleAssistantMessage` and `AxleToolCallMessage` objects — useful for
 client-server architectures that need authoritative message boundaries.
 
