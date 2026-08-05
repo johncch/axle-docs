@@ -5,6 +5,14 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.29.0] - 2026-08-05
+
+- Added Qwen 3.7 Flash and Qwen 3.8 Max model definitions.
+- Updated Qwen model metadata with larger output limits for selected Qwen 3.6 and 3.7 models.
+- **Breaking:** renamed tool-loop terminology from "turn" to "step": `maxIterations` is now `maxSteps`, `"max-iterations"` is now `"max-steps"`, stream events are now `step:start`/`step:complete`, and `generateTurn` is now `generateStep`.
+- Added the 0.29.0 migration guide and a terminology reference.
+- See the [0.29.0 migration guide](/migration/0.29.0) for full details.
+
 ## [0.28.0] - 2026-07-27
 
 - Added `agent.stop()` to stop an active turn at the next tool-batch boundary
