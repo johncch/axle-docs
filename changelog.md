@@ -5,6 +5,12 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.30.1] - 2026-08-13
+
+- Fixed `PromptCompactor` progress reporting and summary handling so completed
+  compactions report progress through 100% without duplicating generated
+  summaries as reader-facing text.
+
 ## [0.30.0] - 2026-08-13
 
 - **Breaking:** replaced agent-owned history with host-owned transcripts: use

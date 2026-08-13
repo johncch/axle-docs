@@ -263,9 +263,11 @@ agent.setCompaction({
 ```
 
 `PromptCompactor` returns stamped messages containing a model-written summary
-and a recent-user-messages appendix. Its `shouldCompactOnTrigger` declines
-while usage is below `thresholdTokens`; explicit `agent.compact()` bypasses
-that threshold.
+and a recent-user-messages appendix. It reports progress through 100% just
+before completion, and does not set a reader-facing summary on the
+`CompactionPart` — the model-generated summary only appears in the
+conversation messages. Its `shouldCompactOnTrigger` declines while usage is
+below `thresholdTokens`; explicit `agent.compact()` bypasses that threshold.
 
 ::: warning 0.29 upgrade
 `setCompaction({ compact: c.compact, triggers })` previously included
