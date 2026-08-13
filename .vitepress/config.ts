@@ -7,7 +7,7 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'Axle',
     nav: [
-      { text: 'v0.29.0', link: '/changelog' },
+      { text: 'v0.30.0', link: '/changelog' },
     ],
     sidebar: [
       {
@@ -39,7 +39,8 @@ export default defineConfig({
           { text: 'Agent with tools', link: '/examples/simple-agent' },
           { text: 'Structured output', link: '/examples/simple-schema' },
           { text: 'Reasoning', link: '/examples/simple-reasoning' },
-          { text: 'Procedural memory', link: '/examples/simple-memory' },
+          { text: 'Transcript & persistence', link: '/examples/simple-transcript' },
+          { text: 'Model-directed memory', link: '/examples/simple-memory' },
           { text: 'Provider tools', link: '/examples/simple-provider-tools' },
           { text: 'generate()', link: '/examples/simple-generate' },
           { text: 'generate() + Instruct', link: '/examples/simple-generate-instruct' },
@@ -68,7 +69,8 @@ export default defineConfig({
         text: 'Reference',
         items: [
           { text: 'Changelog', link: '/changelog' },
-          { text: 'Migration: 0.29.0', link: '/migration/0.29.0' },
+          { text: 'Migration: 0.30.0', link: '/migration/0.30.0' },
+      { text: 'Migration: 0.29.0', link: '/migration/0.29.0' },
           { text: 'Migration: 0.28.0', link: '/migration/0.28.0' },
           { text: 'Migration: 0.27.0', link: '/migration/0.27.0' },
           { text: 'Migration: 0.25.0', link: '/migration/0.25.0' },

@@ -222,9 +222,24 @@ Compaction replaces the agent's active conversation with a shorter one — for
 example a summary — so long sessions can continue past the model's context
 limit. The API is experimental and may change in any release.
 
+Compaction has three layers, each with one job:
+
+- **Triggers** (`beforeTurn` / `afterTurn`) say *when to ask automatically*.
+- **`shouldCompactOnTrigger`** filters those automatic requests
+  synchronously.
+- **`compact`** does *the work* — as fallible turn work, streamed like a
+  tool call. Explicit `agent.compact()` always bypasses the automatic policy
+  and invokes `compact` directly.
+
+The record of a compaction is a `CompactionPart` that arrives `running`,
+receives replacement `compaction:update` progress or summary events, and
+settles `complete` (the message swap applied, atomically) or `error` (a
+recorded, non-fatal failure for automatic triggers).
+
 ### Built-in `PromptCompactor`
 
-Axle ships a prompt-based implementation for the common case:
+Axle ships a prompt-based implementation for the common case. Wire both
+`shouldCompactOnTrigger` and `compact`:
 
 ```typescript
 import { Agent, PromptCompactor } from "@fifthrevision/axle";
@@ -239,6 +254,7 @@ const compactor = new PromptCompactor({
 });
 
 agent.setCompaction({
+  shouldCompactOnTrigger: compactor.shouldCompactOnTrigger,
   compact: compactor.compact,
   triggers: {
     beforeTurn: true,
@@ -246,33 +262,51 @@ agent.setCompaction({
 });
 ```
 
-`PromptCompactor` returns one user message containing a model-written summary
-followed by the latest 10 user messages in oldest-to-newest order. The target
-is an approximate budget for that complete message, including the recent
-message appendix. Set `recentUserMessages` to change the count.
+`PromptCompactor` returns stamped messages containing a model-written summary
+and a recent-user-messages appendix. Its `shouldCompactOnTrigger` declines
+while usage is below `thresholdTokens`; explicit `agent.compact()` bypasses
+that threshold.
 
-For `PromptCompactor`, automatic triggers decline while usage is below
-`thresholdTokens`, while a manual `agent.compact()` bypasses that threshold.
+::: warning 0.29 upgrade
+`setCompaction({ compact: c.compact, triggers })` previously included
+`PromptCompactor`'s threshold policy inside `compact`. In 0.30 that
+configuration accepts every automatic trigger. Add
+`shouldCompactOnTrigger: c.shouldCompactOnTrigger`, or the conversation will
+compact at every configured boundary.
+:::
 
 ### Manual compaction
 
 ```typescript
-const record = await agent.compact(); // CompactionRecord | null when declined
-const record = await agent.compact({ signal }); // can be aborted
+const applied = await agent.compact(); // Promise<boolean>
+const applied = await agent.compact({ signal }); // can be aborted
 ```
 
-`agent.compact({ signal })` follows the same cancellation contract as every
-other operation: aborting rejects with an error whose `name` is
-`"AbortError"`. `null` strictly means no compaction happened by choice — no
-callback configured, or the callback declined.
+`agent.compact()` returns `true` after the configured compactor applies,
+`false` when no compactor is configured. Automatic-trigger failures no longer
+reject the send — the errored `CompactionPart` is the record. Explicit
+`agent.compact()` failures reject.
 
 ### Custom configuration
 
 ```typescript
 agent.setCompaction({
-  compact: async ({ messages }, { usage, signal, trigger, lastCompaction }) => {
-    if (trigger !== "manual" && usage.total < 100_000) return null;
-    return summarize(messages, signal);
+  shouldCompactOnTrigger(state, ctx) {
+    // Synchronous policy. Return false to skip automatic triggers.
+    return state.totalTokens > 100_000;
+  },
+  compact: async ({ messages }, { usage, signal, trigger, id, emit }) => {
+    // id — engine-generated compaction id, shared with the CompactionPart
+    // emit({ summary?, progress? }) — streams transient reader-facing state
+    emit({ progress: 0.3, summary: "Reading conversation…" });
+
+    const summary = await doSummarize(messages, signal);
+
+    // Return the new conversation. summary is optional reader-facing text.
+    return {
+      messages: createNewConversation(summary, messages),
+      summary: "Reduced context by ~60%",
+    };
   },
   triggers: {
     beforeTurn: true,
@@ -281,14 +315,32 @@ agent.setCompaction({
 });
 ```
 
-The callback receives a `trigger` field (`"manual" | "beforeTurn" | "afterTurn"`).
-`lastCompaction.messageCount` marks how many leading messages are carried-over
-compacted content.
+Omitting `triggers` makes compaction manual-only.
 
-Omitting `triggers` makes compaction manual-only. `beforeTurn` invokes the
-callback before the next `send()` commits its user message; `afterTurn`
-invokes it after a successful turn is committed and before that handle
-resolves.
+### Compaction parts
+
+The compactor's returned `summary` is reader-facing text on the
+`CompactionPart` — a presentation choice, independent of the model-facing
+messages. If the callback returns no summary, the latest emitted transient
+summary remains; without one, the completed part renders as a bare divider.
+
+```typescript
+agent.on((event) => {
+  if (event.type === "part:start" && event.part.type === "compaction") {
+    // event.part: { id, type: "compaction", status: "running", summary?, progress? }
+    console.log(`[compaction] running — ${event.part.summary ?? ""}`);
+  }
+  if (event.type === "compaction:update") {
+    console.log(`[compaction] progress=${event.update.progress}, summary=${event.update.summary}`);
+  }
+  if (event.type === "compaction:complete") {
+    console.log("[compaction] applied");
+  }
+  if (event.type === "compaction:error") {
+    console.log(`[compaction] failed: ${event.error}`);
+  }
+});
+```
 
 ### Compaction callback holds the scheduler
 
@@ -296,23 +348,6 @@ Like tool callbacks, the compaction callback runs while the agent's scheduler
 is held: scheduling more work on the same agent from inside it queues behind
 the current operation, so awaiting that work from inside the callback
 deadlocks. Fire-and-forget scheduling is safe.
-
-### History
-
-Compaction is destructive at the message layer: the returned messages become
-the entire active conversation. Nothing is lost:
-
-- `history.messages` — the active conversation sent to the model.
-- `history.archive` — the raw append-only log; compaction never touches it.
-- `history.compactions` — receipts (`{ id, at, messageCount }`) for each
-  compaction; `messageCount` marks how many leading messages are
-  carried-over compacted content.
-
-Compaction emits `compaction:start` / `compaction:end` events and lands in
-`history.turns` as an agent turn containing a single `compaction` part.
-
-See [Migrating to Axle 0.28.0](/migration/0.28.0) for the `onCompaction()`
-migration and detailed `stop()` semantics.
 
 ## Streaming events
 
@@ -327,27 +362,48 @@ See [Streaming](/guide/streaming) for the full event list.
 // Save the current session
 const saved: SavedAgent = {
   definition: myAgentDefinition, // AgentDefinition (serializable recipe)
-  session: agent.snapshot(),     // AgentSession (messages, turns, sessionId)
+  session: await agent.snapshot(),     // AgentSession ({ sessionId, messages })
 };
 
-// Restore from a saved session — constructor form (0.21.0+)
+// Restore from a saved session — pass session as second constructor argument
 const config = await createAgentConfig(saved.definition, resolver);
 const restoredAgent = new Agent(config, saved.session);
-
-// Alternatively, use the explicit restore() method
-const restoredAgent2 = new Agent(config);
-restoredAgent2.restore(saved.session);
 ```
 
-Both forms are equivalent. When both `config.sessionId` and
-`session.sessionId` are supplied, the restored session id wins.
+When both `config.sessionId` and `session.sessionId` are supplied, the
+restored session id wins.
 
 `AgentDefinition` is a serializable recipe — it describes the provider, model,
 tools, and request defaults in a form that can be stored in a database or sent
 over the wire. Hosts resolve it into a runtime `AgentConfig` using
 `createAgentConfig(definition, resolver)`.
 
-`AgentSession` holds continuation state: the model-facing message history,
-renderable turns, session annotations, and the stable `sessionId`.
+`AgentSession` holds continuation state: the active model-facing
+`messages` and the stable `sessionId`. Unknown keys in sessions stored by
+older Axle versions are silently ignored.
+
+### Persisting turns
+
+The agent no longer owns a transcript — turns are host-owned. Attach a
+`Transcript` to the event stream, persist its `turns` next to the session,
+and re-seed it on restore:
+
+```typescript
+const agent = new Agent(config);
+const transcript = new Transcript();
+agent.on((event) => transcript.apply(event));
+
+// … run the agent …
+
+const saved: SavedAgent = {
+  definition: myAgentDefinition,
+  session: await agent.snapshot(),
+};
+await db.save(userId, saved, transcript.turns);
+
+// On restore:
+const restoredTranscript = new Transcript(savedTurns);
+agent.on((event) => restoredTranscript.apply(event));
+```
 
 See [Hosting & Sessions](/guide/hosting) for the full pattern.

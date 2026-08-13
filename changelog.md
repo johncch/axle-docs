@@ -5,6 +5,32 @@ description: Notable changes by release.
 
 # Changelog
 
+## [0.30.0] - 2026-08-13
+
+- **Breaking:** replaced agent-owned history with host-owned transcripts: use
+  `agent.messages` for active conversation state and attach a `Transcript` to
+  the event stream for persistence. `agent.history` is removed.
+- **Breaking:** renamed `TurnAccumulator` to `Transcript` and updated the
+  related transcript exports and persistence APIs.
+- **Breaking:** removed built-in memory APIs (`AgentMemory`, `MemoryContext`,
+  `RecallResult`) and automatic recall/record behavior; use tools for
+  model-directed memory and `Instruct.addContext()` for host-provided context.
+  The CLI's `ProceduralMemory` implementation is removed.
+- **Breaking:** removed session-level annotations and transcript state;
+  annotations now belong to turns or parts.
+- **Breaking:** refactored compaction into trigger, policy, and compactor
+  layers with stateful `CompactionPart`s and `compaction:update`/`complete`/
+  `error` events. `CompactionRecord` is replaced by part-level lifecycle.
+  Automatic compaction failures are now recorded without failing the user turn.
+- **Breaking:** `agent.compact()` returns `Promise<boolean>` (applied vs.
+  skipped) instead of `CompactionRecord | null`.
+- **Breaking:** `AgentSession` is now `{ sessionId, messages }`. Removed:
+  `version`, `archive`, `compactions`, `turns`, `sessionAnnotations`.
+- Added `shouldCompactOnTrigger` policy callback and improved
+  `PromptCompactor` progress reporting.
+- Updated the README, terminology docs, and 0.30.0 migration guide.
+- See the [0.30.0 migration guide](/migration/0.30.0) for full details.
+
 ## [0.29.0] - 2026-08-05
 
 - Added Qwen 3.7 Flash and Qwen 3.8 Max model definitions.

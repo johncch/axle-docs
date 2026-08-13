@@ -35,9 +35,11 @@ and changing them shouldn't require forking the agent core.
   model, system prompt, tools, and request defaults in a form safe to store in
   a database or send over the wire. It is deliberately not executable by
   itself; the host resolves providers and tools into a runtime `AgentConfig`.
-- **`AgentSession`** — continuation and render state. It holds the
-  model-facing message history, renderable turns, session annotations, and
-  the stable `sessionId`.
+- **`AgentSession`** — continuation state. It holds the
+  model-facing `messages` and the stable `sessionId`. Unknown keys in
+  sessions stored by older Axle versions are silently ignored. Turns are
+  host-owned — attach a `Transcript` to the event stream and persist its
+  `turns` alongside the session.
 - **`SavedAgent`** — the pair of `{ definition, session }` suitable for
   persistence.
 
@@ -45,6 +47,7 @@ and changing them shouldn't require forking the agent core.
 
 ```typescript
 import type { SavedAgent, AgentDefinition } from "@fifthrevision/axle";
+import { Transcript } from "@fifthrevision/axle";
 
 // Your serializable definition — store this in your DB
 const definition: AgentDefinition = {
@@ -56,31 +59,37 @@ const definition: AgentDefinition = {
 };
 
 const agent = new Agent(await createAgentConfig(definition, myResolver));
+
+// Attach a transcript to the event stream
+const transcript = new Transcript();
+agent.on((event) => transcript.apply(event));
+
 await agent.send("Hello").final;
 
-// Snapshot the current session
+// Snapshot the current session and persist alongside turns
 const saved: SavedAgent = {
   definition,
-  session: agent.snapshot(),
+  session: await agent.snapshot(),
 };
-
-// Persist `saved` (JSON-serializable)
-await db.saveAgent(userId, saved);
+await db.saveAgent(userId, saved, transcript.turns);
 ```
 
 ### Restoring an agent
 
 ```typescript
-import { Agent, createAgentConfig } from "@fifthrevision/axle";
+import { Agent, createAgentConfig, Transcript } from "@fifthrevision/axle";
 
-const saved = await db.loadAgent(userId);
+const { saved, turns } = await db.loadAgent(userId);
 
 // Host resolves the definition into executable dependencies
 const config = await createAgentConfig(saved.definition, myResolver);
-const agent = new Agent(config);
-agent.restore(saved.session);
+const agent = new Agent(config, saved.session);
 
-// Continue the conversation — history is fully restored
+// Re-seed the transcript from persisted turns
+const transcript = new Transcript(turns);
+agent.on((event) => transcript.apply(event));
+
+// Continue the conversation — messages are fully restored
 await agent.send("What did we discuss before?").final;
 ```
 

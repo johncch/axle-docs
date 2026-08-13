@@ -63,8 +63,7 @@ agent.on((event) => {
 
 | Event                    | Carries                                                                      | Description                                                          |
 | ------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `session:restore`        | `turns`, `sessionAnnotations?`, `config?`                                    | Replayed when prior turns are restored into the agent.               |
-| `turn:user`              | `turn`                                                                       | A user turn was appended to history.                                 |
+| `turn:user`              | `turn`                                                                       | A user turn was appended to messages.                                |
 | `turn:start`             | `turnId`, `timing?`                                                          | A new assistant turn began.                                          |
 | `turn:end`               | `turnId`, `status`, `usage`, `timing?`                                       | The assistant turn finished (`complete`, `cancelled`, `error`).      |
 | `part:start`             | `turnId`, `part` (`TurnPart`)                                                | A new part started — discriminate on `part.type`.                    |
@@ -80,9 +79,12 @@ agent.on((event) => {
 | `action:complete`        | `turnId`, `partId`, `result` (`ActionResult`), `timing?`                     | Action finished — inspect `result.type` for `success` vs `error`.    |
 | `action:error`           | `turnId`, `partId`, `error`, `timing?`                                       | Action failed with a typed error.                                    |
 | `action:child-event`     | `turnId`, `partId`, `event`                                                  | An event from a nested sub-agent run.                                |
-| `annotation:start`       | `target`, `annotation`                                                       | An annotation was created on a session, turn, or part.               |
+| `annotation:start`       | `target`, `annotation`                                                       | An annotation was created on a turn or part.                         |
 | `annotation:update`      | `target`, `annotation`                                                       | An annotation was updated.                                           |
 | `annotation:end`         | `target`, `annotation`                                                       | An annotation finished (`status` defaults to `"complete"`).          |
+| `compaction:update`      | `turnId`, `partId`, `update` (`{ summary?, progress? }`)                     | Transient reader-facing state on a running compaction part.          |
+| `compaction:complete`    | `turnId`, `partId`, `timing?`                                                | Compaction applied — the message swap is committed.                  |
+| `compaction:error`       | `turnId`, `partId`, `error`, `timing?`                                       | Compaction failed (non-fatal for automatic triggers).                |
 | `error`                  | `error`                                                                      | Top-level error during the run.                                      |
 
 ### Part types
@@ -102,6 +104,9 @@ agent.on((event) => {
 - `"file"` — a file attachment the assistant produced (rare).
 - `"action"` — a tool, sub-agent, or provider tool call. Distinguish with
   `part.kind`: `"tool" | "agent" | "provider-tool"`.
+- `"compaction"` — a conversation compaction. Arrives `running`; settles
+  `complete` or `error` via `compaction:update` / `compaction:complete` /
+  `compaction:error` events.
 
 Callbacks are registered once and fire on every subsequent `send()`.
 
@@ -118,7 +123,7 @@ interface Citation {
 }
 ```
 
-If you use `TurnAccumulator`, citations accumulate on `TextPart.citations`
+If you use `Transcript`, citations accumulate on `TextPart.citations`
 automatically — no extra reducer work is needed.
 
 Some providers (such as OpenRouter web search) emit citations as a source list
