@@ -8,10 +8,6 @@ files.
 Humans are welcome to read it too; nothing here is agent-specific except the
 directness.
 
-# Package Manager
-
-**This project uses pnpm, not npm.**
-
 # Commands
 
 - Dev server: `pnpm dev`

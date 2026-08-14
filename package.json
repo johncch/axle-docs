@@ -2,6 +2,7 @@
   "name": "axle-docs",
   "version": "0.0.1",
   "type": "module",
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "dev": "vitepress dev",
     "build": "node scripts/check-snippets.mjs && node scripts/check-links.mjs && vitepress build",
