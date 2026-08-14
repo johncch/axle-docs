@@ -4,11 +4,19 @@
   "type": "module",
   "scripts": {
     "dev": "vitepress dev",
-    "build": "vitepress build",
+    "build": "node scripts/check-snippets.mjs && node scripts/check-links.mjs && vitepress build",
+    "build:fast": "vitepress build",
+    "check:snippets": "node scripts/check-snippets.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "check": "node scripts/check-snippets.mjs && node scripts/check-links.mjs",
     "preview": "vitepress preview"
   },
   "devDependencies": {
+    "@fifthrevision/axle": "0.30.1",
+    "@types/node": "^26.2.0",
+    "typescript": "^6.0.3",
     "vitepress": "^1.6.4",
-    "vue": "^3.5.34"
+    "vue": "^3.5.34",
+    "zod": "^4.4.3"
   }
 }

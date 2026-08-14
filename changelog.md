@@ -5,6 +5,153 @@ description: Notable changes by release.
 
 # Changelog
 
+Mirrored from [`CHANGELOG.md`](https://github.com/johncch/axle/blob/main/CHANGELOG.md)
+in the library repository. For upgrade instructions, see [Upgrading](/upgrading).
+
+
+## [0.30.1] - 2026-08-13
+
+- Fixed `PromptCompactor` progress reporting and summary handling so completed compactions are reported reliably without duplicating generated summaries.
+
+## [0.30.0] - 2026-08-13
+
+- **Breaking:** replaced agent-owned history with host-owned transcripts: use `agent.messages` for active conversation state and attach a `Transcript` to the event stream for persistence.
+- **Breaking:** renamed `TurnAccumulator` to `Transcript` and updated the related transcript exports and persistence APIs.
+- **Breaking:** removed built-in memory APIs and automatic recall/record behavior; use tools for model-directed memory and `Instruct.addContext()` for host-provided context.
+- **Breaking:** removed session-level annotations and transcript state; annotations now belong to turns or parts, with session-wide application state kept by the host.
+- **Breaking:** refactored compaction into trigger, policy, and compactor layers with stateful compaction parts and `compaction:update`/`complete`/`error` events; automatic compaction failures are now recorded without failing the user turn.
+- Improved `PromptCompactor` progress reporting and summary handling so repeated compactions avoid reusing prior summaries.
+- Updated the README, terminology docs, and 0.30.0 migration guide.
+
+## [0.29.0] - 2026-08-05
+
+- Added Qwen 3.7 Flash and Qwen 3.8 Max model definitions.
+- Updated Qwen model metadata with larger output limits for selected Qwen 3.6 and 3.7 models.
+- **Breaking:** renamed tool-loop terminology from “turn” to “step”: `maxIterations` is now `maxSteps`, `"max-iterations"` is now `"max-steps"`, stream events are now `step:start`/`step:complete`, and `generateTurn` is now `generateStep`.
+- Added a 0.29.0 migration guide and terminology reference for the step/turn naming changes.
+
+## [0.28.0] - 2026-07-27
+
+- Added `agent.stop()` to stop an active turn at the next tool-batch boundary without interrupting in-flight work.
+- Added `agent.clear()` to cancel queued agent operations while leaving the active turn untouched.
+- Added `PromptCompactor` and automatic before/after-turn compaction triggers for easier long-session management.
+- Improved compaction cancellation, history handling, and messages for repeated compactions.
+- Updated available model definitions and fixed Gemini thinking configuration for newer Gemini 3.x models.
+
+## [0.27.1] - 2026-07-17
+
+- Added support for the Kimi K3 model.
+
+## [0.27.0] - 2026-07-10
+
+- Improved model registry support for clearer model selection.
+- Updated TypeScript support and improved type narrowing definitions.
+
+## [0.26.1] - 2026-07-09
+
+- Fixed OpenAI tool schemas so optional properties are accepted correctly.
+- Improved generation failure handling and exposed the clearer `AxleFailure` name while keeping `GenerateError` as an alias.
+- Improved stream turn accumulation error handling for more reliable failures.
+- Removed the Gemini 3.5 Pro model option.
+
+## [0.26.0] - 2026-07-06
+
+- Added experimental context compaction: `agent.onCompaction(callback)` supplies the policy and strategy, `await agent.compact()` triggers it. Active history is replaced; `agent.history` now exposes `messages` (active), `archive` (raw append-only), and `compactions` (receipts). Compaction renders as an agent turn containing a new `compaction` part and emits `compaction:start`/`compaction:end` turn events.
+- Added `maxContextTokens` to `stream()`/`generate()`: a token budget for the tool loop, checked after each turn settles.
+- **Behavior change:** loop limits are stops, not errors. `maxIterations` and `maxContextTokens` return `ok: true` with `stopped: "max-iterations" | "token-limit"` instead of an error result. Non-positive limits throw at call time.
+- **Breaking:** `agent.history.log` is now `agent.history.messages`.
+- **Breaking:** `agent.snapshot()` is now async; it waits for in-flight work to settle so snapshots are always at rest.
+- **Breaking:** removed `Agent.restore()`; resume with `new Agent(config, session)`.
+- **Breaking:** removed `index` from `StreamEvent`. Correlate tool events by `id`; text/thinking deltas belong to the most recently opened part.
+- **Breaking:** removed the `createHandle` export.
+- Added an `agent-compaction` baseline check exercising compaction end to end against live providers.
+
+## [0.25.5] - 2026-07-03
+
+- Add Claude Fable, Sonnet 5; Gemini 3.5 models
+
+## [0.25.4] - 2026-06-17
+
+- Improved `parallelize` handling for more reliable batched tool execution.
+
+## [0.25.3] - 2026-06-16
+
+- Fixed OpenAI file handling so filenames and URLs are resolved correctly.
+
+## [0.25.2] - 2026-06-15
+
+- Fixed tool calls with syntactically invalid JSON parameters so they are handled gracefully instead of failing.
+
+## [0.25.1] - 2026-06-13
+
+- Consolidate vendor options for ChatCompletions
+
+## [0.25.0] - 2026-06-12
+
+- Added a web search fallback for more reliable search behavior.
+- Improved handling of non-text tool results.
+
+## [0.24.0] - 2026-06-11
+
+- Added experimental subagent tools for delegating bounded work to other agents, with child turn-event forwarding (`action:child-event`).
+- Added experimental parallel tool execution for running batched tool calls concurrently.
+- Added tool context helpers for reporting usage and adding contextual information during runs, including a flat per-provider/model `Stats.breakdown`.
+- Added the `tool:exec-error` stream event for fatal/aborted tool calls; `Agent.on()` now returns an unsubscribe function.
+- **Behavior change:** in `stream()`, a user-provided `onToolCall` returning `null`/`undefined` now falls through to executing the matching registry tool (matching `generate()`'s existing semantics) instead of producing a `not-found` result.
+- **Behavior change:** a tool throwing an error merely named `AbortError` while the run's signal is live is reported to the model as an ordinary tool error instead of aborting the run.
+- Fixed output fencing in generated content.
+
+## [0.23.1] - 2026-06-08
+
+- Updated Anthropic thinking configuration support
+
+## [0.23.0] - 2026-06-08
+
+- Improved observability with a simplified span-based tracing interface
+- Added richer trace events, span completion details, and token/content logging for agent and streaming runs
+- Added provider tool logging and support for routing observability data to multiple sinks
+
+## [0.22.1] - 2026-06-07
+
+- Improved handling of chat-completions streaming errors
+- Fixed Gemini citation handling
+
+## [0.22.0] - 2026-06-06
+
+- Added support for OpenRouter web search citations
+- Improved citation handling for web search results
+- Fixed tool handling for interleaved tool calls
+
+## [0.21.0] - 2026-05-30
+
+- Added support for Opus 4.8
+- Added support for citations and thinking formats
+- Added configurable retry options
+- Added a convenience method for rehydrating agents
+- Added metadata support for turns and messages
+
+## [0.20.0] - 2026-05-25
+
+- Split the library and CLI into separate packages for clearer installation and usage
+- Added `AgentSession` and snapshot restore APIs for saving and resuming agent sessions
+- Added `createAgentConfig` for easier agent configuration
+- Updated memory handling so memory is managed separately from `AgentConfig`
+- Added documentation updates and removed Brave-related docs/support
+
+## [0.19.0] - 2026-05-24
+
+- Added a browser-only export for client-side bundles that omits server-only code
+- Added annotations support to Turns
+
+## [0.18.0] - 2026-05-22
+
+- Added support for Gemini 3.5 Flash
+- Standardized request options across providers, including output tokens, temperature, top-p, stop sequences, tool choice, and provider-specific options
+- Renamed provider option types and runtime parameters; see the 0.18.0 migration guide for update details
+- Updated usage stats to include cached tokens and thinking tokens
+- Added a simple context counter and split MCP tools for more flexible tool usage
+- Fixed bugs found during smoke testing
+
 ## [0.17.0] - 2026-05-13
 
 - Updated the Instruct constructor to use object-style options

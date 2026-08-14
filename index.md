@@ -1,58 +1,89 @@
 ---
 title: Introduction
-description: A small, focused TypeScript library for building multi-turn LLM agents.
+description: What Axle is, why it exists, and how these docs are organized.
 ---
 
 # Introduction
 
-Axle is a TypeScript library for building multi-turn LLM agents. It provides a
-small, focused API for building agentic applications.
+Axle is a TypeScript library for building multi-turn LLM agents. You get an
+`Agent` that owns a conversation, a tool loop that runs to completion, structured
+output backed by Zod, and one event stream you can render — all working the same
+way across Anthropic, OpenAI, Gemini, and any OpenAI-compatible endpoint.
+
+It's a library, not a framework. There's no graph to declare, no runtime to host,
+no DSL to learn. You make an object and call `send()`.
 
 ```typescript
 import { Agent, anthropic } from "@fifthrevision/axle";
 
-const provider = anthropic(process.env.ANTHROPIC_API_KEY);
-const agent = new Agent({ provider, model: "claude-sonnet-4-5-20250929" });
+const agent = new Agent({
+  provider: anthropic(process.env.ANTHROPIC_API_KEY!),
+  model: "claude-sonnet-4-5",
+});
 
-const r1 = await agent.send("What is the capital of France?").final;
-if (!r1.ok) throw new Error(r1.error.kind);
-console.log(r1.response); // "Paris is the capital of France."
-
-// Multi-turn — history is managed automatically
-const r2 = await agent.send("And what about Germany?").final;
-if (!r2.ok) throw new Error(r2.error.kind);
+const result = await agent.send("What is the capital of France?").final;
+if (result.ok) console.log(result.response);
 ```
 
-## Philosophy
+That's a complete program. Everything else in these docs builds on it.
 
-Axle has two big goals:
+## Is this for you?
 
-1. **A small, focused, and ergonomic interface for building agents.** The
-   `Agent`, `Instruct`, and other APIs are the entire surface, and there is a
-   lot of thought to make them distinct and composable.
-2. **Systematic prompt improvement.** Log what was sent, validate what came
-   back, feed learnings into the next run. (This is where the roadmap is
-   headed.)
+Probably, if you want:
 
-Axle started as a DSPy-inspired workflow tool. As models got better with
-reasoning and tool use, rigid workflow graphs felt unnecessary — but the goals
-behind them (structured output, verification, multi-step reasoning) didn't go
-away. The project shifted toward making those capabilities composable
-primitives rather than fixed pipelines.
+- A TypeScript-native library rather than a Python port.
+- Multi-turn agents without wiring up a framework first.
+- The freedom to switch providers without rewriting your agents.
+- To own your own UI — Axle emits events and hands you the state to render.
 
-## Roadmap
+## What we're going for
 
-- **Memory:** Ways to remember previous runs to retrieve them and add them
-  back into the prompt for future runs.
-- **Verification:** Automatic and manual ways to verify the output hits goals.
+A small, ergonomic surface for building agents. `Agent`, `Instruct`, `stream()`,
+and `generate()` are most of the library. Each has one job, and they're designed
+to compose.
+
+Axle started life as a DSPy-inspired workflow tool. As models got better at
+reasoning and tool use, rigid workflow graphs stopped earning their keep — but
+the goals behind them (structured output, verification, multi-step reasoning)
+didn't go away. So the project shifted toward making those capabilities
+composable primitives instead of fixed pipelines.
+
+Axle powers [Sunnyday](https://www.sunnyday.run), a hosted AI agent platform, and
+forms the core of [Axle CLI](https://www.npmjs.com/package/@fifthrevision/axle-cli)
+and experiments like [Axle Code](https://github.com/johncch/axle-code).
+
+## Finding your way around
+
+**Getting Started** takes you from an empty directory to a working agent.
+
+**Agent** is the main path — start with
+[Anatomy of a send](/concepts/anatomy-of-a-send), which sets up three words
+(messages, steps, turns) that the rest of the docs lean on constantly. It's a
+five-minute read and it makes everything after it easier.
+
+**Primitives** is the layer underneath: `generate()` and `stream()`, for when you
+want the tool loop without a conversation.
+
+**Building blocks** are the pieces both layers use — providers, `Instruct`,
+tools, results, observability. Dip in as you need them.
+
+**API Reference** is the exhaustive listing: what a thing accepts, what it
+returns. It doesn't teach, it just tells you.
+
+**Cookbook** is task-shaped recipes. Streaming to a UI, attaching files,
+cancelling a run, delegating to subagents.
+
+## What's not here yet
+
+A few honest gaps, so you don't go looking:
+
+- No multi-modal *output*. Models can read images and PDFs, but Axle won't
+  surface generated images or audio.
+- Compaction is marked experimental and may change in any release.
+- Axle CLI is being reworked, so it isn't documented on this site yet.
 
 ## Where to next
 
 - [Installation](/getting-started/installation) and [Quick Start](/getting-started/quick-start)
-- [Agent](/guide/agent) — the primary interface
-- [Instruct](/guide/instruct) — structured output, file inputs, templated prompts
-- [CLI](/cli/overview) — declarative job runner
-
-## Known limitations
-
-1. Axle does not support multi-modal output right now.
+- [Anatomy of a send](/concepts/anatomy-of-a-send) — the mental model
+- [Agent](/concepts/agent) — the interface you'll use most
