@@ -16,6 +16,9 @@ import { spawnSync } from "node:child_process";
 const ROOT = process.cwd();
 const WORK = join(ROOT, ".snippet-check");
 
+// Contributor guidance, not site content.
+const EXCLUDED_DOCS = new Set(["LLM-CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md"]);
+
 // Identifiers the docs deliberately leave undefined.
 const PLACEHOLDER = /^(provider|model|apiKey|agent|instruct|schema|messages|previousMessages|newMessages|tools|myTool|getWeather|searchTool|webSearchTool|myLocalTool|myDatabaseTool|readFile|showChart|research|researcher|compactor|transcript|handle|result|session|definition|config|db|sessionId|id|turnId|url|token|input|ctx|state|context|event|socket|logger|exporter|sandbox|authorize|searchIndex|summarize|lookup|persist|render|myReducer|applyHostEvent|myProviderFor|myToolFor|myOtelWriter|myBackend|fs|github|docs|remote|servers|items|documents|doc|hits|shouldStop|shouldHandoff|done|sandboxAlive|userInput|saved|TurnView|ActionView|Markdown|Thinking|FileChip|SourceList|Divider|Spinner|Note|DocRef|Generic|Error|useState|useEffect|outcome|incoming|next|running|lead|researchBatch|batchResearch|webSearch|setName|custom|base|template|variant|usage|summary|fileResolver|myRegistry|controller|text|args|part|turn|turns|citation|annotation|applied|recent|newServer|other|mcpClient|tool|error|message|item|msg|entry|value|key|q|name|status|reason|delta|chunk|progress|index|file|image|city|topic|query|prompt|body|res|opts|params|payload|a|b|g|o|handleItem|incoming|session)$/;
 
@@ -24,7 +27,7 @@ function walk(dir, out = []) {
     if (name === "node_modules" || name === ".vitepress" || name === ".snippet-check" || name === ".git" || name === "scripts") continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
-    else if (name.endsWith(".md")) out.push(full);
+    else if (name.endsWith(".md") && !EXCLUDED_DOCS.has(name)) out.push(full);
   }
   return out;
 }

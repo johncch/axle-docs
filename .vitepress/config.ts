@@ -4,6 +4,8 @@ export default defineConfig({
   title: 'Axle',
   description: 'A small, focused TypeScript library for building multi-turn LLM agents.',
   cleanUrls: true,
+  // Contributor guidance, not site content.
+  srcExclude: ['LLM-CONTRIBUTING.md', 'AGENTS.md', 'CLAUDE.md'],
   themeConfig: {
     siteTitle: 'Axle',
     nav: [

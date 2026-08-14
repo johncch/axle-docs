@@ -7,12 +7,15 @@ import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
 
+// Contributor guidance, not site content.
+const EXCLUDED_DOCS = new Set(["LLM-CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md"]);
+
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     if (["node_modules", ".vitepress", ".snippet-check", ".git", "scripts"].includes(name)) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
-    else if (name.endsWith(".md")) out.push(full);
+    else if (name.endsWith(".md") && !EXCLUDED_DOCS.has(name)) out.push(full);
   }
   return out;
 }
