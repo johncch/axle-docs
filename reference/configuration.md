@@ -122,6 +122,8 @@ interface PromptCompactorOptions {
   thresholdTokens: number;
   targetTokens: number;
   recentUserMessages?: number; // default 10
+  reasoning?: boolean; // default false
+  providerOptions?: ProviderOptions;
 }
 ```
 
@@ -142,6 +144,8 @@ Behavior:
 - `compact` summarizes with a streaming call to `provider`/`model`, appending the
   most recent user messages verbatim. The appendix is capped at half of
   `targetTokens`; the summary gets the remainder as `maxOutputTokens`.
+- `reasoning` and `providerOptions` are passed through to the summary call, so a
+  thinking-capable model can be used for compaction. Both default to off / none.
 - Progress is emitted continuously while the summary streams.
 - Messages carrying a [compaction stamp](/reference/messages#compaction-helpers)
   are treated as already-compacted and are not re-summarized.
