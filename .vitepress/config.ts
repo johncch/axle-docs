@@ -13,7 +13,7 @@ export default defineConfig({
       { text: 'Reference', link: '/reference/agent', activeMatch: '/reference/' },
       { text: 'Cookbook', link: '/cookbook/tool-using-agent', activeMatch: '/cookbook/' },
       {
-        text: 'v0.30.1',
+        text: 'v0.30.2',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Upgrading', link: '/upgrading' },

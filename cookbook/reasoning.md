@@ -95,7 +95,11 @@ case "thinking":
 ```
 
 Summaries stream on their own channel, by the way — `thinking:summary-delta`
-rather than `thinking:delta`.
+rather than `thinking:delta`. Some providers (OpenAI's reasoning models, DeepSeek)
+give you the raw thinking text; others (OpenRouter's hosted reasoning models,
+Gemini) expose only a summary, and that's what this channel carries. OpenRouter
+in particular streams thinking as summary deltas, so handle this event even if
+you're only used to `thinking:delta` from other providers.
 
 ## Continuity across turns
 
@@ -147,9 +151,12 @@ simplify the schema.
 
 Some models reason by default, which isn't always what you want.
 `reasoning: false` turns it off wherever the provider supports that. It's worth
-setting explicitly on latency-sensitive paths and on
-[compaction](/concepts/compaction) calls — `PromptCompactor` already does the
-latter for you.
+setting explicitly on latency-sensitive paths — and on
+[compaction](/concepts/compaction) calls, where `PromptCompactor` keeps it off
+by default. If you *do* want a reasoning model to drive the summary, pass
+`reasoning: true` (and `providerOptions` for the provider-specific knobs) when
+you construct the compactor — it's opt-in, because a cheap summary rarely
+benefits from the extra latency.
 
 ## See also
 

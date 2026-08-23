@@ -7,7 +7,7 @@ description: Trading a long conversation for a shorter one, without losing what 
 
 ::: warning Experimental
 Compaction is still under active design and may change in any release. It was
-restructured in 0.30.0. Everything here is accurate for 0.30.1, but do check the
+restructured in 0.30.0. Everything here is accurate for 0.30.2, but do check the
 changelog when you upgrade.
 :::
 
@@ -72,6 +72,11 @@ Use a cheap, fast model here — summarization doesn't need your best one. The
 compactor treats the transcript it's summarizing as untrusted data and says so in
 its own system prompt, which matters if that conversation contains anything a
 user or a tool put there.
+
+Reasoning is off by default for the summary call. Pass `reasoning: true` (and
+`providerOptions` for the knobs) if you want a thinking-capable model to do the
+summarizing — most of the time you don't, which is why it's opt-in. See
+[Reasoning models](/cookbook/reasoning#turning-it-off) for the trade-off.
 
 `targetTokens` budgets the whole replacement, including the verbatim recent-user-message
 appendix. If you set it too small relative to `recentUserMessages`, it throws
