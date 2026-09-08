@@ -64,7 +64,7 @@ and on `GenerateParams` / `StreamParams`.
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `reasoning` | `boolean` | Enable/disable provider reasoning controls. |
+| `reasoning` | `ReasoningSetting` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high" }`. |
 | `maxOutputTokens` | `number` | Output token cap. |
 | `temperature` | `number` | Sampling temperature. |
 | `topP` | `number` | Nucleus sampling, mapped to provider casing. |

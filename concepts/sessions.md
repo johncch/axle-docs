@@ -138,21 +138,6 @@ conversation.
 Harness concerns like file resolvers, tracing, transport, and stores stay outside
 the definition on purpose. Keep those in your own configuration.
 
-## FileStore
-
-`FileStore` is a two-method interface for hosts that want a pluggable file
-backend:
-
-```typescript
-interface FileStore {
-  read(path: string): Promise<string | null>;
-  write(path: string, content: string): Promise<void>;
-}
-```
-
-Core ships the type, not an implementation. Provide your own if a component asks
-for one.
-
 ## Long conversations
 
 A session grows without bound until you do something about it. That something is
