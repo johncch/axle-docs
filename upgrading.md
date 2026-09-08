@@ -7,10 +7,72 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.30.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.31.0-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.30.2**.
+Current release: **0.31.0**.
+
+## 0.31.0 — portable reasoning & compaction sizing
+
+Two breaking changes, both in the request surface. The CLI was redesigned too,
+but it's out of scope for this site — see the library's
+[`packages/axle-cli/CHANGELOG.md`](https://github.com/johncch/axle/blob/main/packages/axle-cli/CHANGELOG.md)
+for that.
+
+**`reasoning` is a portable setting, not a boolean.** It was `reasoning?: boolean`
+on `Agent`, `generate()`, `stream()`, and `PromptCompactor`; it's now
+`reasoning?: ReasoningSetting`:
+
+```typescript
+type ReasoningEffort = "low" | "medium" | "high";
+type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort };
+```
+
+Booleans are now a type error. The nearest replacements and what changes on the
+wire:
+
+| 0.30    | 0.31                   | What changes                                                                                                                                              |
+| ------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| omitted | omitted or `"default"` | none; no reasoning fields are sent                                                                                                                         |
+| `true`  | `"on"`                 | **medium effort, not high.** Pass `{ effort: "high" }` to keep the old depth.                                                                             |
+| `false` | `"off"`                | **Anthropic sends `thinking: { type: "disabled" }`** and **Gemini sends `thinkingBudget: 0`** instead of nothing; some always-thinking models reject it. |
+
+See [Reasoning models](/cookbook/reasoning) for the full story.
+[Full guide](https://github.com/johncch/axle/blob/main/docs/0.31.0-migration.md).
+
+**`PromptCompactor` sizing changed.** `targetTokens` and `recentUserMessages`
+are removed; `summaryWords` and `appendixTokens` replace them:
+
+```typescript
+// @check-skip — shows the pre-0.31 API
+new PromptCompactor({
+  provider,
+  model,
+  prompt,
+  thresholdTokens: 100_000,
+  targetTokens: 30_000,
+  recentUserMessages: 10,
+});
+```
+
+```typescript
+new PromptCompactor({
+  provider,
+  model,
+  prompt: "Summarize this conversation, preserving decisions and open questions.",
+  thresholdTokens: 100_000,
+  summaryWords: 1_500, // default 1000
+  appendixTokens: 15_000, // default: thresholdTokens / 10; 0 disables
+});
+```
+
+The summary is steered in **words** (not capped by an output token budget), and
+the recent-user-message appendix is budgeted in **tokens** directly (not by
+message count). The summarizer request no longer sends `maxOutputTokens`, so
+thinking models summarize reliably at any reasoning setting. See
+[Compaction](/concepts/compaction).
+
+**Housekeeping:** the unused `FileStore` type export was removed.
 
 ## 0.30.0 — host-owned transcripts
 

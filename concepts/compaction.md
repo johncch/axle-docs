@@ -7,8 +7,8 @@ description: Trading a long conversation for a shorter one, without losing what 
 
 ::: warning Experimental
 Compaction is still under active design and may change in any release. It was
-restructured in 0.30.0. Everything here is accurate for 0.30.2, but do check the
-changelog when you upgrade.
+restructured in 0.30.0 and its sizing contract changed in 0.31.0. Everything
+here is accurate for 0.31.0, but do check the changelog when you upgrade.
 :::
 
 Eventually a conversation gets too long for the model's context window.
@@ -57,8 +57,8 @@ const compactor = new PromptCompactor({
   model: "claude-haiku-4-5",
   prompt: "Summarize this conversation, preserving decisions and open questions.",
   thresholdTokens: 100_000,
-  targetTokens: 20_000,
-  recentUserMessages: 10,
+  summaryWords: 1_000,
+  appendixTokens: 10_000,
 });
 
 agent.setCompaction({
@@ -73,14 +73,21 @@ compactor treats the transcript it's summarizing as untrusted data and says so i
 its own system prompt, which matters if that conversation contains anything a
 user or a tool put there.
 
-Reasoning is off by default for the summary call. Pass `reasoning: true` (and
-`providerOptions` for the knobs) if you want a thinking-capable model to do the
-summarizing — most of the time you don't, which is why it's opt-in. See
+`reasoning` is left unset by default for the summary call, so the summarizing
+model follows its own default. Pass an explicit setting such as `reasoning: "on"`
+(and `providerOptions` for the knobs) if you want a thinking-capable model to do
+the summarizing — most of the time you don't, which is why it's opt-in. See
 [Reasoning models](/cookbook/reasoning#turning-it-off) for the trade-off.
 
-`targetTokens` budgets the whole replacement, including the verbatim recent-user-message
-appendix. If you set it too small relative to `recentUserMessages`, it throws
-rather than silently truncating something important.
+The two size controls are denominated in their honest units. `summaryWords`
+steers the summary length in words — a word count is the only size a model can
+actually aim for — and is enforced by escalation: the prompt asks for it, the
+result is measured, one relative-shrink rewrite runs if it lands over ~1.3× the
+request, and word-boundary truncation is the last resort. `appendixTokens`
+budgets the verbatim recent-user-message appendix in tokens (up to the last ten
+user messages, evicted oldest-first); it defaults to a tenth of
+`thresholdTokens`, and `0` keeps no appendix. The summarizer request carries no
+output cap, so thinking models summarize reliably at any reasoning setting.
 
 ## Triggers
 

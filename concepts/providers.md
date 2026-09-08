@@ -127,7 +127,7 @@ const agent = new Agent({
   model,
   temperature: 0.2,
   maxOutputTokens: 4096,
-  reasoning: true,
+  reasoning: "on",
 });
 
 // Just this one send — merged over the agent's defaults
@@ -136,7 +136,7 @@ await agent.send("...", { temperature: 0.9 }).final;
 
 | Option | What it does |
 | --- | --- |
-| `reasoning` | Turns provider thinking/reasoning controls on or off |
+| `reasoning` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high" }` |
 | `maxOutputTokens` | Caps output tokens for the request |
 | `temperature`, `topP` | Sampling |
 | `stop` | Stop sequence(s) |

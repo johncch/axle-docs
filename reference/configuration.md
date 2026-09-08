@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: Global configuration, compaction wiring, and the file store interface.
+description: Global configuration and compaction wiring.
 ---
 
 # Configuration
@@ -120,9 +120,9 @@ interface PromptCompactorOptions {
   model: string;
   prompt: string;
   thresholdTokens: number;
-  targetTokens: number;
-  recentUserMessages?: number; // default 10
-  reasoning?: boolean; // default false
+  summaryWords?: number; // default 1000
+  appendixTokens?: number; // default thresholdTokens / 10; 0 disables
+  reasoning?: ReasoningSetting; // default unset
   providerOptions?: ProviderOptions;
 }
 ```
@@ -142,30 +142,21 @@ Behavior:
 - `shouldCompactOnTrigger` returns `true` when estimated context reaches
   `thresholdTokens` and there is at least one message.
 - `compact` summarizes with a streaming call to `provider`/`model`, appending the
-  most recent user messages verbatim. The appendix is capped at half of
-  `targetTokens`; the summary gets the remainder as `maxOutputTokens`.
+  most recent user messages verbatim. The appendix is budgeted in tokens by
+  `appendixTokens` (up to the last ten user messages, evicted oldest-first); the
+  summary is steered in words by `summaryWords`. The summarizer request sends no
+  `maxOutputTokens`, so the provider's own ceiling bounds thinking plus summary.
 - `reasoning` and `providerOptions` are passed through to the summary call, so a
-  thinking-capable model can be used for compaction. Both default to off / none.
+  thinking-capable model can be used for compaction. `reasoning` defaults to
+  unset (the model's own default); `providerOptions` defaults to none.
 - Progress is emitted continuously while the summary streams.
 - Messages carrying a [compaction stamp](/reference/messages#compaction-helpers)
   are treated as already-compacted and are not re-summarized.
 - The transcript being summarized is declared untrusted data in the compactor's
   own system prompt.
 
-Throws `INVALID_OPTIONS` when `targetTokens` leaves less than one token for the
-summary after the appendix.
-
-## FileStore
-
-```typescript
-interface FileStore {
-  read(path: string): Promise<string | null>;
-  write(path: string, content: string): Promise<void>;
-}
-```
-
-Type only — core ships no implementation. `read` resolves `null` for a missing
-path.
+Throws `INVALID_OPTIONS` when `thresholdTokens`, `summaryWords` is non-positive,
+or `appendixTokens` is negative.
 
 ## Entry points
 

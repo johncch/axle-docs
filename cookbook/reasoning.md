@@ -11,7 +11,7 @@ import { Agent, anthropic } from "@fifthrevision/axle";
 const agent = new Agent({
   provider: anthropic(process.env.ANTHROPIC_API_KEY!),
   model: "claude-opus-4-5",
-  reasoning: true,
+  reasoning: "on",
 });
 
 agent.on((event) => {
@@ -33,11 +33,26 @@ const result = await agent.send("Prove that the square root of 2 is irrational."
 console.log(`\nreasoning tokens: ${result.usage.reasoningOut ?? 0}`);
 ```
 
-`reasoning` is a portable boolean that maps onto each provider's own controls.
+`reasoning` is a portable setting that maps onto each provider's own controls —
+a named effort level, not a boolean:
+
+```typescript
+type ReasoningEffort = "low" | "medium" | "high";
+type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort };
+```
+
+- `"default"` (or omitted) sends no reasoning fields; the model runs at its
+  provider's own default, which may be thinking-on or thinking-off.
+- `"on"` is `{ effort: "medium" }` — a moderate choice. Reach for
+  `{ effort: "high" }` on purpose when you want the deepest thinking.
+- `"off"` sends the provider's explicit disable shape. Some always-thinking
+  models reject it; the provider error surfaces unchanged.
+- `{ effort }` picks a named level.
+
 Set it per agent, or per send when one question doesn't need it:
 
 ```typescript
-await agent.send("Quick question.", { reasoning: false }).final;
+await agent.send("Quick question.", { reasoning: "off" }).final;
 ```
 
 For provider-specific knobs — thinking budgets, effort levels — use
@@ -47,7 +62,7 @@ For provider-specific knobs — thinking budgets, effort levels — use
 const agent = new Agent({
   provider,
   model,
-  reasoning: true,
+  reasoning: "on",
   providerOptions: { thinking: { type: "enabled", budget_tokens: 10_000 } },
 });
 ```
@@ -150,12 +165,15 @@ simplify the schema.
 ## Turning it off
 
 Some models reason by default, which isn't always what you want.
-`reasoning: false` turns it off wherever the provider supports that. It's worth
-setting explicitly on latency-sensitive paths — and on
-[compaction](/concepts/compaction) calls, where `PromptCompactor` keeps it off
-by default. If you *do* want a reasoning model to drive the summary, pass
-`reasoning: true` (and `providerOptions` for the provider-specific knobs) when
-you construct the compactor — it's opt-in, because a cheap summary rarely
+`reasoning: "off"` turns it off wherever the provider supports that — it sends
+the provider's explicit disable shape rather than just omitting the field, so
+a model that thinks by default actually stops. It's worth setting explicitly on
+latency-sensitive paths — and on
+[compaction](/concepts/compaction) calls, where `PromptCompactor` leaves
+`reasoning` unset by default (so the model follows its own default). If you
+*do* want a reasoning model to drive the summary, pass an explicit setting such
+as `reasoning: "on"` (and `providerOptions` for the provider-specific knobs)
+when you construct the compactor — it's opt-in, because a cheap summary rarely
 benefits from the extra latency.
 
 ## See also

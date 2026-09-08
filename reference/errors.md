@@ -57,7 +57,7 @@ chain, so it's safe to log directly.
 
 | Code | Thrown when |
 | --- | --- |
-| `INVALID_OPTIONS` | `maxSteps` or `maxContextTokens` below 1; `targetTokens` too small for the compactor appendix |
+| `INVALID_OPTIONS` | `maxSteps` or `maxContextTokens` below 1; `PromptCompactor` `thresholdTokens`/`summaryWords` non-positive or `appendixTokens` negative |
 | `TOOL_OPTIONS_CONFLICT` | Both `registry` and `tools`/`providerTools` passed |
 | `TOOL_REGISTRY_DUPLICATE` | A tool name is already registered |
 | `COMPACTION_INVALID_MESSAGES` | A compactor returned malformed messages |
