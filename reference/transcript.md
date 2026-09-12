@@ -75,8 +75,27 @@ Every part has `id`, `type`, optional `annotations`, and optional `timing`.
 | `TextPart` | `text: string`, `citations?: Citation[]`, `providerMetadata?` |
 | `CitationPart` | `citations: Citation[]`, `providerMetadata?` |
 | `FilePart` | `file: FileInfo` |
-| `ThinkingPart` | `text?`, `summary?`, `redacted?`, `continuity?`, `providerMetadata?` |
+| `ThinkingPart` | `summary?`, `raw?`, `continuity?`, `providerMetadata?` |
 | `CompactionPart` | `status: "running" \| "complete" \| "error"`, `summary?`, `progress?`, `error?` |
+
+### ThinkingPart
+
+```typescript
+interface ThinkingPart {
+  id: string;
+  type: "thinking";
+  summary?: string; // the provider's condensed account of its reasoning
+  raw?: string; // the chain of thought itself; open-weight models only
+  continuity?: ThinkingContinuity;
+  providerMetadata?: Record<string, unknown>;
+}
+```
+
+Each content field is named for what the provider handed back; neither present
+is the withheld state. Render `summary ?? raw`. A field appears only once a
+delta wrote it, so never test for `""`. (`text` / `redacted` on the turn part
+were removed in 0.32.0 — `redacted` now lives only on the message layer; see
+[Messages & parts](/reference/messages) and [Upgrading](/upgrading).)
 
 ### ActionPart
 
@@ -140,9 +159,9 @@ Omit `status` for static annotations that have no lifecycle.
 | `part:start` | `turnId`, `part` — the whole part object |
 | `text:delta` | `turnId`, `partId`, `delta` |
 | `text:citation` | `turnId`, `partId`, `citation` |
-| `thinking:delta` | `turnId`, `partId`, `delta` |
+| `thinking:raw-delta` | `turnId`, `partId`, `delta` |
 | `thinking:summary-delta` | `turnId`, `partId`, `delta` |
-| `thinking:update` | `turnId`, `partId`, `redacted?`, `continuity?`, `providerMetadata?` |
+| `thinking:update` | `turnId`, `partId`, `continuity?`, `providerMetadata?` |
 | `part:end` | `turnId`, `partId`, `timing?` |
 
 Openings carry the full part; deltas carry only ids and the delta.

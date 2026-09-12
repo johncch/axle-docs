@@ -29,7 +29,7 @@ Extends `AxleModelRequestOptions` minus `signal`.
 | `mcps` | `MCP[]` | — | MCP clients, resolved lazily on first send. |
 | `observability` | `ObservabilityOptions` | — | Logging and tracing. |
 | `fileResolver` | `FileResolver` | — | Resolves deferred file references. |
-| `reasoning` | `ReasoningSetting` | — | Portable reasoning/thinking control: `"default"`, `"off"`, `"on"`, or `{ effort }`. |
+| `reasoning` | `ReasoningSetting` | — | Portable reasoning/thinking control: `"default"`, `"off"`, `"on"`, or `{ effort, display? }`. |
 | `maxOutputTokens` | `number` | — | Output token cap. |
 | `temperature` | `number` | — | Sampling temperature. |
 | `topP` | `number` | — | Nucleus sampling. |

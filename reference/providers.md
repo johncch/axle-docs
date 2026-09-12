@@ -64,7 +64,7 @@ and on `GenerateParams` / `StreamParams`.
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `reasoning` | `ReasoningSetting` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high" }`. |
+| `reasoning` | `ReasoningSetting` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high", display?: "visible" \| "hidden" }`. |
 | `maxOutputTokens` | `number` | Output token cap. |
 | `temperature` | `number` | Sampling temperature. |
 | `topP` | `number` | Nucleus sampling, mapped to provider casing. |
@@ -76,7 +76,22 @@ and on `GenerateParams` / `StreamParams`.
 
 ```typescript
 type ToolChoice = "auto" | "none" | "required" | { type: "tool"; name: string };
+
+type ReasoningEffort = "low" | "medium" | "high";
+type ReasoningDisplay = "visible" | "hidden";
+type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort; display?: ReasoningDisplay };
 ```
+
+`display` (default `"visible"`) asks the provider to disclose its thinking
+wherever a request field exists. Enabling reasoning (`"on"` or `{ effort }`)
+now requests disclosure on Anthropic (`display: "summarized"`), OpenAI
+(`summary: "auto"`), and Gemini (`includeThoughts: true`), so Claude and OpenAI
+models that streamed no thinking under 0.31 now do. Pass
+`{ effort, display: "hidden" }` to keep the 0.31 wire behaviour — the turn
+receives no thinking content while the message keeps whatever the wire carried.
+Fine-grained values (OpenAI `concise` / `detailed`, Anthropic `updates`) stay in
+`providerOptions`; overriding `thinking` on Anthropic replaces the whole object,
+`type` included. See [Reasoning models](/cookbook/reasoning#disclosure-vs-form).
 
 Agent-level and send-level options merge shallowly, with send-level winning.
 `providerOptions` merges key by key rather than replacing wholesale.
@@ -168,15 +183,16 @@ this with the agent's own state.
 interface AIProvider {
   get name(): string;
   resolveProviderToolName?(name: string, model: string): string | undefined;
-  createGenerationRequest(model: string, params: ProviderGenerationParams): Promise<ModelResult>;
   createStreamingRequest(model: string, params: ProviderStreamParams): AsyncGenerator<AnyStreamChunk>;
 }
 ```
 
-The request methods are internal, and so are their types:
-`ProviderGenerationParams`, `ProviderStreamParams`, `ModelResult`, and
-`AnyStreamChunk` are declared by the package but not exported, so you can't name
-them from outside.
+The request method is internal, and so are its types:
+`ProviderStreamParams` and `AnyStreamChunk` are declared by the package but not
+exported, so you can't name them from outside. (`createGenerationRequest`,
+`ProviderGenerationParams`, and `ModelResult` were removed in 0.32.0 when
+`generate()` was unified onto the streaming transport — see
+[Upgrading](/upgrading).)
 
 You *can* implement this interface to add your own provider, but it isn't
 supported — the chunk and conversion contracts aren't stable across releases, so

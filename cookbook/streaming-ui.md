@@ -56,7 +56,7 @@ function TurnView({ turn }: { turn: Turn }) {
           case "text":
             return <Markdown key={part.id} text={part.text} citations={part.citations} />;
           case "thinking":
-            return <Thinking key={part.id} text={part.text} summary={part.summary} />;
+            return <Thinking key={part.id} text={part.summary ?? part.raw} summary={part.summary} />;
           case "file":
             return <FileChip key={part.id} file={part.file} />;
           case "citation":

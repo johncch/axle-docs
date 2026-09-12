@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@fifthrevision/axle':
-        specifier: 0.31.0
-        version: 0.31.0(ws@8.21.3)
+        specifier: 0.32.0
+        version: 0.32.0(ws@8.21.3)
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
@@ -105,8 +105,8 @@ packages:
     resolution: {integrity: sha512-PIOUXlSnrqM0S+WOgDRb4RzotydJH7ZoT6tOyL7tAO7qJOfvX5wsEW8Pe+PMKMwvuI4/gIyK9cg2H7lJXqnc4Q==}
     engines: {node: '>= 14.0.0'}
 
-  '@anthropic-ai/sdk@0.98.1':
-    resolution: {integrity: sha512-mqMQBMqAG0AoWStJEXrjDd3MrMyMiaIye9/5q2b3j5JxRF/2E7jgYlHSIJHiPj+4ztfsFH4Lcfj94WeXg2mAhg==}
+  '@anthropic-ai/sdk@0.125.0':
+    resolution: {integrity: sha512-Hq5wYlXupzJ9M1Fzqjqa3hObcuigEXVZJqSYDgeZGM3wF4qrNERM5Z1OOAeoT9rlod8awJ3uYyJjbQXp1ckIGg==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -296,11 +296,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fifthrevision/axle@0.31.0':
-    resolution: {integrity: sha512-da41yQ0EDsMlA+fBBYurJHI/DnGFKCg1QWdicLFS+kW4oIy/bVybZm8Yu9ZNc246tXqy0ir0+kGTwiXEtrXqQA==}
+  '@fifthrevision/axle@0.32.0':
+    resolution: {integrity: sha512-y2xQ7BYBfAukN3Fw5DEFzylrWjfOhd1q0tM4EC43raykZ0btsqQALc+Ihh25j3aXSFxEgNIm3wAabC0BH+iurQ==}
+    engines: {node: '>=22'}
 
-  '@google/genai@2.17.0':
-    resolution: {integrity: sha512-Cnw71bRtYXnGkN/K1YLb4Wz3yPwIe/7c5kw4VkbXAX508A9HHZCTMsBUhaAjTHDfD9Tn2veHxyJXK1Dxxtcx4g==}
+  '@google/genai@2.22.0':
+    resolution: {integrity: sha512-NE90Nl0AP75YZ2tGxXjQQs6Gkunma7a1JmPCx5g5CxvjHXshmuI2aNoPJ1xLrRixjkNxog898oylM+MyNudUQw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.25.2
@@ -720,9 +721,9 @@ packages:
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
 
-  chalk@5.6.2:
-    resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
-    engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
+  chalk@6.0.0:
+    resolution: {integrity: sha512-2uNTXIuTTxk7ciZgAU1BQcgnchcG0xXnrs6jzkQfj9SsRa9M2s5zE8WT96hS6KmG4MzWHSrvH43DF1m4XRkrFg==}
+    engines: {node: '>=22'}
 
   character-entities-html4@2.1.0:
     resolution: {integrity: sha512-1v7fgQRj6hnSwFpq1Eu0ynr/CDEw0rXo2B61qXrLNdHZmPKgb7fqS1a2JwF0rISo9q77jDI8VMEHoApn8qDoZA==}
@@ -1025,8 +1026,8 @@ packages:
   mark.js@8.11.1:
     resolution: {integrity: sha512-1I+1qpDt4idfgLQG+BNWmrqku+7/2bi5nLf4YwF8y8zXvmfiTBY3PV3ZibfrjBueCByROpuBjLLFCajqkgYoLQ==}
 
-  marked@18.0.9:
-    resolution: {integrity: sha512-/Sa4qiiHZxf0/FQdBBowr9q4r10krCwMvpK48FUBdXdUXScDxiQGR9zCPrFgRVR5LU3iySOiIjy09ZQvADir1w==}
+  marked@18.0.12:
+    resolution: {integrity: sha512-LEm4ga2YeI2T3GVHj9b0BaDPPk93LLTHMFeMyQbNIzPxc8vCI0y/scy0ZA6z6lXKyT9j9Nhl/OC6ZYKYGuFScA==}
     engines: {node: '>= 20'}
     hasBin: true
 
@@ -1126,13 +1127,15 @@ packages:
   oniguruma-to-es@3.1.1:
     resolution: {integrity: sha512-bUH8SDvPkH3ho3dvwJwfonjlQ4R80vjyvrU8YpxuROddv55vAEJrTuCuCVUhhsHbtlD9tGGbaNApGQckXhS8iQ==}
 
-  openai@6.49.0:
-    resolution: {integrity: sha512-aYCc0C6L864eR6WSYIwQGyXriw/nIyZx0ObvhzOEVuk0zoBDpynjSbrionWI7q65B5H8jJX0DXR9snEzM6bfPg==}
+  openai@7.15.0:
+    resolution: {integrity: sha512-2DIwesnPSduw68MFx7nAdgvshrgvS8WOan5W8+tgUMlAy/tY+Q41g80Pa+w/v64rHA6rtn+dketa8QvMVxU96w==}
+    engines: {node: '>=22.0.0'}
     peerDependencies:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
       '@smithy/hash-node': '>=4.3.0 <5'
       '@smithy/signature-v4': '>=5.4.0 <6'
-      ws: ^8.18.0
+      undici: '>=5 <9'
+      ws: ^8.21.0
       zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       '@aws-sdk/credential-provider-node':
@@ -1140,6 +1143,8 @@ packages:
       '@smithy/hash-node':
         optional: true
       '@smithy/signature-v4':
+        optional: true
+      undici:
         optional: true
       ws:
         optional: true
@@ -1448,6 +1453,9 @@ packages:
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
+  zod@4.6.2:
+    resolution: {integrity: sha512-lh5RCAGFa1Cm2hjtNwLQhSs/AsqdWnTQaBER9fEwN/88pSh7KOtJavtBx/0VlkN/uFd61SwYmljLMDAsHlvzBQ==}
+
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
@@ -1565,12 +1573,12 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.56.0
 
-  '@anthropic-ai/sdk@0.98.1(zod@4.4.3)':
+  '@anthropic-ai/sdk@0.125.0(zod@4.6.2)':
     dependencies:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
     optionalDependencies:
-      zod: 4.4.3
+      zod: 4.6.2
 
   '@babel/helper-string-parser@7.29.7': {}
 
@@ -1681,17 +1689,17 @@ snapshots:
   '@esbuild/win32-x64@0.21.5':
     optional: true
 
-  '@fifthrevision/axle@0.31.0(ws@8.21.3)':
+  '@fifthrevision/axle@0.32.0(ws@8.21.3)':
     dependencies:
-      '@anthropic-ai/sdk': 0.98.1(zod@4.4.3)
-      '@google/genai': 2.17.0(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))
-      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
-      chalk: 5.6.2
+      '@anthropic-ai/sdk': 0.125.0(zod@4.6.2)
+      '@google/genai': 2.22.0(@modelcontextprotocol/sdk@1.30.0(zod@4.6.2))
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.6.2)
+      chalk: 6.0.0
       glob: 13.0.6
-      marked: 18.0.9
+      marked: 18.0.12
       mime: 4.1.0
-      openai: 6.49.0(ws@8.21.3)(zod@4.4.3)
-      zod: 4.4.3
+      openai: 7.15.0(ws@8.21.3)(zod@4.6.2)
+      zod: 4.6.2
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@cfworker/json-schema'
@@ -1699,17 +1707,18 @@ snapshots:
       - '@smithy/signature-v4'
       - bufferutil
       - supports-color
+      - undici
       - utf-8-validate
       - ws
 
-  '@google/genai@2.17.0(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))':
+  '@google/genai@2.22.0(@modelcontextprotocol/sdk@1.30.0(zod@4.6.2))':
     dependencies:
       google-auth-library: 10.9.1
       p-retry: 4.6.2
       protobufjs: 7.6.5
       ws: 8.21.3
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.6.2)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -1727,7 +1736,7 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@modelcontextprotocol/sdk@1.30.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.30.0(zod@4.6.2)':
     dependencies:
       '@hono/node-server': 2.1.0(hono@4.13.1)
       ajv: 8.20.0
@@ -1744,8 +1753,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
+      zod: 4.6.2
+      zod-to-json-schema: 3.25.2(zod@4.6.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -2101,7 +2110,7 @@ snapshots:
 
   ccount@2.0.1: {}
 
-  chalk@5.6.2: {}
+  chalk@6.0.0: {}
 
   character-entities-html4@2.1.0: {}
 
@@ -2448,7 +2457,7 @@ snapshots:
 
   mark.js@8.11.1: {}
 
-  marked@18.0.9: {}
+  marked@18.0.12: {}
 
   math-intrinsics@1.1.0: {}
 
@@ -2535,10 +2544,10 @@ snapshots:
       regex: 6.1.0
       regex-recursion: 6.0.2
 
-  openai@6.49.0(ws@8.21.3)(zod@4.4.3):
+  openai@7.15.0(ws@8.21.3)(zod@4.6.2):
     optionalDependencies:
       ws: 8.21.3
-      zod: 4.4.3
+      zod: 4.6.2
 
   p-retry@4.6.2:
     dependencies:
@@ -2897,10 +2906,12 @@ snapshots:
 
   ws@8.21.3: {}
 
-  zod-to-json-schema@3.25.2(zod@4.4.3):
+  zod-to-json-schema@3.25.2(zod@4.6.2):
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.2
 
   zod@4.4.3: {}
+
+  zod@4.6.2: {}
 
   zwitch@2.0.4: {}

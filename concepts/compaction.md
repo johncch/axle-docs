@@ -8,7 +8,7 @@ description: Trading a long conversation for a shorter one, without losing what 
 ::: warning Experimental
 Compaction is still under active design and may change in any release. It was
 restructured in 0.30.0 and its sizing contract changed in 0.31.0. Everything
-here is accurate for 0.31.0, but do check the changelog when you upgrade.
+here is accurate for 0.32.0, but do check the changelog when you upgrade.
 :::
 
 Eventually a conversation gets too long for the model's context window.
