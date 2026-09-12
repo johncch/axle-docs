@@ -82,7 +82,7 @@ The practical upshot is that rendering an agent is a `switch` over
 turn.parts.map((part) => {
   switch (part.type) {
     case "text": return <Markdown text={part.text} />;
-    case "thinking": return <Collapsed text={part.text} />;
+    case "thinking": return <Collapsed text={part.summary ?? part.raw} />;
     case "action": return <ToolCall part={part} />;
     // …
   }
@@ -98,7 +98,7 @@ Parts are a discriminated union on `type`, so a `switch` covers them exhaustivel
 | Part | What it carries |
 | --- | --- |
 | `text` | Accumulated text, plus any anchored `citations` |
-| `thinking` | Reasoning text, optional `summary`, `redacted`, provider `continuity` |
+| `thinking` | A `summary` and/or `raw` thinking field, provider `continuity` |
 | `file` | A `FileInfo` attached to a user turn |
 | `citation` | An unanchored source list the provider emitted on its own |
 | `action` | A tool call, subagent run, or provider tool — see below |

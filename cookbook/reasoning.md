@@ -20,7 +20,10 @@ agent.on((event) => {
       if (event.part.type === "thinking") console.log("\n[thinking]");
       if (event.part.type === "text") console.log("\n[answer]");
       break;
-    case "thinking:delta":
+    case "thinking:raw-delta":
+      process.stdout.write(event.delta);
+      break;
+    case "thinking:summary-delta":
       process.stdout.write(event.delta);
       break;
     case "text:delta":
@@ -34,11 +37,12 @@ console.log(`\nreasoning tokens: ${result.usage.reasoningOut ?? 0}`);
 ```
 
 `reasoning` is a portable setting that maps onto each provider's own controls —
-a named effort level, not a boolean:
+a named effort level plus a disclosure choice:
 
 ```typescript
 type ReasoningEffort = "low" | "medium" | "high";
-type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort };
+type ReasoningDisplay = "visible" | "hidden";
+type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort; display?: ReasoningDisplay };
 ```
 
 - `"default"` (or omitted) sends no reasoning fields; the model runs at its
@@ -48,11 +52,15 @@ type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort };
 - `"off"` sends the provider's explicit disable shape. Some always-thinking
   models reject it; the provider error surfaces unchanged.
 - `{ effort }` picks a named level.
+- `{ effort, display: "hidden" }` keeps thinking out of the turn while the
+  message still carries whatever the wire returned, so provider continuity
+  keeps working. See [Disclosure vs form](#disclosure-vs-form).
 
 Set it per agent, or per send when one question doesn't need it:
 
 ```typescript
 await agent.send("Quick question.", { reasoning: "off" }).final;
+await agent.send("Think, but keep it out of the transcript.", { reasoning: { effort: "high", display: "hidden" } }).final;
 ```
 
 For provider-specific knobs — thinking budgets, effort levels — use
@@ -68,53 +76,92 @@ const agent = new Agent({
 ```
 
 Bear in mind that ties the agent to one provider, so keep it out of code you
-want to stay portable.
+want to stay portable. On Anthropic, overriding the whole `thinking` object
+replaces it — `type` included — so restate the fields you still want.
 
 As always, that switch is fine for a terminal. In a UI, apply the events to a
 [`Transcript`](/concepts/transcripts) and render the `thinking` parts it
 assembles.
 
+## Disclosure vs form
+
+`display` says whether the provider should show its thinking. It never decides
+*in what form* thinking arrives — that part is the model's, and the thinking
+part records which one showed up.
+
+Enabling reasoning (`"on"` or `{ effort }`) now asks for disclosure wherever a
+request field exists: Anthropic gets `display: "summarized"`, OpenAI gets
+`summary: "auto"`, Gemini gets `includeThoughts: true`. Which means Claude and
+OpenAI models that previously streamed no thinking now stream it — and time to
+first text token on Anthropic rises, since thinking tokens arrive first.
+
+If that's not what you want, opt out per request:
+
+```typescript
+await agent.send("...", { reasoning: { effort: "high", display: "hidden" } }).final;
+```
+
+`"hidden"` sends the provider's own hide value on the same routes (`omitted` on
+Anthropic, no summary field on OpenAI, `includeThoughts: false` on Gemini,
+`reasoning: { exclude: true }` on OpenRouter) and withholds thinking content
+from the turn on every route. Generic chat-completions endpoints and Together
+have no field and send nothing either way. `"default"` and `"off"` are
+unchanged and send nothing for display.
+
+Fine-grained values stay in `providerOptions`: OpenAI `concise` and `detailed`
+summaries, Anthropic's `updates` display.
+
 ## What you get back
 
-Reasoning surfaces as `thinking` parts:
+Reasoning surfaces as `thinking` parts. Each content field is named for what
+the provider handed back — and neither present is the withheld state:
 
 ```typescript
 interface ThinkingPart {
   id: string;
   type: "thinking";
-  text?: string; // renderable reasoning, when the provider exposes it
-  summary?: string; // provider-supplied summary
-  redacted?: boolean; // provider withheld the content
+  summary?: string; // the provider's condensed account of its reasoning
+  raw?: string; // the chain of thought itself; open-weight models only
   continuity?: ThinkingContinuity; // opaque state — preserve it
 }
 ```
 
-Your UI needs to handle three cases, and it's easiest to write all three up
-front:
+Your UI needs to handle two cases, and it's easiest to write both up front:
 
-- **`text` present** — render it, usually collapsed by default.
-- **`summary` present, no `text`** — some providers only expose a summary. Render
-  that.
-- **`redacted: true`** — the provider withheld the content for safety. Show that
-  thinking happened; there is nothing to display.
+- **`summary` present** — the provider's condensed account. Render it, usually
+  collapsed by default. This is what Anthropic, OpenAI, and Gemini return.
+- **`raw` present** — the chain of thought itself, from open-weight models
+  through OpenAI's `gpt-oss` and chat-completions endpoints. Render it the same
+  way.
 
 ```tsx
 case "thinking":
-  if (part.redacted) return <Note key={part.id}>Reasoning withheld</Note>;
+  if (!part.summary && !part.raw) return <Note key={part.id}>Reasoning withheld</Note>;
   return (
     <details key={part.id}>
       <summary>Thinking</summary>
-      <pre>{part.text ?? part.summary}</pre>
+      <pre>{part.summary ?? part.raw}</pre>
     </details>
   );
 ```
 
-Summaries stream on their own channel, by the way — `thinking:summary-delta`
-rather than `thinking:delta`. Some providers (OpenAI's reasoning models, DeepSeek)
-give you the raw thinking text; others (OpenRouter's hosted reasoning models,
-Gemini) expose only a summary, and that's what this channel carries. OpenRouter
-in particular streams thinking as summary deltas, so handle this event even if
-you're only used to `thinking:delta` from other providers.
+A part opens with no content field; a field appears only once a delta wrote it.
+So render `summary ?? raw` and never test for `""`.
+
+Summaries and raw text stream on separate channels — `thinking:summary-delta`
+and `thinking:raw-delta` — because a part can receive both kinds of delta. Some
+providers (OpenAI's reasoning models, DeepSeek) give you the raw thinking text;
+others (OpenRouter's hosted reasoning models, Gemini) expose only a summary. On
+OpenRouter, Claude summaries stream as summary deltas — they used to land in the
+raw channel, and no longer do — so handle both events even if you're only used
+to one.
+
+One vocabulary note: the message-layer thinking part (`ContentPartThinking` on
+`AxleMessage`) keeps the wire vocabulary — `text`, `summary`, `redacted` —
+because it exists to be echoed back to the provider, not read. `redacted` there
+means only that the provider substituted an opaque payload (Anthropic
+`redacted_thinking`, OpenRouter `reasoning.encrypted`); a merely hidden block is
+not marked redacted. Read the turn part, echo the message part.
 
 ## Continuity across turns
 
@@ -125,12 +172,23 @@ thought signature — that lets a model continue reasoning across requests.
 type ThinkingContinuity =
   | { provider: "openai"; encrypted: string }
   | { provider: "anthropic"; signature?: string; redactedData?: string }
-  | { provider: "gemini"; thoughtSignature: string };
+  | { provider: "gemini"; thoughtSignature: string }
+  | {
+      provider: "openrouter";
+      type: string;
+      id?: string;
+      format?: string;
+      index?: number;
+      signature?: string;
+      data?: string;
+    };
 ```
 
 Axle carries it through `agent.messages` automatically, so normally you never
-think about it. But there are two places where **you** have to preserve it
-verbatim:
+think about it. Claude through OpenRouter is worth knowing about: OpenRouter's
+`reasoning_details` are read and echoed back on assistant messages, so summaries
+render as summaries and multi-turn tool loops keep their signatures. But there
+are two places where **you** have to preserve it verbatim:
 
 - **Persistence.** If you serialize and restore sessions, do not strip it.
   `agent.snapshot()` keeps it; hand-rolled message filtering often does not.

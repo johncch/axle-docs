@@ -44,7 +44,7 @@ Every event after `turn:user` carries a `turnId`, and part-level events carry a
 
 - **Turn lifecycle** — `turn:user`, `turn:start`, `turn:end`
 - **Part streaming** — `part:start`, `text:delta`, `text:citation`,
-  `thinking:delta`, `thinking:summary-delta`, `thinking:update`, `part:end`
+  `thinking:raw-delta`, `thinking:summary-delta`, `thinking:update`, `part:end`
 - **Actions** — `action:args-delta`, `action:running`, `action:progress`,
   `action:complete`, `action:error`
 - **Nesting** — `action:child-event`, wrapping a subagent's own turn events

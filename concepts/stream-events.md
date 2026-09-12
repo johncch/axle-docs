@@ -63,7 +63,7 @@ If you've come from `agent.on()`, four things change:
   `tool-results:start`, `tool-results:complete`
 - **Text** — `text:start`, `text:delta`, `text:citation`, `text:end`, plus
   `citation` for an unanchored source list
-- **Thinking** — `thinking:start`, `thinking:delta`,
+- **Thinking** — `thinking:start`, `thinking:raw-delta`,
   `thinking:summary-delta`, `thinking:update`, `thinking:end`
 - **Tools** — `tool:request`, `tool:args-delta`, `tool:exec-start`,
   `tool:exec-delta`, `tool:exec-complete`, `tool:exec-error`
@@ -91,9 +91,9 @@ you want that behaviour in your own loop.
 
 ## What about generate()?
 
-`generate()` runs the same loop without streaming and resolves the final result
-directly — no events at all. It's the right choice for batch work where nobody's
-watching.
+`generate()` is `stream()` resolved as a promise — the same request, the same
+tool loop, and the same result, without streaming. No events at all. It's the
+right choice for batch work where nobody's watching.
 
 ## If you want render state anyway
 

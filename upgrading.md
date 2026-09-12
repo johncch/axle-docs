@@ -7,10 +7,95 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.31.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.32.0-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.31.0**.
+Current release: **0.32.0**.
+
+## 0.32.0 — thinking parts, disclosure control, one transport
+
+Three breaking changes, all on the reasoning surface, plus one removal. The
+migration guide is
+[`docs/0.32.0-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.32.0-migration.md)
+in the library repo.
+
+**Turn thinking parts carry `summary` / `raw`, not `text` / `redacted`.**
+`ThinkingPart` on a turn now names each content field for what the provider
+handed back: `summary` is the provider's condensed account, `raw` is the chain
+of thought itself (open-weight models only). Neither present is the withheld
+state — render `summary ?? raw`. A part opens with no content field; a field
+appears only once a delta wrote it, so never test for `""`. Anthropic block
+content that used to land in `text` now lands in `summary`. The message-layer
+`ContentPartThinking` keeps the wire vocabulary (`text`, `summary`, `redacted`)
+because it exists to be echoed back, not read — and `redacted` there now means
+only that the provider substituted an opaque payload.
+
+```typescript
+// @check-skip — shows the pre-0.32 shape
+interface ThinkingPart {
+  text?: string;
+  summary?: string;
+  redacted?: boolean;
+}
+```
+
+```typescript
+interface ThinkingPart {
+  id: string;
+  type: "thinking";
+  summary?: string; // the provider's condensed account
+  raw?: string; // the chain of thought itself; open-weight models only
+}
+```
+
+Persisted 0.31 turns carry the old shape and Axle ships no shim — a host that
+stores turns decides whether to migrate rows or render both.
+
+**Thinking events are renamed and reshaped.** `thinking:delta` (stream and
+turn) is now `thinking:raw-delta`; the names say which field they grow.
+`thinking:summary-delta` and `thinking:update` keep their names but lose the
+`redacted` flag. Stream `thinking:start` loses `redacted` too, and stream
+`thinking:end` reports `{ summary?, raw? }` — each present only if written —
+instead of a single `final` string.
+
+| 0.31 | 0.32 |
+| --- | --- |
+| `thinking:delta` (stream and turn) | `thinking:raw-delta` |
+| stream `thinking:start` `.redacted` | removed |
+| stream and turn `thinking:update` `.redacted` | removed |
+| stream `thinking:end` `{ final: string }` | `{ summary?, raw? }`, each present only if written |
+
+**`reasoning` gains a `display` disclosure control.** The object form accepts
+`display: "visible" | "hidden"` (default `"visible"`):
+
+```typescript
+type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort; display?: ReasoningDisplay };
+```
+
+`display` says whether the provider should show its thinking, never in what
+form — whether a summary or raw text comes back is the model's property,
+recorded on the thinking part. Enabling reasoning (`"on"` or `{ effort }`) now
+also requests disclosure wherever a request field exists (Anthropic
+`summarized`, OpenAI `summary: "auto"`, Gemini `includeThoughts: true`), so
+Claude and OpenAI models that previously streamed no thinking now do. To keep
+the 0.31 wire behaviour, pass `display: "hidden"` per request. Under `"hidden"`
+the turn receives no thinking content — the message keeps whatever the wire
+carried, so provider continuity still round-trips. Fine-grained values
+(OpenAI `concise` / `detailed`, Anthropic `updates`) stay in `providerOptions`;
+overriding `thinking` on Anthropic replaces the whole object, `type` included.
+
+**`generateStep` is removed.** The single non-streaming model request no longer
+exists — there is no non-streaming request to make. Call `stream()` with
+`maxSteps: 1` and read `final`, or `generate()` with the same option. Custom
+providers implement `createStreamingRequest` only; `createGenerationRequest` is
+gone from the `AIProvider` interface. Behaviourally, `generate()` is now exactly
+`stream().final`: Anthropic's implicit `max_tokens` on `generate()` rises to the
+model-registry ceiling (else 64,000), retryable failures surface at first byte,
+and `raw` on the error result preserves the adapter's raw error payload rather
+than the vendor's buffered response object.
+
+See [Reasoning models](/cookbook/reasoning) for the full story.
+[Full guide](https://github.com/johncch/axle/blob/main/docs/0.32.0-migration.md).
 
 ## 0.31.0 — portable reasoning & compaction sizing
 

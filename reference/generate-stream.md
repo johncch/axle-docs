@@ -14,6 +14,10 @@ generate(options: GenerateParams): Promise<GenerateResult>
 generate<TSchema>(options: GenerateInstructParams<TSchema>): Promise<GenerateInstructResult<TSchema>>
 ```
 
+`generate(o)` is `stream(o).final` — the same request, the same tool loop, and
+the same result, resolved as a promise instead of a handle. (Unified onto the
+streaming transport in 0.32.0; there is no non-streaming request anymore.)
+
 ## stream()
 
 ```typescript
@@ -160,11 +164,11 @@ output existed.
 
 | Event | Fields |
 | --- | --- |
-| `thinking:start` | `redacted?`, `continuity?`, `providerMetadata?` |
-| `thinking:delta` | `delta`, `accumulated` |
+| `thinking:start` | `continuity?`, `providerMetadata?` |
+| `thinking:raw-delta` | `delta`, `accumulated` |
 | `thinking:summary-delta` | `delta`, `accumulated` |
-| `thinking:update` | `redacted?`, `continuity?`, `providerMetadata?` |
-| `thinking:end` | `final` |
+| `thinking:update` | `continuity?`, `providerMetadata?` |
+| `thinking:end` | `summary?`, `raw?` — each present only if a delta wrote it |
 
 Text and thinking parts stream sequentially; a delta belongs to the most recently
 opened part of its kind.
@@ -190,35 +194,14 @@ Correlated by `id`.
 | `provider-tool:complete` | `id`, `name`, `output?` |
 | `error` | `error: AxleFailure` |
 
-## generateStep()
+## Removed in 0.32.0: generateStep()
 
 ```typescript
+// @check-skip — removed in 0.32.0, kept here so the name resolves
 generateStep(params): Promise<ModelResult>
 ```
 
-One provider request. No loop, no tool execution. Takes `provider`, `model`,
-`messages`, `system?`, `tools?` (as `ToolDefinition[]`), `providerTools?`,
-`span?`, `fileResolver?`, plus request options.
-
-```typescript
-type ModelResult = ModelResponse | ModelError;
-
-interface ModelResponse {
-  type: "success";
-  role: "assistant";
-  id: string;
-  model: string;
-  text: string;
-  content: Array<ContentPartText | ContentPartThinking | ContentPartToolCall | ContentPartCitation>;
-  finishReason: AxleStopReason;
-  usage: Stats;
-  raw: any;
-}
-
-interface ModelError {
-  type: "error";
-  error: { type: string; message: string };
-  usage?: Stats;
-  raw?: any;
-}
-```
+`generateStep()` performed exactly one provider request — no loop, no tool
+execution. It no longer exists: there is no non-streaming request to make.
+Call `stream()` with `maxSteps: 1` and read `final`, or `generate()` with the
+same option. Custom providers implement `createStreamingRequest` only.

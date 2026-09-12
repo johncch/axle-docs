@@ -17,7 +17,7 @@ the `TurnEvent`s you'd get from `Agent`.
 
 | | `generate()` | `stream()` |
 | --- | --- | --- |
-| Returns | `Promise<GenerateResult>` | A handle with `.on()` and `.final` |
+| Returns | `Promise<GenerateResult>` (exactly `stream().final`) | A handle with `.on()` and `.final` |
 | Events | None | `StreamEvent` |
 | Cancellable | Via `signal` | Via `signal` or `handle.cancel()` |
 
@@ -147,9 +147,11 @@ so nothing is lost. It's the primitive behind `agent.stop()`.
 
 ## One step at a time
 
-`generateStep()` performs exactly one provider request. No loop, no tool
-execution, no retries. It's the bottom of the stack — reach for it when you're
-building your own orchestration and want Axle purely for provider normalization.
+`stream()` with `maxSteps: 1` performs exactly one provider request and reads
+`final` — the bottom of the stack for when you're building your own
+orchestration and want Axle purely for provider normalization. (The standalone
+`generateStep()` was removed in 0.32.0 when `generate()` was unified onto the
+streaming transport.)
 
 ## When to use Agent instead
 

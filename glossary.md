@@ -53,6 +53,24 @@ compaction. Never a single assistant message; never a provider request.
 (`agent.send(...)`), executed as a FIFO queue item. The host-facing unit of "the
 agent took its turn."
 
+**Display** — the request-side reasoning disclosure control:
+`display: "visible" | "hidden"` on the `{ effort }` form of `reasoning`. It says
+whether the provider should show its thinking, never in what form. The form that
+arrives — a `summary` or `raw` text — is recorded on the thinking part and is
+the model's property. `"hidden"` withholds thinking content from the turn while
+the message keeps whatever the wire carried, so continuity still round-trips.
+
+**Summary / raw** — the two content fields of a turn's thinking part, each named
+for what the provider handed back: `summary` is the provider's condensed account
+of its reasoning, `raw` is the chain of thought itself (open-weight models
+only). Neither present is the withheld state. The message-layer thinking part
+keeps the wire vocabulary (`text`, `summary`, `redacted`) because it exists to
+be echoed, not read.
+
+**Redacted** — a wire-layer flag only: the provider substituted an opaque
+payload for the content and wants it echoed on the next turn. Never a turn-part
+or event field, and never set because thinking was merely hidden.
+
 **Transcript** — the host-owned, reader-facing fold of `TurnEvent`s into turns
 and annotations. The exported `Transcript` class is the shipped in-memory
 implementation; hosts persist its `turns` and pass them to the constructor on
@@ -88,5 +106,9 @@ and one flat namespace.
 | `generateTurn` | `generateStep` | 0.29.0 |
 | `TurnAccumulator` | `Transcript` | 0.30.0 |
 | `agent.history.log` | `agent.messages` | 0.26.0 / 0.30.0 |
+| `ThinkingPart.text` | `ThinkingPart.summary` / `ThinkingPart.raw` | 0.32.0 |
+| `ThinkingPart.redacted` (turn) | removed — `redacted` is wire-layer only | 0.32.0 |
+| `thinking:delta` (stream and turn) | `thinking:raw-delta` | 0.32.0 |
+| `generateStep` | removed — use `stream()` with `maxSteps: 1` | 0.32.0 |
 
 See [Upgrading](/upgrading).

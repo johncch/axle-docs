@@ -82,12 +82,30 @@ type ContentPart =
 type ThinkingContinuity =
   | { provider: "openai"; encrypted: string }
   | { provider: "anthropic"; signature?: string; redactedData?: string }
-  | { provider: "gemini"; thoughtSignature: string };
+  | { provider: "gemini"; thoughtSignature: string }
+  | {
+      provider: "openrouter";
+      type: string;
+      id?: string;
+      format?: string;
+      index?: number;
+      signature?: string;
+      data?: string;
+    };
 ```
 
 Opaque provider state that lets a model continue reasoning across requests.
 Preserve it verbatim through storage and restoration — strip it and multi-turn
-reasoning breaks.
+reasoning breaks. The `openrouter` member carries the `reasoning_details`
+entry's identity so Claude through OpenRouter keeps its signatures across tool
+calls.
+
+`ContentPartThinking` keeps the wire vocabulary — `text`, `summary`,
+`redacted` — because it exists to be echoed back to the provider's next
+request, not read. `redacted` means only that the provider substituted an
+opaque payload (Anthropic `redacted_thinking`, OpenRouter
+`reasoning.encrypted`); a hidden block is never marked redacted. Read the
+[turn part](/reference/transcript#thinkingpart), echo the message part.
 
 ## Files
 
