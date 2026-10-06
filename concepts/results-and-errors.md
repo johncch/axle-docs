@@ -23,7 +23,7 @@ the same two-state union:
 const result = await agent.send("...").final;
 
 if (!result.ok) {
-  result.error.kind; // "model" | "tool" | "parse"
+  result.error.kind; // "model" | "refusal" | "parse"
   result.error.message; // always there
   return;
 }
@@ -45,9 +45,27 @@ doesn't expose the loop budgets (`maxSteps`, `maxContextTokens`), so there's no
 
 | `kind` | What happened |
 | --- | --- |
-| `model` | The provider returned an error — rate limit, bad request, overload |
-| `tool` | A tool failed in a way the loop couldn't continue past |
+| `model` | The provider returned an error — rate limit, bad request, overload. `type` names it (`"authentication"` when your key was rejected); `status` carries the HTTP status when there was one |
+| `refusal` | The provider declined the request or blocked its output — a safety refusal, a content filter, a blocked prompt. `text` and `category` carry what the provider said, when it said anything |
 | `parse` | The response didn't match your `Instruct` schema |
+
+A refusal is not a model error and not an empty success. Before 0.33.0 an
+Anthropic refusal arrived as `ok: true` with `finishReason: "error"`, an OpenAI
+or Chat Completions refusal as `ok: true` with empty content, and a Gemini block
+as a `model` failure — now all of them resolve `ok: false` with
+`kind: "refusal"`. Branch on it explicitly: retrying won't help, and falling
+through to your generic model-error path will mislead. The refused step is not
+stored — `messages` holds only the steps that completed before it — and after a
+refused `agent.send()` the agent's history ends with the user message. A refusal
+the model writes as ordinary text is still a normal `ok: true` answer; only
+provider-marked refusals take this branch.
+
+Failures are flat: a `model` failure carries `type`, `message`, `status?`,
+`usage?`, and `raw?` directly on `error` (no nested `error` object since
+0.33.0). To detect a bad key, check
+`!result.ok && result.error.kind === "model" && result.error.type === "authentication"`
+instead of digging through `raw.status` or message strings. See
+[Errors](/reference/errors) for the full union.
 
 ### What `response` holds
 

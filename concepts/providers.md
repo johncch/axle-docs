@@ -86,13 +86,10 @@ inference provider becomes a one-line provider change — which is what you want
 when you're moving between direct API access and a gateway for cost, routing, or
 availability reasons.
 
-Axle also keeps a small alias table for the handful of models where OpenRouter's
-slug differs from the publisher's canonical form (casing, or a different author
-prefix — `zai/glm-5.2` is `z-ai/glm-5.2` there). Those are corrected for you.
-
-This doesn't rescue you when two providers genuinely disagree about a model's
-name, but the frontier labs are consistent enough that it covers most of what
-you'll hit.
+Pass the slug the gateway lists. `chatCompletions()` no longer rewrites model
+IDs — the alias table for OpenRouter slugs that differed from the publisher's
+canonical form was removed in 0.33.0, so `zai/glm-5.3` stays `zai/glm-5.3` and
+you should pass `z-ai/glm-5.3` yourself.
 
 ### The safety net
 
@@ -103,20 +100,21 @@ rejects `"openai/gpt-5.1"` before it costs you a round trip.
 Accepted prefixes are what you'd guess, with one convenience: `gemini()` takes
 both `google/` and `gemini/`.
 
-### The model catalog
+### No model catalog
+
+There is no model catalog. Axle ships no list of models, no context windows, no
+output ceilings — model IDs are plain strings your application owns. If you need
+a ceiling or a capability flag, keep your own table or ask the provider's models
+API. A model hosted by several vendors has a different ID on each, so a shared
+constant could never be portable with `chatCompletions()` anyway.
 
 ```typescript
-import { Models, ModelInfo } from "@fifthrevision/axle/models";
-
-Models.Anthropic.CLAUDE_SONNET_4_5; // "anthropic/claude-sonnet-4-5"
-ModelInfo[Models.Anthropic.CLAUDE_SONNET_4_5];
-// { contextWindow: 200000, maxOutputTokens: 64000, multimodal: true }
+const model = "openai/gpt-5.5";
 ```
 
-The catalog is a convenience, not a gate. Raw strings always work, so a
-brand-new model is usable before the catalog has heard of it. Models their
-publisher has deprecated carry a `@deprecated` tag, so your editor will nudge
-you.
+(The `@fifthrevision/axle/models` entry point and its `Models`, `ModelInfo`,
+and `ModelMetadata` exports were removed in 0.33.0 — see
+[Upgrading](/upgrading).)
 
 ## Request options
 
@@ -128,25 +126,36 @@ different.
 const agent = new Agent({
   provider,
   model,
-  temperature: 0.2,
   maxOutputTokens: 4096,
   reasoning: "on",
 });
 
 // Just this one send — merged over the agent's defaults
-await agent.send("...", { temperature: 0.9 }).final;
+await agent.send("...", { maxOutputTokens: 1024 }).final;
 ```
 
 | Option | What it does |
 | --- | --- |
 | `reasoning` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high", display?: "visible" \| "hidden" }` — `display` (default `"visible"`) asks the provider to disclose its thinking |
 | `maxOutputTokens` | Caps output tokens for the request |
-| `temperature`, `topP` | Sampling |
-| `stop` | Stop sequence(s) |
 | `toolChoice` | `"auto"`, `"none"`, `"required"`, or `{ type: "tool", name }` |
 | `parallelToolCalls` | Asks the provider to avoid parallel tool calls |
 | `providerOptions` | Raw passthrough, applied *after* Axle's mappings |
 | `signal` | Aborts the request |
+
+Sampling controls (`temperature`, `topP`) and stop sequences were removed in
+0.33.0 — they were never portable, and the newest models reject them. Send them
+through `providerOptions` using the provider's own field names:
+
+```typescript
+await agent.send("...", { providerOptions: { temperature: 0.2 } }).final;
+```
+
+| Removed option | Anthropic | OpenAI | Gemini | Chat Completions |
+| --- | --- | --- | --- | --- |
+| `temperature` | `temperature` | `temperature` | `temperature` | `temperature` |
+| `topP` | `top_p` | `top_p` | `topP` | `top_p` |
+| `stop` | `stop_sequences` | not supported | `stopSequences` | `stop` |
 
 `providerOptions` merges key by key with the agent's defaults and lands last, so
 it can deliberately override Axle's own mapping. It's the escape hatch for

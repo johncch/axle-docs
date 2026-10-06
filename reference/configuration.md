@@ -163,5 +163,4 @@ or `appendixTokens` is negative.
 | Import | Contains |
 | --- | --- |
 | `@fifthrevision/axle` | The full runtime surface. |
-| `@fifthrevision/axle/models` | `Models`, `ModelInfo`, `ModelMetadata`. |
 | `@fifthrevision/axle/ui` | Type-only render surface plus `Transcript` — no provider SDKs. |

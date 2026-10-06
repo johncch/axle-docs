@@ -7,10 +7,108 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.32.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.33.0-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.32.0**.
+Current release: **0.33.0**.
+
+## 0.33.0 — no registry, flat failures, portable provider tools
+
+Six breaking changes in the library surface (plus CLI changes, which are out of
+scope for this site). The migration guide is
+[`docs/0.33.0-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.33.0-migration.md)
+in the library repo.
+
+**The model registry is removed.** The `@fifthrevision/axle/models` entry point
+no longer exists — no `Models`, no `ModelInfo`, no `ModelMetadata`. Pass model
+IDs as plain strings (`"openai/gpt-5.5"`); first-party providers still accept
+both the publisher-qualified form (`"openai/gpt-5.5"`) and the bare id
+(`"gpt-5.5"`). An application that needs a context window or an output ceiling
+keeps its own table or asks the provider's models API. OpenRouter IDs are sent
+unchanged — the alias table (`zai/glm-5.3` → `z-ai/glm-5.3`) is gone, so pass
+the slug OpenRouter lists.
+
+```typescript
+// @check-skip — shows the pre-0.33 API
+import { Models } from "@fifthrevision/axle/models";
+const model = Models.OpenAI.GPT_5_5;
+```
+
+```typescript
+const model = "openai/gpt-5.5";
+```
+
+**`temperature`, `topP`, and `stop` are removed.** They are gone from
+`AxleModelRequestOptions`, and so from `generate()`, `stream()`, `Agent`,
+`agent.send()`, and an agent definition's `request` block. Send them through
+`providerOptions` using the provider's own field names:
+
+```typescript
+// @check-skip — shows the pre-0.33 API
+await generate({ provider, model, messages, temperature: 0.2 });
+```
+
+```typescript
+await generate({ provider, model, messages, providerOptions: { temperature: 0.2 } });
+```
+
+| Removed option | Anthropic | OpenAI | Gemini | Chat Completions |
+| --- | --- | --- | --- | --- |
+| `temperature` | `temperature` | `temperature` | `temperature` | `temperature` |
+| `topP` | `top_p` | `top_p` | `topP` | `top_p` |
+| `stop` | `stop_sequences` | not supported | `stopSequences` | `stop` |
+
+**Provider tool parts have one shape on every provider.** A `provider-tool` part
+now carries portable `input` and `result` plus per-provider `continuity`, and a
+new `provider-tool-result` part holds results that arrive a step later. There is
+a new `ConsoleOutput` shape for code execution output, and two new stream/turn
+events (`provider-tool:input`, `provider-tool:error` / `action:input`); `output`
+is gone from `provider-tool:complete`. See [Provider tools](/cookbook/provider-tools)
+and [Messages & parts](/reference/messages).
+
+**A refusal is its own failure kind.** `generate()`, `stream().final`, and
+`agent.send().final` now resolve `{ kind: "refusal", message, text?, category? }`
+when a provider declines or blocks output, instead of empty successes or
+mislabeled `model` failures. Code that switches over `error.kind` needs a
+`"refusal"` case. See [Results & errors](/concepts/results-and-errors).
+
+**Failures are flat, and a rejected key is `type: "authentication"`.**
+`AxleFailure` no longer nests under `error` — the `model` member carries `type`,
+`message`, `status?`, `usage?`, and `raw?` directly, `ModelError` is removed,
+the never-produced `tool` member is gone, and parse failures carry `cause`
+instead of `error`. HTTP 401 (and Gemini's `API_KEY_INVALID`) reports
+`type: "authentication"`. Chat Completions HTTP errors report the body's
+`error.type` / `error.message` with `status` alongside. See
+[Errors](/reference/errors).
+
+```typescript
+// @check-skip — shows the pre-0.33 shape
+type AxleFailure =
+  | { kind: "model"; error: ModelError; message: string }
+  | { kind: "tool"; error: { name: string; message: string }; message: string }
+  | { kind: "parse"; error: unknown; message: string };
+```
+
+```typescript
+type AxleFailure =
+  | { kind: "model"; type: string; message: string; status?: number; usage?: Stats; raw?: unknown }
+  | { kind: "refusal"; message: string; text?: string; category?: string }
+  | { kind: "parse"; message: string; cause: unknown };
+```
+
+**`AxleStopReason.Error` and `AxleStopReason.Custom` are removed.**
+`finishReason` is now `stop`, `length`, `function_call`, or `cancelled`. Unknown
+stop reasons fail the request instead of resolving `ok: true`.
+
+Behavior changes worth knowing: Anthropic `pause_turn` responses continue
+automatically within one step; `Agent` forwards its `sessionId` to OpenRouter;
+Anthropic's implicit `max_tokens` defaults to 128,000; adjacent text parts
+concatenate without separators; `web_search` resolves to newer provider versions
+(`web_search_20260318` with `allowed_callers: ["direct"]` on Anthropic,
+`web_search` on OpenAI) and Gemini searches surface a `provider-tool` part;
+OpenAI replays assistant items in order and truncations finish with `length`.
+
+[Full guide](https://github.com/johncch/axle/blob/main/docs/0.33.0-migration.md).
 
 ## 0.32.0 — thinking parts, disclosure control, one transport
 

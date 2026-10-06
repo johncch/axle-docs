@@ -110,5 +110,12 @@ and one flat namespace.
 | `ThinkingPart.redacted` (turn) | removed — `redacted` is wire-layer only | 0.32.0 |
 | `thinking:delta` (stream and turn) | `thinking:raw-delta` | 0.32.0 |
 | `generateStep` | removed — use `stream()` with `maxSteps: 1` | 0.32.0 |
+| `Models` / `ModelInfo` / `ModelMetadata` (`@fifthrevision/axle/models`) | removed — pass model IDs as plain strings | 0.33.0 |
+| `temperature` / `topP` / `stop` (request options) | removed — send through `providerOptions` with provider field names | 0.33.0 |
+| `AxleFailure` `{ kind: "tool" }` | removed — nothing produced it | 0.33.0 |
+| `AxleFailure` nested `error` (`ModelError`, parse `error`) | flattened — `model` carries `type`/`status`/`usage`/`raw` directly; parse carries `cause` | 0.33.0 |
+| `provider-tool` part `output` | `input` / `result` / `continuity`; results in `continuity`, late results in `provider-tool-result` parts | 0.33.0 |
+| `provider-tool:complete` `output` (search) | search results live on the part's `continuity`; failures arrive as `provider-tool:error` | 0.33.0 |
+| `AxleStopReason.Error` / `AxleStopReason.Custom` | removed — unknown stop reasons fail the request | 0.33.0 |
 
 See [Upgrading](/upgrading).

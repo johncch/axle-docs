@@ -115,9 +115,21 @@ and discriminate on `kind`.
 ```typescript
 type ActionResult =
   | { type: "in-progress"; content: string }
-  | { type: "success"; content: unknown }
+  | { type: "success"; content?: string | ConsoleOutput | ToolResultPart[] }
   | { type: "error"; error: { type: string; message: string } };
+
+interface ConsoleOutput {
+  stdout: string;
+  stderr?: string;
+  exitCode?: number;
+}
 ```
+
+`ConsoleOutput` (added in 0.33.0) arrives only from provider code execution
+that separates its streams (Anthropic today); OpenAI and Gemini report one
+stream, so their output arrives as a string. A renderer that narrows `content`
+with `typeof content === "string"` and treats the rest as parts must add the
+object case. Local tools still return strings or parts.
 
 `pendingArgs` holds accumulated argument JSON before it can be parsed into
 `parameters`. Render it during streaming so there's something on screen.
@@ -172,6 +184,7 @@ Openings carry the full part; deltas carry only ids and the delta.
 | --- | --- |
 | `action:args-delta` | `turnId`, `partId`, `delta`, `accumulated` |
 | `action:running` | `turnId`, `partId`, `parameters?` |
+| `action:input` | `turnId`, `partId`, `input` — what the provider tool was asked to do (added in 0.33.0) |
 | `action:progress` | `turnId`, `partId`, `chunk` |
 | `action:complete` | `turnId`, `partId`, `result`, `timing?` |
 | `action:error` | `turnId`, `partId`, `error`, `timing?` |

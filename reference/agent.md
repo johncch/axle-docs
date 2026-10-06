@@ -31,9 +31,6 @@ Extends `AxleModelRequestOptions` minus `signal`.
 | `fileResolver` | `FileResolver` | — | Resolves deferred file references. |
 | `reasoning` | `ReasoningSetting` | — | Portable reasoning/thinking control: `"default"`, `"off"`, `"on"`, or `{ effort, display? }`. |
 | `maxOutputTokens` | `number` | — | Output token cap. |
-| `temperature` | `number` | — | Sampling temperature. |
-| `topP` | `number` | — | Nucleus sampling. |
-| `stop` | `string \| string[]` | — | Stop sequences. |
 | `toolChoice` | `ToolChoice` | — | `"auto"`, `"none"`, `"required"`, `{ type: "tool", name }`. |
 | `parallelToolCalls` | `boolean` | — | Ask the provider to avoid parallel tool calls. |
 | `providerOptions` | `Record<string, any>` | — | Raw passthrough, applied after normalized mappings. |
@@ -86,7 +83,7 @@ defaults; `providerOptions` merges key-by-key.
 | `fileResolver` | `FileResolver` | Overrides the agent's resolver for this send. |
 | `metadata` | `MessageMetadata` | Host-owned metadata attached to the user message and copied to the user turn. Providers ignore it. |
 | `signal` | `AbortSignal` | Cancels this send. |
-| ...request options | | `reasoning`, `maxOutputTokens`, `temperature`, `topP`, `stop`, `toolChoice`, `parallelToolCalls`, `providerOptions`. |
+| ...request options | | `reasoning`, `maxOutputTokens`, `toolChoice`, `parallelToolCalls`, `providerOptions`. (`temperature`, `topP`, and `stop` were removed in 0.33.0 — use `providerOptions`.) |
 
 ### AgentHandle
 
@@ -117,7 +114,7 @@ interface AgentErrorResult {
 }
 ```
 
-`AxleFailure` is one of `{ kind: "model" }`, `{ kind: "tool" }`, or
+`AxleFailure` is one of `{ kind: "model" }`, `{ kind: "refusal" }`, or
 `{ kind: "parse" }` — see [Errors](/reference/errors).
 
 ## stop()
