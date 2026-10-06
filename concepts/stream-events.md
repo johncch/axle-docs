@@ -67,7 +67,7 @@ If you've come from `agent.on()`, four things change:
   `thinking:summary-delta`, `thinking:update`, `thinking:end`
 - **Tools** — `tool:request`, `tool:args-delta`, `tool:exec-start`,
   `tool:exec-delta`, `tool:exec-complete`, `tool:exec-error`
-- **Provider tools** — `provider-tool:start`, `provider-tool:complete`
+- **Provider tools** — `provider-tool:start`, `provider-tool:input`, `provider-tool:complete`, `provider-tool:error`
 - **Error** — `error`
 
 Every field is listed in the

@@ -48,8 +48,8 @@ Axle maps two names to each vendor's native equivalent:
 
 | Portable | Anthropic | OpenAI | Gemini |
 | --- | --- | --- | --- |
-| `web_search` | `web_search_20250305` | `web_search_preview` | `googleSearch` |
-| `code_execution` | — | `code_interpreter` | `codeExecution` |
+| `web_search` | `web_search_20260318` | `web_search` | `googleSearch` |
+| `code_execution` | `code_execution_20260521` | `code_interpreter` | `codeExecution` |
 
 Anything else passes through untouched, so a vendor-specific tool works by
 naming it directly:
@@ -58,9 +58,46 @@ naming it directly:
 const custom: ProviderTool = { type: "provider", name: "computer_20250124" };
 ```
 
-Note the gap in that table: Anthropic has no mapping for `code_execution`, so
-the name goes through as-is and the request will fail unless Anthropic happens to
-recognize it.
+On Anthropic, `web_search` sends `allowed_callers: ["direct"]` so searches run
+directly rather than from inside code execution (dynamic filtering) — a model
+without programmatic tool calling requires that setting. Opt in to dynamic
+filtering with `config: { allowed_callers: ["code_execution_20260120"] }`, or
+pin the old version with `config: { type: "web_search_20250305" }`.
+
+## What a provider-tool part carries
+
+Every provider reports these calls differently; Axle normalizes what your UI
+reads into one shape (normalized in 0.33.0):
+
+```typescript
+{
+  type: "provider-tool",
+  id,
+  name, // "web_search", "web_fetch", "code_execution", "file_search"
+  input?, // { type: "search", queries } | { type: "open", url } | { type: "find", url, pattern } | { type: "code", code } | { type: "command", command }
+  result?, // { type: "success", output? } | { type: "error", error: { type, message } }
+  continuity?, // the provider's own objects, sent back to that provider only
+}
+```
+
+`input` is absent for tools Axle has no shape for; `result` is absent while the
+tool has not run in that message. A successful code execution carries what it
+printed as `output` — a string for OpenAI and Gemini, `{ stdout, stderr?,
+exitCode? }` for Anthropic. Search results live in `continuity` (Anthropic's
+result blocks, OpenAI's items), so read them there.
+
+A provider tool call goes back only to the provider that made it. And when
+Claude calls an Anthropic-run tool and one of your tools in the same response,
+the server tool's result arrives a step later in its own
+`provider-tool-result` part — handle both part types if you switch exhaustively.
+
+## Events
+
+`provider-tool:start` opens the call, `provider-tool:input` carries what it was
+asked to do, and then either `provider-tool:complete` (success) or
+`provider-tool:error` (the provider reported failure, e.g. a search past
+`max_uses`) closes it. If you wait for `complete` to close a provider tool in a
+UI, handle `error` too. The turn stream mirrors `input` as `action:input`.
 
 ## Configuration is not portable
 

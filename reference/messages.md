@@ -33,7 +33,7 @@ interface AxleAssistantMessage {
   model?: string;
   content: Array<
     ContentPartText | ContentPartThinking | ContentPartToolCall
-    | ContentPartProviderTool | ContentPartCitation
+    | ContentPartProviderTool | ContentPartProviderToolResult | ContentPartCitation
   >;
   finishReason?: AxleStopReason;
 }
@@ -64,6 +64,7 @@ type ContentPart =
   | ContentPartToolCall
   | ContentPartThinking
   | ContentPartProviderTool
+  | ContentPartProviderToolResult
   | ContentPartCitation;
 ```
 
@@ -73,8 +74,45 @@ type ContentPart =
 | `ContentPartFile` | `type: "file"`, `file: FileInfo` |
 | `ContentPartThinking` | `type: "thinking"`, `id?`, `text?`, `summary?`, `redacted?`, `continuity?`, `providerMetadata?` |
 | `ContentPartToolCall` | `type: "tool-call"`, `id`, `name`, `parameters`, `providerMetadata?` |
-| `ContentPartProviderTool` | `type: "provider-tool"`, `id`, `name`, `input?`, `output?` |
+| `ContentPartProviderTool` | `type: "provider-tool"`, `id`, `name`, `input?`, `result?`, `continuity?` |
+| `ContentPartProviderToolResult` | `type: "provider-tool-result"`, `id`, `name`, `result`, `continuity?` |
 | `ContentPartCitation` | `type: "citation"`, `citations`, `providerMetadata?` |
+
+### ProviderTool parts
+
+```typescript
+type ProviderToolInput =
+  | { type: "search"; queries: string[] }
+  | { type: "open"; url: string }
+  | { type: "find"; url: string; pattern: string }
+  | { type: "code"; code: string }
+  | { type: "command"; command: string };
+
+type ProviderToolResult =
+  | { type: "success"; output?: string | ConsoleOutput }
+  | { type: "error"; error: { type: string; message: string } };
+
+interface ConsoleOutput {
+  stdout: string;
+  stderr?: string;
+  exitCode?: number;
+}
+```
+
+`name` is Axle's portable name (`"web_search"`, `"web_fetch"`,
+`"code_execution"`, `"file_search"`). `input` says what the tool was asked to
+do and is absent for tools Axle has no shape for; `result` is absent while the
+tool has not run in that message. A successful code execution carries what it
+printed as `output` — a string when the provider returns one stream (OpenAI,
+Gemini), `{ stdout, stderr?, exitCode? }` when it separates them (Anthropic).
+`continuity` is the provider's own objects, sent back only to the provider that
+made them — a part with another provider's `continuity`, or none, is left out
+of the request.
+
+`ContentPartProviderToolResult` holds the result of a provider tool call an
+earlier assistant message made. Only Anthropic produces it, when Claude calls
+an Anthropic-run tool and one of your tools in the same response. Code that
+switches exhaustively over assistant content parts needs a case for it.
 
 ### ThinkingContinuity
 

@@ -103,7 +103,7 @@ const definition: AgentDefinition = {
   provider: { type: "anthropic", config: { apiKeyEnv: "ANTHROPIC_API_KEY" } },
   model: "claude-sonnet-4-5",
   system: "You research topics thoroughly.",
-  request: { temperature: 0.3 },
+  request: { maxOutputTokens: 2048 },
   tools: [{ name: "web_search" }],
 };
 ```

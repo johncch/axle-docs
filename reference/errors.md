@@ -16,19 +16,41 @@ The resolved-failure union carried in `result.error`.
 
 ```typescript
 type AxleFailure =
-  | { kind: "model"; error: ModelError; message: string }
-  | { kind: "tool"; error: { name: string; message: string }; message: string }
-  | { kind: "parse"; error: unknown; message: string };
+  | { kind: "model"; type: string; message: string; status?: number; usage?: Stats; raw?: unknown }
+  | { kind: "refusal"; message: string; text?: string; category?: string }
+  | { kind: "parse"; message: string; cause: unknown };
 ```
 
 `message` is always present, whatever the kind. `GenerateError` is a deprecated
 alias kept for compatibility.
 
-::: warning `ModelError` is not exported
-It's referenced by `AxleFailure` but isn't importable from the package root, so
-you can't name it in your own signatures. Narrow on `kind` and read
-`error.error.type` / `error.error.message` instead.
-:::
+A `model` failure carries the fields directly — there is no nested `ModelError`
+(it was removed in 0.33.0, along with the never-produced `tool` member). `type`
+is `"authentication"` when the provider rejected the API key or token (HTTP 401
+on Anthropic, OpenAI, and Chat Completions, or Gemini's `API_KEY_INVALID`);
+every other failure keeps the provider's own error type. `status` is the HTTP
+status when the failure was an HTTP response, and absent for transport or
+mid-stream errors. A Chat Completions non-2xx JSON body in the OpenAI shape
+reports the body's `error.type` (else `error.code`) as `type` and
+`error.message` as `message` — match on `status`, not on `type === "404"`.
+
+A `refusal` means the provider declined the request or blocked its output
+(added in 0.33.0). `text` is the refusal text or explanation when the provider
+gave one; `category` is the provider's own name for the reason. Either can be
+absent. The refused step is not stored and `step:complete` does not fire. Code
+that switches over `error.kind` needs a `"refusal"` case — see
+[Results & errors](/concepts/results-and-errors).
+
+A `parse` failure carries the schema error as `cause` (renamed from `error` in
+0.33.0).
+
+```typescript
+// @check-skip — shows the pre-0.33 shape
+type AxleFailure =
+  | { kind: "model"; error: ModelError; message: string }
+  | { kind: "tool"; error: { name: string; message: string }; message: string }
+  | { kind: "parse"; error: unknown; message: string };
+```
 
 ## AxleError
 
@@ -160,7 +182,7 @@ import { AxleAbortError, AxleToolFatalError, AxleError } from "@fifthrevision/ax
 try {
   const result = await agent.send("...").final;
   if (!result.ok) {
-    // model / tool / parse — expected
+    // model / refusal / parse — expected
     return;
   }
 } catch (error) {

@@ -47,6 +47,7 @@ Both extend `AxleModelRequestOptions`.
 | `maxContextTokens` | `number` | Context budget in tokens. Must be ≥ 1. |
 | `span` | `Span` | Parent tracing span. |
 | `fileResolver` | `FileResolver` | Resolves deferred file references. |
+| `sessionId` | `string` | Conversation identity forwarded to the provider. Only OpenRouter uses it today (as `session_id`, for sticky routing and dashboard grouping); other providers ignore it. `Agent` passes its own `sessionId`. |
 | ...request options | | See [Providers](/reference/providers#axlemodelrequestoptions). |
 
 Passing both `registry` and `tools`/`providerTools` throws `AxleError` with code
@@ -190,9 +191,20 @@ Correlated by `id`.
 
 | Event | Fields |
 | --- | --- |
-| `provider-tool:start` | `id`, `name` |
-| `provider-tool:complete` | `id`, `name`, `output?` |
+| `provider-tool:start` | `id`, `name` — `name` is Axle's portable name |
+| `provider-tool:input` | `id`, `name`, `input` — what the tool was asked to do |
+| `provider-tool:complete` | `id`, `name`, `output?` — the tool's printed output when the provider reports one stream |
+| `provider-tool:error` | `id`, `name`, `error: { type, message }` — the provider reported failure |
 | `error` | `error: AxleFailure` |
+
+`provider-tool:input` (added in 0.33.0) fires when the provider says what the
+tool was asked to do — before the search runs on Anthropic, together with the
+result on OpenAI. `provider-tool:error` replaces `complete` when the provider
+reports failure; a consumer that waits for `complete` to close a provider tool
+must handle `error` as well. On `complete`, `output` carries the tool's printed
+output when the provider reports one stream (code execution); search results
+live on the finished message part's `continuity`, not on the event. See
+[Messages & parts](/reference/messages#providertool-parts).
 
 ## Removed in 0.32.0: generateStep()
 

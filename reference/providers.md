@@ -41,8 +41,9 @@ The vendor is inferred from the hostname when omitted:
 | `openrouter.ai`, `api.openrouter.ai` | `openrouter` |
 | `api.together.ai`, `api.together.xyz` | `together` |
 
-Only `openrouter` currently remaps model ids and provider tool names; other
-vendors pass both through unchanged.
+Only `openrouter` currently adjusts request behavior; other
+vendors pass both through unchanged. Model IDs are never rewritten — pass the
+slug the gateway lists.
 
 Provider `name` is `"anthropic"`, `"openai"`, `"gemini"`, or `"ChatCompletions"`.
 
@@ -66,13 +67,16 @@ and on `GenerateParams` / `StreamParams`.
 | --- | --- | --- |
 | `reasoning` | `ReasoningSetting` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high", display?: "visible" \| "hidden" }`. |
 | `maxOutputTokens` | `number` | Output token cap. |
-| `temperature` | `number` | Sampling temperature. |
-| `topP` | `number` | Nucleus sampling, mapped to provider casing. |
-| `stop` | `string \| string[]` | Stop sequences. |
 | `toolChoice` | `ToolChoice` | Tool-use constraint. |
 | `parallelToolCalls` | `boolean` | Ask the provider to avoid parallel tool calls. |
 | `providerOptions` | `Record<string, any>` | Raw fields, applied **after** normalized mappings. |
 | `signal` | `AbortSignal` | Aborts the in-flight request. |
+
+`temperature`, `topP`, and `stop` were removed in 0.33.0. Send them through
+`providerOptions` using the provider's own field names (`top_p` on Anthropic /
+OpenAI / Chat Completions, `topP` on Gemini; `stop_sequences` on Anthropic,
+`stopSequences` on Gemini, `stop` on Chat Completions, unsupported on OpenAI).
+See [Upgrading](/upgrading).
 
 ```typescript
 type ToolChoice = "auto" | "none" | "required" | { type: "tool"; name: string };
@@ -118,33 +122,17 @@ string works against a first-party provider and an inference gateway without
 change. See
 [One model string, any inference provider](/concepts/providers#one-model-string-any-inference-provider).
 
-For OpenRouter, `chatCompletions` additionally consults a generated alias table
-(`OpenRouterModelAliases`) for models whose OpenRouter slug differs from the
-publisher's canonical form — `zai/glm-5.2` → `z-ai/glm-5.2`, and similar casing
-fixes. Unknown ids pass through unchanged. Other vendors pass everything through.
+OpenRouter slugs are sent unchanged. If OpenRouter lists a model under a slug
+that differs from the publisher's canonical form (casing, or a different author
+prefix — `z-ai/glm-5.3`, not `zai/glm-5.3`), pass OpenRouter's slug. IDs that
+were already OpenRouter slugs are unaffected.
 
-## Model catalog
+## Removed in 0.33.0: model catalog
 
-```typescript
-import { Models, ModelInfo } from "@fifthrevision/axle/models";
-
-Models.Anthropic.CLAUDE_SONNET_4_5; // "anthropic/claude-sonnet-4-5"
-
-ModelInfo["anthropic/claude-sonnet-4-5"];
-// { contextWindow: 200000, maxOutputTokens: 64000, multimodal: true }
-```
-
-```typescript
-interface ModelMetadata {
-  contextWindow?: number;
-  maxOutputTokens?: number;
-  multimodal: boolean;
-}
-```
-
-Groups: `Anthropic`, `DeepSeek`, `Google`, `MiniMax`, `Mistral`, `Moonshot`,
-`OpenAI`, `Qwen`, `ZAI`. Entries deprecated by their publisher carry a
-`@deprecated` tag. The catalog is advisory — any string is a valid model.
+The `@fifthrevision/axle/models` entry point (`Models`, `ModelInfo`,
+`ModelMetadata`) no longer exists. Pass model IDs as plain strings; keep your
+own table (or ask the provider's models API) when you need context windows or
+output ceilings. See [Upgrading](/upgrading).
 
 ## Context estimation
 
@@ -208,10 +196,10 @@ enum AxleStopReason {
   Stop = "stop",
   Length = "length",
   FunctionCall = "function_call",
-  Error = "error",
-  Custom = "custom",
   Cancelled = "cancelled",
 }
 ```
 
-Surfaces as `AxleAssistantMessage.finishReason`.
+Surfaces as `AxleAssistantMessage.finishReason`. (`Error` and `Custom` were
+removed in 0.33.0 — unknown stop reasons now fail the request. See
+[Upgrading](/upgrading).)

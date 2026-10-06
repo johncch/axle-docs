@@ -39,7 +39,6 @@ Most of the time you'll only use the first one.
 | Import | What's in it |
 | --- | --- |
 | `@fifthrevision/axle` | Everything: `Agent`, `Instruct`, providers, `stream()`, `generate()`, tools, MCP, errors. |
-| `@fifthrevision/axle/models` | The `Models` catalog and `ModelInfo` metadata — context windows, output limits, multimodal support. |
 | `@fifthrevision/axle/ui` | A type-only surface for renderers: `Turn`, `TurnEvent`, `Transcript`, `Citation`, `Stats`. Import this in UI code so you don't pull three provider SDKs into your browser bundle. |
 
 ## API keys

@@ -73,11 +73,12 @@ Portable names and their native mappings:
 
 | Portable | Anthropic | OpenAI | Gemini |
 | --- | --- | --- | --- |
-| `web_search` | `web_search_20250305` | `web_search_preview` | `googleSearch` |
-| `code_execution` | — | `code_interpreter` | `codeExecution` |
+| `web_search` | `web_search_20260318` | `web_search` | `googleSearch` |
+| `code_execution` | `code_execution_20260521` | `code_interpreter` | `codeExecution` |
 
 Unmapped names pass through unchanged. `config` is raw passthrough — field names
-and placement are not portable.
+and placement are not portable. On Anthropic, `web_search` defaults to
+`allowed_callers: ["direct"]`; see [Provider tools](/cookbook/provider-tools).
 
 ## ToolDefinition
 

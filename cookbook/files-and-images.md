@@ -36,8 +36,8 @@ instruct.addFile(await loadFileContent("./report.pdf"));
 instruct.prompt = "Summarize the key findings in this report.";
 ```
 
-Not every model accepts PDFs, though. Check `ModelInfo[model].multimodal`, and
-prefer a model whose docs mention document support specifically.
+Not every model accepts PDFs, though. Check the provider's model docs for
+document support, and prefer a model that mentions it specifically.
 
 ## An image by URL
 
