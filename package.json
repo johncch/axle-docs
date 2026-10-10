@@ -13,7 +13,7 @@
     "preview": "vitepress preview"
   },
   "devDependencies": {
-    "@fifthrevision/axle": "0.33.0",
+    "@fifthrevision/axle": "0.34.0",
     "@types/node": "^26.2.0",
     "typescript": "^6.0.3",
     "vitepress": "^1.6.4",

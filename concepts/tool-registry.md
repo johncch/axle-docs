@@ -24,7 +24,7 @@ The pattern the registry was built for: a tool whose job is to make other tools
 exist.
 
 ```typescript
-import type { ExecutableTool } from "@fifthrevision/axle";
+import { Agent, type ExecutableTool } from "@fifthrevision/axle";
 import * as z from "zod";
 
 declare const toolsets: Record<string, ExecutableTool[]>;
@@ -33,19 +33,21 @@ const loadToolsSchema = z.object({
   toolset: z.enum(["database", "deploy", "analytics"]),
 });
 
+const agent = new Agent({ provider, model, tools: [] });
+
 const loadTools: ExecutableTool<typeof loadToolsSchema> = {
   name: "load_tools",
   description:
     "Load a toolset when you need it. Available: 'database', 'deploy', 'analytics'.",
   schema: loadToolsSchema,
-  async execute({ toolset }, ctx) {
+  async execute({ toolset }) {
     const loaded = toolsets[toolset];
-    ctx.registry.add(loaded);
+    agent.registry.add(loaded);
     return `Loaded: ${loaded.map((t) => t.name).join(", ")}. You can call these now.`;
   },
 };
 
-const agent = new Agent({ provider, model, tools: [loadTools] });
+agent.registry.add(loadTools);
 ```
 
 The agent starts with one tool and grows into whatever the task needs. The model
@@ -59,8 +61,10 @@ compiles fine but leaves the input properties `unknown`.
 
 Two details make it work:
 
-- **`ctx.registry` is the live registry**, not a copy. Tools added during
-  `execute` are available to the model on the next step of the *same* send.
+- **The agent is in closure scope.** `ToolContext` no longer carries a
+  `registry` (removed in 0.34.0) — the tool reaches the agent it runs under
+  directly, and `agent.registry.add()` lands on the next provider request,
+  even mid-turn.
 - **Say so in the return value.** The model has no other signal that its
   capabilities changed. `"Loaded: query_db, list_tables. You can call these
   now."` is doing real work.
@@ -107,9 +111,10 @@ agent.registry.add(editingTools);
 ```
 
 ::: tip When changes take effect
-`agent.registry` is live and gets handed to the tool loop on every send, so
-host-side mutations land on the **next** send. Mutations from inside a tool's
-`execute` land on the next step of the current send. Either way, the
+`agent.registry` is live and the agent hands its prompt and tool lists to the
+tool loop at turn open and again at every tool-batch boundary, so host-side
+mutations land on the **next provider request** — between turns, or mid-turn
+when a tool mutates the agent in closure scope. Either way, the
 [steer playbook](/concepts/agent#the-steer-playbook) gives you a clean boundary
 to change things at.
 :::
@@ -157,29 +162,23 @@ const agent = new Agent({ provider, model, tools: [getWeather] });
 agent.registry; // the one it built — mutate this
 ```
 
-`generate()` and `stream()` accept a registry directly, which is how you share
-one set of capabilities across many independent calls:
+`generate()` and `stream()` take `tools` and `providerTools` directly — there is
+no `registry` option anymore (removed in 0.34.0). To share one set of
+capabilities across many independent calls, share the tool arrays:
 
 ```typescript
-declare const search: ExecutableTool;
+const tools = [getWeather, searchTool];
+const providerTools: ProviderTool[] = [{ type: "provider", name: "web_search" }];
 
-const registry = new ToolRegistry({ tools: [getWeather, search] });
-
-await generate({ provider, model, messages, registry });
-await generate({ provider, model, messages: [...messages], registry });
+await generate({ provider, model, messages, tools, providerTools });
+await generate({ provider, model, messages: [...messages], tools, providerTools });
 ```
-
-Pass `tools`/`providerTools` **or** `registry`, never both — that throws
-`TOOL_OPTIONS_CONFLICT`, since there's no sensible merge.
 
 ::: tip Sharing capabilities between agents
 Since each `Agent` owns its registry, share the tool *arrays* rather than the
 registry — every agent built from the same arrays ends up with an equivalent
 tool set, and each can then diverge independently as its conversation goes its
 own way.
-
-Sharing one registry across `generate()` calls is fine and intentional. Mutate it
-between calls rather than during them; there's no locking.
 :::
 
 ## MCP arrives late

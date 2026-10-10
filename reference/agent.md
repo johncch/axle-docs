@@ -26,6 +26,7 @@ Extends `AxleModelRequestOptions` minus `signal`.
 | `name` | `string` | — | Agent name; appears on spans as `agentName`. |
 | `tools` | `ExecutableTool[]` | — | Local executable tools. |
 | `providerTools` | `ProviderTool[]` | — | Provider-managed tools. |
+| `skills` | `Skill[]` | — | Skills disclosed in the system prompt and loaded on demand through the `view-skill` tool. See [Skills](/concepts/skills). |
 | `mcps` | `MCP[]` | — | MCP clients, resolved lazily on first send. |
 | `observability` | `ObservabilityOptions` | — | Logging and tracing. |
 | `fileResolver` | `FileResolver` | — | Resolves deferred file references. |
@@ -54,10 +55,11 @@ session id wins.
 | `model` | `string` | readonly |
 | `name` | `string \| undefined` | readonly |
 | `registry` | `ToolRegistry` | readonly |
+| `skills` | `SkillRegistry` | readonly — the skills disclosed in the system prompt; mutating it rebuilds the `view-skill` tool and lands on the next provider request |
 | `requestOptions` | `Omit<AxleModelRequestOptions, "signal">` | readonly |
 | `fileResolver` | `FileResolver \| undefined` | readonly |
 | `sessionId` | `string` | mutable |
-| `system` | `string \| undefined` | mutable |
+| `system` | `string \| undefined` | readonly getter — the configured system prompt, then the skills catalog when skills are present |
 | `messages` | `AxleMessage[]` | Getter returning a **copy** of the active conversation. |
 
 ## send()
@@ -67,7 +69,12 @@ send(message: string | Instruct<undefined>, options?: SendMessageOptions): Agent
 send<TSchema>(instruct: Instruct<TSchema>, options?: SendMessageOptions): AgentHandle<ParsedSchema<TSchema>>
 ```
 
-Schedules a FIFO conversation turn and returns a handle synchronously.
+Schedules a FIFO conversation turn and returns a handle synchronously. The user
+message and its turn are built up front, so `send()` emits `pending:queued`
+with a `pending` preview turn carrying the id the committed turn will have —
+render `[...transcript.turns, ...transcript.pending]` keyed by id to show queued
+work. A handle cancelled while still queued emits `pending:dropped` and commits
+nothing.
 
 Strings are wrapped in an `Instruct` with `vars: "optional"`. A supplied
 `Instruct` is cloned, then validated — `InstructVariableError` throws
@@ -128,6 +135,18 @@ in-flight batch executes and commits, then the handle settles without another
 provider request. Returns `false` when no turn is executing. Queued sends are
 unaffected.
 
+## cancel()
+
+```typescript
+cancel(reason?: unknown): boolean
+```
+
+Cancels the active operation immediately — as if that handle's own `cancel()`
+had been called. A turn that already opened settles `cancelled` with its
+partial work committed. Queued operations are unaffected and the next one
+starts. Returns `false` when nothing is running. While `onSettled` callbacks
+run, the operation is already done, so `cancel()` (and `stop()`) return `false`.
+
 ## clear()
 
 ```typescript
@@ -146,6 +165,82 @@ on(callback: (event: TurnEvent) => void): () => void
 
 Registers a turn-event callback for all subsequent sends. Returns an
 unsubscribe function.
+
+## onSettled()
+
+```typescript
+onSettled(callback: SettledCallback): () => void
+```
+
+Fires once after every send or manual compaction that ran, however it ended:
+after its `turn:end` when it opened a turn, and before its handle settles. The
+agent is at rest and the next queued operation has not started, so a host that
+reads its `Transcript.turns` inside the callback gets turns and messages that
+match. An operation cancelled while still queued never ran and does not fire.
+
+```typescript
+type SettledCallback = (
+  session: AgentSession,
+  operation: SettledOperation,
+) => void | Promise<void>;
+
+type SettledOperation =
+  | {
+      kind: "send";
+      id: string; // the id its `pending:queued` turn carried
+      result: PromiseSettledResult<AgentResult<unknown> | AgentErrorResult>;
+    }
+  | { kind: "compaction"; id: string; result: PromiseSettledResult<boolean> };
+```
+
+The session is the one `snapshot()` returns; unlike `snapshot()`, it does not
+wait behind queued operations. The operation carries exactly what the handle is
+about to settle with: the result on success, the rejection reason otherwise.
+
+A callback may return a promise. The handle does not settle and the next queued
+operation does not start until every callback has settled; all callbacks run
+together. A callback that throws or rejects cannot affect the operation: the
+error is recorded on the trace and the other callbacks still run.
+
+Do not await `send()`, `compact()`, or `snapshot()` on this agent from inside a
+callback: the callback holds the queue they wait for, so the nested call
+deadlocks.
+
+```typescript
+declare const report: (reason: unknown) => void;
+
+agent.onSettled(async (session, operation) => {
+  await db.save(session.sessionId, { session, turns: transcript.turns });
+  if (operation.result.status === "rejected") report(operation.result.reason);
+});
+```
+
+## onIdle()
+
+```typescript
+onIdle(callback: IdleCallback): () => void
+```
+
+Called each time the agent goes from busy to idle: an operation finished and
+nothing is queued behind it. Fires after the last operation's `onSettled`
+callbacks have settled, and also when the queue was emptied by `clear()` while
+they ran. Work scheduled during those callbacks keeps the agent busy, so it does
+not fire until that work is done too.
+
+```typescript
+type IdleCallback = () => void;
+```
+
+The callback is not awaited — the agent is already free, so a `send()` from
+inside it starts at once. A callback that throws is recorded on the trace and
+the other callbacks still run. Use it to close whatever the host opened when
+work began:
+
+```typescript
+declare const notifyClients: (event: { type: string }) => void;
+
+agent.onIdle(() => notifyClients({ type: "run:stop" }));
+```
 
 ## context()
 
@@ -174,11 +269,17 @@ Locally estimated, not provider-reported.
 snapshot(): Promise<AgentSession>
 ```
 
-Enqueued behind in-flight sends and compactions, so the capture is always at
-rest. Returns `{ sessionId, messages }`. Excludes transcripts and all runtime
-objects.
+Resolves at once when the agent is idle, and otherwise when it next goes idle,
+so the capture is always at rest — a snapshot never contains a streaming or
+running turn, and it includes everything queued before the agent went idle. It
+is not queued work: it does not make the agent busy, fires no `onIdle`, and is
+not cancelled by `clear()`. Returns `{ sessionId, messages }`. Excludes
+transcripts and all runtime objects.
 
-**Do not await from inside a running send** — it deadlocks.
+**Do not await from inside a running send or an `onSettled` callback** — the
+agent cannot go idle until they return, so the nested call deadlocks. To save
+after each operation, use `onSettled` instead of awaiting `snapshot()` in a
+loop.
 
 ## compact() and setCompaction()
 
@@ -189,8 +290,10 @@ compact(options?: { signal?: AbortSignal }): Promise<boolean>
 
 `setCompaction` replaces any previous configuration. `compact()` resolves `false`
 when no config is registered, otherwise enqueues the work and resolves `true`
-once applied. It bypasses `shouldCompactOnTrigger`. Cancellation rejects with
-`AxleAgentAbortError`.
+once applied. A queued manual compaction previews as a `pending` agent turn with
+one `pending` compaction part (see [Transcript &
+events](/reference/transcript#pending-lifecycle)). It bypasses
+`shouldCompactOnTrigger`. Cancellation rejects with `AxleAgentAbortError`.
 
 **Do not await from inside a running send** — it deadlocks.
 
@@ -217,8 +320,8 @@ createAgentConfig(
 ```
 
 Throws `AxleError` when `definition.version !== 1`, when no model can be
-resolved, or when the definition declares `tools` but the resolver returns none.
-Provider tools and MCP clients are constructed from the definition when the
+resolved, or when the definition declares `tools` or `skills` but the resolver
+returns none. Provider tools and MCP clients are constructed from the definition when the
 resolver omits them.
 
 ### AgentDefinition
@@ -234,6 +337,7 @@ resolver omits them.
 | `tools` | `ToolDefinitionRef[]?` | `{ name, config? }`. |
 | `providerTools` | `ProviderToolDefinitionRef[]?` | `{ name, config? }`. |
 | `mcps` | `MCPConfig[]?` | MCP client configs. |
+| `skills` | `SkillDefinitionRef[]?` | `{ name }` — resolved to `Skill[]` by the host. |
 
 ### Related types
 
@@ -246,6 +350,7 @@ interface ResolvedAgentDefinition {
   tools?: ExecutableTool[];
   providerTools?: ProviderTool[];
   mcps?: MCP[];
+  skills?: Skill[];
 }
 
 interface AgentSession {

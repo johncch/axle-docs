@@ -1,6 +1,6 @@
 ---
 title: Web search
-description: One web_search that works on every provider, native or not.
+description: One web_search that works on every provider, native or attached.
 ---
 
 # Web search
@@ -9,17 +9,16 @@ description: One web_search that works on every provider, native or not.
 OpenAI, and Gemini. But on a local model or a plain OpenAI-compatible endpoint,
 there's nothing native to call.
 
-So Axle lets you register a fallback backend, and quietly substitutes a real
-executable tool when it's needed. The upshot is that the same agent code runs
-everywhere.
+So Axle lets you attach a search tool to the `chatCompletions()` provider that
+needs one, and the same agent code runs everywhere.
 
-## Registering a fallback
+## Attaching a search
 
 ```typescript
-import { configureAxle, braveWebSearch, Agent } from "@fifthrevision/axle";
+import { chatCompletions, braveWebSearch, Agent } from "@fifthrevision/axle";
 
-configureAxle({
-  webSearchFallback: braveWebSearch({
+const provider = chatCompletions("http://localhost:11434/v1", {
+  webSearch: braveWebSearch({
     apiKey: process.env.BRAVE_API_KEY!,
     maxResults: 5,
     country: "US",
@@ -28,7 +27,7 @@ configureAxle({
 });
 
 const agent = new Agent({
-  provider: chatCompletions("http://localhost:11434/v1"), // no native search
+  provider, // no native search
   model: "qwen3:32b",
   providerTools: [{ type: "provider", name: "web_search" }],
 });
@@ -36,29 +35,35 @@ const agent = new Agent({
 const result = await agent.send("What happened in the news this week?").final;
 ```
 
-`configureAxle` is process-global and merges with anything you set before, so
-call it once at startup and forget about it.
+The request still names `web_search` as a provider tool. When the provider sees
+it, it sends the attached tool to the model as an ordinary function tool and
+drops `web_search` from the provider tools it translates — the loop then runs
+it as an ordinary tool call. What a provider can do is fixed when the provider
+is constructed, so two providers in one process can serve the same name
+differently.
 
-## How the substitution works
+## How the serving works
 
-At each `generate()` / `stream()` call, Axle asks the provider to resolve
-`web_search` to a native name.
+Each provider decides how to serve a provider-tool name: as a tool the vendor
+hosts, as an executable tool the provider brings, or not at all.
 
-- **Resolved** → the provider tool is used. The fallback is ignored entirely.
-- **Unresolved, fallback registered** → Axle swaps in an executable `web_search`
-  tool backed by your backend, and the model calls it like any other tool.
-- **Unresolved, no fallback** → throws `AxleError` with code
-  `WEB_SEARCH_FALLBACK_NOT_CONFIGURED`, carrying `details.provider` and
-  `details.model`.
+- **Hosted** (Anthropic, OpenAI, Gemini) → the provider tool is used. No
+  attached tool is involved.
+- **Attached** (`chatCompletions()` with `webSearch`) → the attached tool runs
+  as an ordinary tool call. This wins wherever it is attached — including on
+  OpenRouter, which hosts a search of its own. Don't attach one if you want
+  OpenRouter's.
+- **Neither** → the request fails before anything is sent: `ok: false` with
+  `error.kind` `"model"` and a message naming the tool. There is no error code.
 
-The nice property here is that the failure is loud and happens at call time. You
-won't accidentally ship an agent that quietly can't search.
+The nice property here is that the failure is loud. You won't accidentally ship
+an agent that quietly can't search.
 
-## What changes when it falls back
+## What changes when it's attached
 
 The behaviour isn't identical, and it's worth knowing which one you got:
 
-| | Native provider tool | Fallback tool |
+| | Native provider tool | Attached tool |
 | --- | --- | --- |
 | Renders as | `provider-tool` action part | `tool` action part |
 | Citations | Provider-supplied, often anchored to text spans | None — results are JSON in the tool result |
@@ -67,7 +72,7 @@ The behaviour isn't identical, and it's worth knowing which one you got:
 
 One practical consequence: if your UI keys off `part.kind === "provider-tool"`
 to show a search indicator, remember to add the `tool` case too, or search will
-look invisible on fallback providers.
+look invisible on attached providers.
 
 ## The generated tool
 
@@ -103,29 +108,35 @@ Do pay attention to the token and snippet caps. Search results are verbose, and
 an uncapped result set can eat a large share of your context window in a single
 tool call.
 
-## A custom backend
+## A custom search tool
 
-Any search API works — you just implement two members:
+Any search API works — you just write an `ExecutableTool` named `web_search`
+whose `execute` returns the results as a string, and attach it as `webSearch`:
 
 ```typescript
-import { configureAxle, type WebSearchBackend } from "@fifthrevision/axle";
+import { chatCompletions, type ExecutableTool } from "@fifthrevision/axle";
+import * as z from "zod";
 
-const myBackend: WebSearchBackend = {
-  name: "internal-docs",
-  async search({ query }, { signal, span }) {
-    span?.setAttribute("index", "docs-v2");
-    const hits = await searchIndex(query, { signal });
-    return {
-      results: hits.map((h) => ({
-        title: h.title,
-        url: h.url,
-        snippets: h.passages,
-      })),
-    };
+declare const searchIndex: (query: string, signal: AbortSignal) => Promise<{ title: string; url: string; passages: string[] }[]>;
+
+const internalSearchSchema = z.object({ query: z.string().trim().min(1).max(400) });
+
+const internalSearch: ExecutableTool<typeof internalSearchSchema> = {
+  name: "web_search",
+  description: "Search the internal docs index for current information.",
+  schema: internalSearchSchema,
+  async execute({ query }, { signal }) {
+    const hits = await searchIndex(query, signal);
+    return JSON.stringify({
+      query,
+      results: hits.map((h) => ({ title: h.title, url: h.url, snippets: h.passages })),
+    });
   },
 };
 
-configureAxle({ webSearchFallback: myBackend });
+const provider = chatCompletions("http://localhost:11434/v1", {
+  webSearch: internalSearch,
+});
 ```
 
 This is also how you point `web_search` at an internal corpus rather than the
@@ -136,5 +147,5 @@ Do forward `signal`, so a cancelled send doesn't leave a search running.
 ## See also
 
 - [Provider tools](/cookbook/provider-tools)
-- [Configuration reference](/reference/configuration#websearchfallback)
+- [Providers reference](/reference/providers#websearch)
 - [Tools reference](/reference/tools#web-search)

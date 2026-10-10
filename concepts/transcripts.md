@@ -15,7 +15,7 @@ interface Turn {
   id: string;
   owner: "user" | "agent";
   parts: TurnPart[]; // display order
-  status: "streaming" | "complete" | "cancelled" | "error";
+  status: "pending" | "streaming" | "complete" | "cancelled" | "error";
   annotations?: Annotation[];
   metadata?: Record<string, unknown>;
   timing?: { start: string; end?: string };
@@ -115,6 +115,37 @@ Which means rendering a subagent is recursive: the same component that renders
 
 How these parts get built — the event families, and the openings-vs-deltas rule
 `Transcript` is applying — is [Turn events](/concepts/turn-events).
+
+## Pending: the turns that haven't opened yet
+
+A queued `send()` or manual `compact()` is accepted before it runs, and the
+agent says so up front: `pending:queued` carries a preview turn with `status:
+"pending"` and the id the real turn will carry — the user turn the send will
+commit, or an agent turn with one `pending` compaction part. `Transcript` holds
+these in `pending`, never in `turns`, and each leaves when its turn opens (or
+when `pending:dropped` arrives because the operation was cancelled while queued
+or failed during setup).
+
+Render both, keyed by id:
+
+```typescript
+agent.on((event) => transcript.apply(event));
+
+for (const turn of [...transcript.turns, ...transcript.pending]) {
+  console.log(turn.id, turn.status);
+}
+```
+
+The preview and the committed turn share the id, so the queued row becomes the
+real row with no flicker — one component, keyed by id. A `pending` turn only
+ever appears in `pending`, so a renderer that reads `turns` alone never sees
+one. And `pending` is live state: saving `turns` doesn't save it, a transcript
+restored from saved turns has none, and the constructor takes it only as an
+optional second list for mirroring a live transcript:
+
+```typescript
+const mirror = new Transcript(saved.turns, transcript.pending);
+```
 
 ## Annotations: the extension point
 

@@ -13,7 +13,7 @@ export default defineConfig({
       { text: 'Reference', link: '/reference/agent', activeMatch: '/reference/' },
       { text: 'Cookbook', link: '/cookbook/tool-using-agent', activeMatch: '/cookbook/' },
       {
-        text: 'v0.33.0',
+        text: 'v0.34.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Upgrading', link: '/upgrading' },
@@ -46,6 +46,7 @@ export default defineConfig({
           { text: 'Turn events', link: '/concepts/turn-events' },
           { text: 'Sessions & persistence', link: '/concepts/sessions' },
           { text: 'Compaction', link: '/concepts/compaction' },
+          { text: 'Skills', link: '/concepts/skills' },
         ],
       },
       {
@@ -53,6 +54,7 @@ export default defineConfig({
         items: [
           { text: 'generate() & stream()', link: '/concepts/generate-and-stream' },
           { text: 'Stream events', link: '/concepts/stream-events' },
+          { text: 'Typed decisions', link: '/concepts/decisions' },
         ],
       },
       {
@@ -72,8 +74,10 @@ export default defineConfig({
           { text: 'Agent', link: '/reference/agent' },
           { text: 'Instruct', link: '/reference/instruct' },
           { text: 'Providers', link: '/reference/providers' },
+          { text: 'Decisions', link: '/reference/decisions' },
           { text: 'generate() & stream()', link: '/reference/generate-stream' },
           { text: 'Tools', link: '/reference/tools' },
+          { text: 'Skills', link: '/reference/skills' },
           { text: 'MCP', link: '/reference/mcp' },
           { text: 'Transcript & turn events', link: '/reference/transcript' },
           { text: 'Messages & parts', link: '/reference/messages' },

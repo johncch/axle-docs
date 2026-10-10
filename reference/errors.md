@@ -80,17 +80,34 @@ chain, so it's safe to log directly.
 | Code | Thrown when |
 | --- | --- |
 | `INVALID_OPTIONS` | `maxSteps` or `maxContextTokens` below 1; `PromptCompactor` `thresholdTokens`/`summaryWords` non-positive or `appendixTokens` negative |
-| `TOOL_OPTIONS_CONFLICT` | Both `registry` and `tools`/`providerTools` passed |
 | `TOOL_REGISTRY_DUPLICATE` | A tool name is already registered |
+| `SKILL_INVALID` | A `SKILL.md` has no frontmatter block, a missing or empty `name`/`description`, invalid YAML, a mistyped optional field, or a name containing `<`, `>`, `"`, or a line break |
+| `SKILL_NOT_FOUND` | `loadSkill(dir)` found no `SKILL.md` in the directory |
+| `SKILL_REGISTRY_DUPLICATE` | A skill name is already registered, or listed twice in `set()` |
+| `DECISION_ANSWER_MISMATCH` | `decide()` got a missing or mistyped answer for a question |
+| `DECISION_REQUEST_FAILED` | A decision provider request failed with a non-2xx status |
+| `DECISION_RESPONSE_INVALID` | A decision provider returned a body Axle could not read |
 | `COMPACTION_INVALID_MESSAGES` | A compactor returned malformed messages |
-| `WEB_SEARCH_FALLBACK_NOT_CONFIGURED` | `web_search` requested on a provider without native support and no fallback registered |
 | `ABORTED` | On `AxleAbortError` |
 | `TOOL_FATAL_ERROR` | On `AxleToolFatalError` |
 | `INSTRUCT_VARIABLE_ERROR` | On `InstructVariableError` |
 | `TASK_ERROR` | On `TaskError` |
 
+(`TOOL_OPTIONS_CONFLICT` and `WEB_SEARCH_FALLBACK_NOT_CONFIGURED` were removed
+in 0.34.0 with `StreamParams.registry` and `configureAxle`. See
+[Upgrading](/upgrading).)
+
+`decide()` throws its `DECISION_*` failures instead of resolving them — there is
+no partial state to hand back, so there is no `ok` flag. See
+[Decisions](/concepts/decisions).
+
+A `chatCompletions()` request that times out fails as a `model` failure with
+`type: "TimeoutError"` and message `"Request timed out after <n>ms"` (changed
+from `AbortError` / `"Request aborted"` in 0.34.0). Match on `TimeoutError` to
+detect it; aborting through your own signal still reports `AbortError`.
+
 `createAgentConfig()` also throws bare `AxleError`s for an unsupported definition
-version, a missing model, and declared-but-unresolved tools.
+version, a missing model, and declared-but-unresolved tools or skills.
 
 ## AxleAbortError
 

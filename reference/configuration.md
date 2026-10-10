@@ -1,46 +1,34 @@
 ---
 title: Configuration
-description: Global configuration and compaction wiring.
+description: Compaction wiring and entry points.
 ---
 
 # Configuration
 
-## configureAxle()
+## Removed in 0.34.0: configureAxle()
 
 ```typescript
-import { configureAxle } from "@fifthrevision/axle";
-
+// @check-skip — removed in 0.34.0, kept here so the name resolves
 configureAxle(options: AxleConfiguration): void
-
-interface AxleConfiguration {
-  webSearchFallback?: WebSearchBackend;
-}
 ```
 
-Process-global and merged with the existing configuration, so repeated calls
-patch rather than replace. Reads are snapshotted at the start of each
-`generate()` / `stream()` call.
-
-### webSearchFallback
-
-When a `web_search` provider tool is requested and the active provider has no
-native equivalent, Axle substitutes an executable `web_search` tool backed by
-this backend.
+There is no process-global configuration anymore. Web search on a provider
+without hosted search used to be a process-wide fallback backend; it is now a
+tool attached to the `chatCompletions()` provider that needs it:
 
 ```typescript
-import { configureAxle, braveWebSearch } from "@fifthrevision/axle";
+import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
 
-configureAxle({
-  webSearchFallback: braveWebSearch({ apiKey: process.env.BRAVE_API_KEY! }),
+const provider = chatCompletions("https://api.together.ai/v1", {
+  apiKey,
+  webSearch: braveWebSearch({ apiKey: braveKey }),
 });
 ```
 
-Without a fallback, the same request throws `AxleError` with code
-`WEB_SEARCH_FALLBACK_NOT_CONFIGURED`, carrying `details.provider` and
-`details.model`.
-
-Providers that resolve `web_search` natively ignore the fallback entirely. See
-[Web search](/cookbook/web-search).
+`AxleConfiguration`, `WebSearchBackend`, `WebSearchRequest`,
+`WebSearchBackendContext`, and `WebSearchResponse` are removed. A custom search
+is an `ExecutableTool` passed as `webSearch`. See [Web
+search](/cookbook/web-search) and [Upgrading](/upgrading).
 
 ## Compaction
 
