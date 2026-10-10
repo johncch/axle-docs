@@ -39,9 +39,8 @@ Both extend `AxleModelRequestOptions`.
 | `model` | `string` | **Required.** |
 | `messages` | `AxleMessage[]` | **Required** (optional with `instruct`). |
 | `system` | `string` | System instruction. |
-| `tools` | `ExecutableTool[]` | Local tools. Mutually exclusive with `registry`. |
-| `providerTools` | `ProviderTool[]` | Provider-managed tools. Mutually exclusive with `registry`. |
-| `registry` | `ToolRegistry` | Prebuilt registry. Mutually exclusive with `tools`/`providerTools`. |
+| `tools` | `ExecutableTool[]` | Local tools. |
+| `providerTools` | `ProviderTool[]` | Provider-managed tools. |
 | `onToolCall` | `ToolCallCallback` | Intercepts tool calls before the registry. |
 | `maxSteps` | `number` | Cap on model requests. Must be ≥ 1. |
 | `maxContextTokens` | `number` | Context budget in tokens. Must be ≥ 1. |
@@ -50,8 +49,12 @@ Both extend `AxleModelRequestOptions`.
 | `sessionId` | `string` | Conversation identity forwarded to the provider. Only OpenRouter uses it today (as `session_id`, for sticky routing and dashboard grouping); other providers ignore it. `Agent` passes its own `sessionId`. |
 | ...request options | | See [Providers](/reference/providers#axlemodelrequestoptions). |
 
-Passing both `registry` and `tools`/`providerTools` throws `AxleError` with code
-`TOOL_OPTIONS_CONFLICT`. Non-positive limits throw with code `INVALID_OPTIONS`.
+Non-positive limits throw with code `INVALID_OPTIONS`.
+
+(`StreamParams.registry` was removed in 0.34.0 — the loop builds every request
+from the `tools` and `providerTools` it was given and never reads a registry,
+so a tool added to a `ToolRegistry` mid-loop no longer appears. See
+[Upgrading](/upgrading).)
 
 ### Instruct variants
 
@@ -102,7 +105,18 @@ interface StreamHandle {
 
 type ToolBatchCompleteCallback = (
   message: AxleToolCallMessage,
-) => "continue" | "finish" | Promise<"continue" | "finish">;
+) => ToolBatchDecision | Promise<ToolBatchDecision>;
+
+/**
+ * What the tool-batch boundary decides: `"finish"` ends the loop without
+ * another request; `"continue"` sends the next one as is; an object continues
+ * with that prompt and those tools replacing the current ones, exactly as the
+ * initial call set them. (The object form was added in 0.34.0.)
+ */
+type ToolBatchDecision =
+  | "continue"
+  | "finish"
+  | Pick<StreamParams, "system" | "tools" | "providerTools">;
 ```
 
 `StreamInstructHandle<TSchema>` is the same with `final: Promise<StreamInstructResult<TSchema>>`.

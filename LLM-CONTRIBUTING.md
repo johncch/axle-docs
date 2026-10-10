@@ -35,8 +35,8 @@ Seven sidebar groups, defined in `.vitepress/config.ts`. Each has one job.
 | Group | Job |
 | --- | --- |
 | **Getting Started** | Empty directory → working agent. |
-| **Agent** | The `Agent` layer: `Agent`, anatomy of a send, turns & transcripts, turn events, sessions, compaction. |
-| **Primitives** | The layer underneath: `generate()`/`stream()` and stream events. |
+| **Agent** | The `Agent` layer: `Agent`, anatomy of a send, turns & transcripts, turn events, sessions, compaction, skills. |
+| **Primitives** | The layer underneath: `generate()`/`stream()` and stream events, plus `decide()` and typed decisions (no conversation in either case). |
 | **Building blocks** | Shared by both layers: providers, `Instruct`, tools, registry, results & errors, observability. |
 | **API Reference** | Exhaustive signatures and options. Teaches nothing. |
 | **Cookbook** | Task-shaped recipes. |

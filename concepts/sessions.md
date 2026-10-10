@@ -34,16 +34,28 @@ const session = await db.load(sessionId);
 const agent = new Agent(config, session);
 ```
 
-`snapshot()` is async, and it goes through the
-[send queue](/concepts/agent#sends-line-up-in-a-queue). That's what guarantees
-you're capturing a conversation at rest — a snapshot will never contain a
-streaming or half-executed turn.
+`snapshot()` is async, and it resolves when the agent goes idle — at once when
+nothing is running, otherwise when the last queued operation has settled. That's
+what guarantees you're capturing a conversation at rest: a snapshot never
+contains a streaming or half-executed turn, and it includes everything queued
+before the agent went idle. It is not queued work itself — it doesn't make the
+agent busy, fires no `onIdle`, and `clear()` doesn't cancel it.
 
-::: danger Don't await snapshot() from inside a send
-It queues behind in-flight work, so calling it from a tool's `execute`, an
-`onToolCall` handler, or a compaction callback will deadlock. Call it from
-outside a send.
+::: danger Don't await snapshot() from inside a send or an onSettled callback
+It needs the agent to go idle, so calling it from a tool's `execute`, an
+`onToolCall` handler, a compaction callback, or an `onSettled` callback will
+deadlock. Call it from outside a send.
 :::
+
+To save after each operation without awaiting the queue empty, use `onSettled`
+instead — it hands you the same session plus exactly what the handle settled
+with, before the handle settles:
+
+```typescript
+agent.onSettled(async (session, operation) => {
+  await db.save(session.sessionId, { session, turns: transcript.turns });
+});
+```
 
 If you supply both `config.sessionId` and `session.sessionId`, the restored one
 wins. Unknown keys from older Axle versions get ignored, so an old stored session
@@ -86,6 +98,10 @@ const transcript = new Transcript(saved.turns);
 agent.on((event) => transcript.apply(event));
 ```
 
+Persist `turns` only — `transcript.pending` is live state (queued sends and
+compactions the agent accepted but hasn't started) and is never saved. After a
+restore there is no pending, and nothing recorded a save for.
+
 Worth saying plainly: if you save only the session, you get an agent that
 remembers the conversation perfectly and a UI with nothing to show. It's an easy
 mistake to make once.
@@ -105,6 +121,7 @@ const definition: AgentDefinition = {
   system: "You research topics thoroughly.",
   request: { maxOutputTokens: 2048 },
   tools: [{ name: "web_search" }],
+  skills: [{ name: "pdf-fill" }],
 };
 ```
 
@@ -128,8 +145,8 @@ meaning is whatever your resolver says it is.
 
 Your resolver only has to supply what core can't build itself. Provider tools and
 MCP clients get constructed straight from the definition if the resolver returns
-none. A provider is always required, and declaring `tools` without returning
-resolved tools throws.
+none. A provider is always required, and declaring `tools` or `skills` without
+returning resolved tools or skills throws.
 
 `SavedAgent` is the pair — `{ definition, session }`. That's the shape to store
 when a user should be able to reopen an agent they configured, not just resume a

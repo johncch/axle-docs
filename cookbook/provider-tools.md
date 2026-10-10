@@ -52,7 +52,10 @@ Axle maps two names to each vendor's native equivalent:
 | `code_execution` | `code_execution_20260521` | `code_interpreter` | `codeExecution` |
 
 Anything else passes through untouched, so a vendor-specific tool works by
-naming it directly:
+naming it directly. What each provider does with a name beyond this table —
+including which `chatCompletions()` vendors host, attach, or fail — is the
+provider's own decision; core hands `providerTools` over unchanged. See [Web
+search](/cookbook/web-search) for the attached-search case.
 
 ```typescript
 const custom: ProviderTool = { type: "provider", name: "computer_20250124" };
@@ -111,7 +114,10 @@ const search: ProviderTool = {
 
 `config` is raw passthrough. Field names and placement differ per vendor, so
 anything you put here ties that agent to that provider — which is fine when
-that's what you want, as long as you know you're doing it.
+that's what you want, as long as you know you're doing it. One exception: when
+the tool is served by an attached executable rather than a hosted definition
+(an attached `web_search`, say), there is no vendor definition to merge it
+into, so `config` is ignored without a warning.
 
 ## Rendering citations
 
@@ -169,10 +175,10 @@ Just keep the names unique across both.
 
 ## When the provider has no native support
 
-Ask for `web_search` on a provider that doesn't have one and you'll get
-`WEB_SEARCH_FALLBACK_NOT_CONFIGURED` — unless you've registered a fallback
-backend, in which case Axle quietly substitutes a real executable tool. See
-[Web search](/cookbook/web-search).
+Ask for `web_search` on a provider that doesn't host one and the request fails
+— unless you've attached a search to that `chatCompletions()` provider, in
+which case the attached tool runs as an ordinary tool call (rendered as `tool`
+parts, not `provider-tool` parts). See [Web search](/cookbook/web-search).
 
 ## See also
 

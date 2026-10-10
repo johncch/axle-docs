@@ -20,7 +20,7 @@ const WORK = join(ROOT, ".snippet-check");
 const EXCLUDED_DOCS = new Set(["LLM-CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md"]);
 
 // Identifiers the docs deliberately leave undefined.
-const PLACEHOLDER = /^(provider|model|apiKey|agent|instruct|schema|messages|previousMessages|newMessages|tools|myTool|getWeather|searchTool|webSearchTool|myLocalTool|myDatabaseTool|readFile|showChart|research|researcher|compactor|transcript|handle|result|session|definition|config|db|sessionId|id|turnId|url|token|input|ctx|state|context|event|socket|logger|exporter|sandbox|authorize|searchIndex|summarize|lookup|persist|render|myReducer|applyHostEvent|myProviderFor|myToolFor|myOtelWriter|myBackend|fs|github|docs|remote|servers|items|documents|doc|hits|shouldStop|shouldHandoff|done|sandboxAlive|userInput|saved|TurnView|ActionView|Markdown|Thinking|FileChip|SourceList|Divider|Spinner|Note|DocRef|Generic|Error|useState|useEffect|outcome|incoming|next|running|lead|researchBatch|batchResearch|webSearch|setName|custom|base|template|variant|usage|summary|fileResolver|myRegistry|controller|text|args|part|turn|turns|citation|annotation|applied|recent|newServer|other|mcpClient|tool|error|message|item|msg|entry|value|key|q|name|status|reason|delta|chunk|progress|index|file|image|city|topic|query|prompt|body|res|opts|params|payload|a|b|g|o|handleItem|incoming|session)$/;
+const PLACEHOLDER = /^(provider|model|apiKey|agent|instruct|schema|messages|previousMessages|newMessages|tools|myTool|getWeather|searchTool|webSearchTool|myLocalTool|myDatabaseTool|readFile|showChart|research|researcher|compactor|transcript|handle|result|session|definition|config|db|sessionId|id|turnId|url|token|input|ctx|state|context|event|socket|logger|exporter|sandbox|authorize|searchIndex|summarize|lookup|persist|render|myReducer|applyHostEvent|myProviderFor|myToolFor|myOtelWriter|myBackend|fs|github|docs|remote|servers|items|documents|doc|hits|shouldStop|shouldHandoff|done|sandboxAlive|userInput|saved|TurnView|ActionView|Markdown|Thinking|FileChip|SourceList|Divider|Spinner|Note|DocRef|Generic|Error|useState|useEffect|outcome|incoming|next|running|lead|researchBatch|batchResearch|webSearch|setName|custom|base|template|variant|usage|summary|fileResolver|myRegistry|controller|text|args|part|turn|turns|citation|annotation|applied|recent|newServer|other|mcpClient|tool|error|message|item|msg|entry|value|key|q|name|status|reason|delta|chunk|progress|index|file|image|city|topic|query|prompt|body|res|opts|params|payload|a|b|g|o|handleItem|incoming|session|skill|skills|catalog|decisionProvider|braveKey|operation|answers|unsubscribe)$/;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -70,8 +70,8 @@ mkdirSync(WORK, { recursive: true });
 // Docs show imports once per page and omit them in later blocks, so a block
 // without its own axle import gets one injected. A block that *does* import is
 // left alone — that way a wrong import name is caught rather than papered over.
-const AXLE_IMPORT = `import { Agent, Instruct, MCP, Transcript, ToolRegistry, PromptCompactor, Tracer, LogWriter, SimpleWriter, anthropic, openai, gemini, chatCompletions, generate, stream, configureAxle, createAgentConfig, createAgentTool, parallelize, braveWebSearch, loadFileContent, estimateContextUsage, parseResponse, getCompactionStamp, validateCompactedMessages, createStats, addStats, mergeStats, AxleError, AxleAbortError, AxleAgentAbortError, AxleToolFatalError, InstructVariableError, AxleStopReason } from "@fifthrevision/axle";\n` +
-  `import type { AIProvider, AgentConfig, AgentDefinition, AgentHandle, AgentSession, AgentResult, AxleMessage, AxleAssistantMessage, AxleUserMessage, AxleToolCallMessage, AxleFailure, Citation, CompactionCallback, CompactionConfig, ContentPart, ContextUsage, ExecutableTool, FileInfo, FileResolver, GenerateResult, MessageMetadata, ProviderTool, ShouldCompactOnTriggerCallback, Span, SpanData, Stats, StreamEvent, StreamResult, ToolContext, ToolDefinition, ToolResultPart, TraceWriter, Turn, TurnEvent, TurnPart, ActionPart, TextPart, ThinkingPart, Annotation, WebSearchBackend } from "@fifthrevision/axle";\n`;
+const AXLE_IMPORT = `import { Agent, Instruct, MCP, Transcript, ToolRegistry, SkillRegistry, PromptCompactor, Tracer, LogWriter, SimpleWriter, anthropic, openai, gemini, chatCompletions, inferChatCompletionsVendor, generate, stream, decide, typesafe, choice, noul, score, createAgentConfig, createAgentTool, parallelize, braveWebSearch, loadSkill, parseSkillMarkdown, renderSkillsCatalog, createViewSkillTool, ModelCatalog, loadFileContent, estimateContextUsage, parseResponse, getCompactionStamp, validateCompactedMessages, createStats, addStats, mergeStats, AxleError, AxleAbortError, AxleAgentAbortError, AxleToolFatalError, InstructVariableError, AxleStopReason } from "@fifthrevision/axle";\n` +
+  `import type { AIProvider, AgentConfig, AgentDefinition, AgentHandle, AgentSession, AgentResult, AxleMessage, AxleAssistantMessage, AxleUserMessage, AxleToolCallMessage, AxleFailure, Citation, CompactionCallback, CompactionConfig, ContentPart, ContextUsage, ExecutableTool, FileInfo, FileResolver, GenerateResult, MessageMetadata, ProviderTool, ShouldCompactOnTriggerCallback, Span, SpanData, Stats, StreamEvent, StreamResult, ToolBatchDecision, ToolContext, ToolDefinition, ToolResultPart, TraceWriter, Turn, TurnEvent, TurnPart, ActionPart, TextPart, ThinkingPart, Annotation, Skill, SkillDefinitionRef, SkillFrontmatter, DecisionProvider, DecideParams, DecideResult, DecisionQuestion, DecisionQuestions, DecisionAnswer, DecisionAnswers, DecisionInput, DecisionJson, DecisionRefusal, NoulQuestion, NoulAnswer, ChoiceQuestion, ChoiceAnswer, ScoreQuestion, ScoreAnswer, AnswerFor, DecisionRequestParams, DecisionResponse, TypesafeOptions, ModelCatalogOptions, CatalogMatch, CatalogModel, ContextWindowMatch, ModelCost, SettledCallback, SettledOperation, IdleCallback, PendingDropReason } from "@fifthrevision/axle";\n`;
 
 const ZOD_IMPORT = `import * as z from "zod";\n`;
 
@@ -81,7 +81,7 @@ const AMBIENT = `
 import type {
   Agent as A, AIProvider, Instruct as I, ExecutableTool, ProviderTool, MCP as M,
   Transcript as T, AxleMessage, AgentSession, AgentDefinition, Turn, TurnPart,
-  TurnEvent, FileResolver, ToolRegistry as R, ToolContext, WebSearchBackend,
+  TurnEvent, FileResolver, ToolRegistry as R, ToolContext,
   PromptCompactor as P, TraceWriter,
 } from "@fifthrevision/axle";
 
@@ -121,7 +121,7 @@ declare global {
   const other: M;
   const compactor: P;
   const myOtelWriter: TraceWriter;
-  const myBackend: WebSearchBackend;
+  const myBackend: ExecutableTool;
   const schema: any;
   const config: any;
   const db: any;
@@ -222,13 +222,17 @@ const AMBIENT_NAMES = new Set(
 // Names the package exports. A block that elides its import (because the page
 // showed it earlier) or re-declares a type to document its shape is doing so on
 // purpose, so neither is an error.
-const EXPORTED = new Set(
-  [...readFileSync(join(ROOT, "node_modules/@fifthrevision/axle/dist/index.d.ts"), "utf8")
-    .matchAll(/export\s*\{([^}]*)\}/g)]
+const INDEX_DTS = readFileSync(join(ROOT, "node_modules/@fifthrevision/axle/dist/index.d.ts"), "utf8");
+const EXPORTED = new Set([
+  ...[...INDEX_DTS.matchAll(/export\s*\{([^}]*)\}/g)]
     .flatMap((m) => m[1].split(","))
     .map((s) => s.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop())
     .filter(Boolean),
-);
+  // Bundled declarations (tsdown) export inline instead of in an export list.
+  ...[...INDEX_DTS.matchAll(/export\s+declare\s+(?:abstract\s+)?(?:class|function|const|enum|interface|type)\s+([A-Za-z_$][\w$]*)/g)].map(
+    (m) => m[1],
+  ),
+]);
 
 const firstPass = tsc(["*.ts", "*.tsx"]);
 const fragmentNames = new Set();

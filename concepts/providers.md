@@ -21,7 +21,8 @@ const local = chatCompletions("http://localhost:11434/v1");
 `chatCompletions` points at any OpenAI-compatible endpoint — Ollama, vLLM,
 OpenRouter, Together, LM Studio. It recognizes a few known hostnames
 (OpenRouter, Together) and adjusts, or you can tell it which vendor you're
-talking to.
+talking to (`vendor: "openrouter" | "togetherai"` — `"together"` became
+`"togetherai"` in 0.34.0; see [Upgrading](/upgrading)).
 
 ## Switching providers
 
@@ -100,9 +101,9 @@ rejects `"openai/gpt-5.1"` before it costs you a round trip.
 Accepted prefixes are what you'd guess, with one convenience: `gemini()` takes
 both `google/` and `gemini/`.
 
-### No model catalog
+### No model registry — but there is a ModelCatalog
 
-There is no model catalog. Axle ships no list of models, no context windows, no
+There is no model registry. Axle ships no list of models, no context windows, no
 output ceilings — model IDs are plain strings your application owns. If you need
 a ceiling or a capability flag, keep your own table or ask the provider's models
 API. A model hosted by several vendors has a different ID on each, so a shared
@@ -115,6 +116,25 @@ const model = "openai/gpt-5.5";
 (The `@fifthrevision/axle/models` entry point and its `Models`, `ModelInfo`,
 and `ModelMetadata` exports were removed in 0.33.0 — see
 [Upgrading](/upgrading).)
+
+What 0.34.0 adds is narrower: `ModelCatalog`, a lookup over the models.dev
+catalog for answering "how big is this model's window?" without keeping your
+own table. Open the cache (memory-only, or a path to persist between runs),
+refresh when it's stale, and ask:
+
+```typescript
+import { ModelCatalog } from "@fifthrevision/axle";
+
+const catalog = await ModelCatalog.open({ cachePath: "./.cache/axle-models.json" });
+if (catalog.stale) await catalog.refresh();
+const hit = catalog.contextWindow("openai/gpt-5.5");
+// { window, id, match } | undefined
+```
+
+`open()` never touches the network; `refresh()` always fetches but never
+throws. When to refresh is your call — drive a compaction threshold or a
+progress meter with it, not accounting. Full signatures are in the [Providers
+reference](/reference/providers#removed-in-0330-model-registry-added-in-0340-modelcatalog).
 
 ## Request options
 
@@ -171,7 +191,21 @@ const provider = anthropic(apiKey, { maxRetries: 0, timeoutMs: 30_000 });
 ```
 
 `maxRetries` defaults to `2` on the built-in providers. `timeoutMs` defaults to
-whatever the vendor SDK does.
+whatever the vendor SDK does — except `chatCompletions()`, which gives up each
+attempt after ten minutes (the default the OpenAI and Anthropic SDKs already
+apply). The timer covers the wait for the response to start, not the stream
+that follows, and it restarts on every retry. A `chatCompletions()` timeout
+fails as `TimeoutError` (`"Request timed out after <n>ms"`); aborting through
+your own signal still reports `AbortError`.
+
+Every provider factory, `typesafe()` included, also takes a `fetch` that
+replaces the global for that provider's requests — handy for logging or tests:
+
+```typescript
+declare const loggingFetch: typeof fetch;
+
+const provider = chatCompletions("http://localhost:11434/v1", { fetch: loggingFetch });
+```
 
 ## How full is the context?
 

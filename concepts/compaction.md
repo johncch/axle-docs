@@ -203,7 +203,7 @@ manual `compact()` rejects, since you asked for it directly.
 Cancelling during `beforeTurn` compaction does **not** unwind the transcript. The
 user message is already committed, compaction is work inside that open turn, and
 the turn simply gets marked cancelled. See
-[Agent](/concepts/agent#interrupting-three-different-things).
+[Agent](/concepts/agent#interrupting-four-different-things).
 
 ## Next
 

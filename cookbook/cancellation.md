@@ -11,8 +11,9 @@ table is the short version — the rest of the page is the detail.
 | Call | Effect on the active turn | Effect on the queue | Work already done |
 | --- | --- | --- | --- |
 | `agent.stop()` | Ends at the next tool-batch boundary | Untouched | Kept and committed |
+| `agent.cancel()` | Aborted immediately | Untouched | Partially preserved |
 | `agent.clear()` | Untouched | Cancelled | N/A |
-| `handle.cancel()` | Aborted immediately | Untouched | Partially preserved |
+| `handle.cancel()` | Aborted immediately (that send) | Untouched | Partially preserved |
 | `signal` on send | Same as `cancel()` | | |
 
 ## stop(): let the work finish
@@ -119,15 +120,30 @@ if (text?.type === "text") render(text.text);
 
 ### What commits
 
-Whether the user message sticks around depends on timing, and the line is the
-`turn:user` event:
+Whether the user message sticks around depends on timing, and the line is
+whether the turn opened:
 
 - **Before** it — queued, or during MCP setup — the handle is dropped and nothing
-  commits.
+  commits. The transcript shows `pending:queued` followed by `pending:dropped`.
 - **After** it, the user message stays committed and the turn is marked
-  `cancelled`. This includes cancelling during `beforeTurn` compaction:
-  compaction is work inside an already-open turn, and cancelling does not unwind
-  the transcript.
+  `cancelled` — always `cancelled`, even when the provider rethrows something
+  that doesn't look like an abort. This includes cancelling during `beforeTurn`
+  compaction: compaction is work inside an already-open turn, and cancelling does
+  not unwind the transcript.
+
+## agent.cancel(): stop the active operation
+
+```typescript
+agent.cancel("user-navigated-away"); // false if nothing was running
+```
+
+Same immediacy as `handle.cancel()`, but aimed at whatever is active rather
+than one handle. The active operation aborts, an opened turn settles
+`cancelled` with its partial work committed, and queued operations are
+unaffected — the next one starts. Use `stop()` when you want the in-flight tool
+batch to finish first, and `agent.cancel()` when you don't care about it.
+While `onSettled` callbacks run, the operation is already done, so both
+`cancel()` and `stop()` return `false` in that window.
 
 ## AbortSignal
 
@@ -206,6 +222,6 @@ error, so you keep everything produced so far.
 
 ## See also
 
-- [Agent](/concepts/agent#interrupting-three-different-things)
+- [Agent](/concepts/agent#interrupting-four-different-things)
 - [Results & errors](/concepts/results-and-errors#cancellation)
 - [Errors reference](/reference/errors)
