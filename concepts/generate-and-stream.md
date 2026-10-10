@@ -90,15 +90,17 @@ context and the rendered `Instruct` is appended as the new user message. With
 
 ## Tools
 
-Supply tools inline, or hand over a prebuilt registry — but not both.
+Supply tools inline:
 
 ```typescript
 stream({ provider, model, messages, tools: [a], providerTools: [b] });
-stream({ provider, model, messages, registry: myRegistry });
 ```
 
-Passing both throws `AxleError` with code `TOOL_OPTIONS_CONFLICT`, because
-there's no sensible way to merge them.
+The loop builds every request from the values it was given. (`registry` was
+removed in 0.34.0 — the loop never reads one, so a tool added to a
+`ToolRegistry` after the call no longer appears mid-loop. To change tools or
+the prompt mid-loop, return them from `onToolBatchComplete`, below. See
+[Upgrading](/upgrading).)
 
 There's also `onToolCall`, which intercepts tool calls without registering
 `ExecutableTool` objects at all:
@@ -144,6 +146,12 @@ handle.onToolBatchComplete((message) => (done ? "finish" : "continue"));
 This runs after each tool batch settles. `"finish"` ends the run without another
 provider request — every tool in that batch has already completed and committed,
 so nothing is lost. It's the primitive behind `agent.stop()`.
+
+It can also steer the loop: return `{ system?, tools?, providerTools? }` (typed
+as `ToolBatchDecision`) and the loop continues with those inputs replacing the
+current ones, exactly as the initial call set them. That's how the `Agent` keeps
+skill and registry changes live mid-turn — the same mechanism is available to
+you when you drive `stream()` directly.
 
 ## One step at a time
 

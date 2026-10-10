@@ -17,10 +17,15 @@ pnpm add @fifthrevision/axle
 yarn add @fifthrevision/axle
 ```
 
-Zod comes along as a direct dependency, so schemas work right away:
+Zod is a peer dependency (`^4.2.0`), so schemas work as long as your project
+lists it — which it already does if you define tools:
 
 ```typescript
 import * as z from "zod";
+```
+
+```bash
+npm install @fifthrevision/axle zod
 ```
 
 ## What you'll need

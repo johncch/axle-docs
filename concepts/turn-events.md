@@ -42,6 +42,7 @@ already handles the edge cases you haven't hit yet.
 Every event after `turn:user` carries a `turnId`, and part-level events carry a
 `partId` — the same stable ids you render against.
 
+- **Pending lifecycle** — `pending:queued`, `pending:dropped`
 - **Turn lifecycle** — `turn:user`, `turn:start`, `turn:end`
 - **Part streaming** — `part:start`, `text:delta`, `text:citation`,
   `thinking:raw-delta`, `thinking:summary-delta`, `thinking:update`, `part:end`
@@ -51,6 +52,18 @@ Every event after `turn:user` carries a `turnId`, and part-level events carry a
 - **Compaction** — `compaction:update`, `compaction:complete`, `compaction:error`
 - **Annotations** — `annotation:start`, `annotation:update`, `annotation:end`
 - **Error** — `error`
+
+### The first event of a send is pending:queued
+
+`send()` builds the user message and its turn up front, so the queued preview
+and the committed turn share their id, parts, and timing. That means
+`pending:queued` arrives inside the `send()` call, before `turn:user` — and a
+send that never starts still emits `pending:queued` followed by
+`pending:dropped` (cancelled while queued, or a setup failure). The turn's
+timing is the moment of the call, not the moment the turn committed; for a send
+that waited in the queue the two differ by the wait. A renderer that has no use
+for previews can ignore both events — `Transcript` folds them, and they never
+reach `turns`.
 
 ### Openings carry everything, deltas carry almost nothing
 

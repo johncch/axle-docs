@@ -15,15 +15,20 @@ import in UI code.
 
 ```typescript
 class Transcript<TAnnotation extends Annotation = Annotation, THostEvent extends UnknownEvent = UnknownEvent> {
-  constructor(turns?: readonly Turn<TAnnotation>[]);
+  constructor(turns?: readonly Turn<TAnnotation>[], pending?: readonly Turn<TAnnotation>[]);
   get turns(): readonly Turn<TAnnotation>[];
+  get pending(): readonly Turn<TAnnotation>[];
   getTurn(turnId: string): Turn<TAnnotation> | undefined;
   apply(event: TranscriptInput<TAnnotation, THostEvent>): TranscriptApplyResult<TAnnotation, THostEvent>;
 }
 ```
 
-The constructor shallow-copies the array. `turns` is readonly; all structural
-change goes through `apply()`.
+The constructor shallow-copies the arrays. `turns` is readonly; all structural
+change goes through `apply()`. The second constructor argument seeds `pending`
+to mirror a live transcript for a client that receives the server's `turns`,
+`pending`, and stream position in one read — it discards any entry whose id is
+already in `turns`. This changes nothing about what is saved: persist `turns`
+only.
 
 ```typescript
 type TranscriptApplyResult<TAnnotation extends Annotation, THostEvent extends UnknownEvent> =
@@ -52,9 +57,15 @@ interface Turn<TAnnotation extends Annotation = Annotation> {
   error?: { type: string; message: string };
 }
 
-type TurnStatus = "streaming" | "complete" | "cancelled" | "error";
+type TurnStatus = "pending" | "streaming" | "complete" | "cancelled" | "error";
 interface TimingInfo { start: string; end?: string } // ISO timestamps
 ```
+
+A `pending` turn is a preview of a turn the Agent accepted but hasn't opened —
+the user turn a queued `send()` will commit, or an agent turn with one
+`pending` compaction part for a queued manual compaction. It carries the id the
+real turn will have, and leaves `pending` when that turn opens or when the
+operation is dropped. See [Pending lifecycle](#pending-lifecycle).
 
 ## TurnPart
 
@@ -76,7 +87,7 @@ Every part has `id`, `type`, optional `annotations`, and optional `timing`.
 | `CitationPart` | `citations: Citation[]`, `providerMetadata?` |
 | `FilePart` | `file: FileInfo` |
 | `ThinkingPart` | `summary?`, `raw?`, `continuity?`, `providerMetadata?` |
-| `CompactionPart` | `status: "running" \| "complete" \| "error"`, `summary?`, `progress?`, `error?` |
+| `CompactionPart` | `status: "pending" \| "running" \| "complete" \| "error"`, `summary?`, `progress?`, `error?` |
 
 ### ThinkingPart
 
@@ -155,6 +166,28 @@ Your own UI state, attached to a turn or a part and never sent to a provider.
 Omit `status` for static annotations that have no lifecycle.
 
 ## TurnEvent
+
+### Pending lifecycle
+
+| Event | Fields |
+| --- | --- |
+| `pending:queued` | `turn` — the preview turn (`status: "pending"`, the id the real turn will carry) |
+| `pending:dropped` | `id`, `reason: PendingDropReason` — the operation ended before opening its turn |
+
+```typescript
+type PendingDropReason =
+  | { type: "cancelled" }
+  | { type: "error"; error: { type: string; message: string } };
+```
+
+A queued handle cancelled (`handle.cancel()`, `agent.clear()`, an already-aborted
+signal) drops as `cancelled`; a setup failure (unreachable MCP server, say)
+drops as `error`. Nothing is committed in either case. A `switch` over
+`event.type` with an exhaustiveness check must handle both; a renderer that
+reads `turns` alone can ignore them. `apply()` folds `pending:queued` into
+`pending`, removes the entry on `pending:dropped`, on the matching `turn:user`,
+and on the matching `turn:start` — so `[...turns, ...pending]` renders with one
+component keyed by id.
 
 ### Turn lifecycle
 

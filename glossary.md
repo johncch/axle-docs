@@ -47,11 +47,75 @@ flattened into messages and into the agent turn's parts. Spans are named
 **Turn** — the render-layer unit only: one conversation entry in a transcript, a
 user turn or an agent turn. One send produces one of each; the agent turn
 accumulates parts from every step. Turns can also be opened and closed by
-compaction. Never a single assistant message; never a provider request.
+compaction. A turn's `status` runs `pending` → `streaming` → `complete` |
+`cancelled` | `error`; a user turn skips `streaming`, and a `pending` turn lives
+only in `Transcript.pending`. Never a single assistant message; never a
+provider request.
 
 **Send** — the Agent API verb: one scheduled conversation exchange
 (`agent.send(...)`), executed as a FIFO queue item. The host-facing unit of "the
 agent took its turn."
+
+**Operation** — a queued unit of agent work that opens a turn: a send or a
+manual compaction. Operations run one at a time in FIFO order. An operation is
+_pending_ from the call until its turn opens, and _settles_ when it ends,
+however it ends; `agent.onSettled(...)` then hands the host the session and the
+outcome, and waits for the host before the next operation starts. An operation
+cancelled while still queued never ran and does not settle. `agent.snapshot()`
+opens no turn, is not queued, and is not an operation.
+
+**Idle** — the Agent has no operation running and none queued. It is _busy_
+from the first call that schedules an operation until the last queued one has
+settled; `agent.onIdle(...)` fires at each change from busy to idle, and
+`agent.snapshot()` resolves there.
+
+**Pending turn** — a preview of a turn the Agent has accepted but not yet
+opened: the user turn a queued `send()` will commit, or an agent turn with one
+`pending` compaction part for a queued manual compaction. It is a `Turn` with
+`status: "pending"` and the id the real turn will carry, and it lives in
+`Transcript.pending`, never in `turns`. Pending turns are live state: they are
+not saved, a transcript restored from saved turns has none, and a host seeds
+them through the constructor only to mirror a live transcript.
+
+**Skill** — a unit of on-demand instruction in the Agent Skills format: a
+`SKILL.md` (frontmatter `name` and `description`, Markdown body) with optional
+bundled files. In core a `Skill` is plain data — name, description,
+`instructions`, an opaque `root`, a `files` listing — disclosed in the system
+prompt as a _catalog_ line and _activated_ when the model calls `view-skill`.
+`agent.skills` is the `SkillRegistry` that holds them; like `agent.registry`
+for tools, it changes at any time and the next provider request reads it. A
+skill is not a tool: it adds instructions, and reaches files only through the
+tools the host registered. See [Skills](/concepts/skills).
+
+**Decision** — one `decide()` call: an input and a set of typed questions sent
+to a decision model in a single request, answered with one typed value per
+question. A decision is not a step, a send, or a message: it has no conversation
+and produces no turn. See [Decisions](/concepts/decisions).
+
+**Decision model / decision provider** — a model that answers typed questions
+and cannot generate text, and the `DecisionProvider` that reaches it. Distinct
+from `AIProvider`; a provider may be either or both.
+
+**Noul** — a yes/no question. Its answer `noul` is the probability of yes, from
+0 to 1. A value near 0.5 means the model is unsure, not that the answer is
+"partly".
+
+**Choice** — a question that picks one option from a set the caller defines.
+Its answer carries the chosen option, a probability per option, and a
+confidence.
+
+**Score** — a question that places the input on an ordered scale the caller
+defines, lowest level first. Its answer `score` is a probability-weighted
+position on that scale, zero-based, and can fall between levels.
+
+**Criteria** — the caller's description of a question's possible answers: what
+yes and no mean for a noul, the options for a choice, the ordered levels for a
+score.
+
+**Refusal (decision)** — a provider declining one question in a decision. The
+answer for that question is `{ type: "refusal" }`; the rest of the decision
+stands. Unrelated to the chat-side `Refusal`, which describes a declined request
+or blocked output.
 
 **Display** — the request-side reasoning disclosure control:
 `display: "visible" | "hidden"` on the `{ effort }` form of `reasoning`. It says
@@ -74,13 +138,16 @@ or event field, and never set because thinking was merely hidden.
 **Transcript** — the host-owned, reader-facing fold of `TurnEvent`s into turns
 and annotations. The exported `Transcript` class is the shipped in-memory
 implementation; hosts persist its `turns` and pass them to the constructor on
-restore. The Agent holds no transcript — it emits events and keeps only the
-active `messages`. Lose the turns, lose the transcript.
+restore. Its `pending` view holds operations the Agent has accepted but not
+started; that is live state and is never saved. The Agent holds no
+transcript — it emits events and keeps only the active `messages`. Lose the
+turns, lose the transcript.
 
 **Session** — the continuable identity of a conversation (`sessionId`).
 `AgentSession` is its serialized form: the pure continuation
 `{ sessionId, messages }` that `agent.snapshot()` captures and the `Agent`
-constructor restores. The transcript is not part of it.
+constructor restores. `snapshot()` resolves when the Agent goes idle, so the
+capture is always at rest. The transcript is not part of it.
 
 **Compaction** — replacing the active conversation with a condensed rewrite,
 recorded on the transcript as a `compaction` turn part. Old messages cease to
@@ -117,5 +184,14 @@ and one flat namespace.
 | `provider-tool` part `output` | `input` / `result` / `continuity`; results in `continuity`, late results in `provider-tool-result` parts | 0.33.0 |
 | `provider-tool:complete` `output` (search) | search results live on the part's `continuity`; failures arrive as `provider-tool:error` | 0.33.0 |
 | `AxleStopReason.Error` / `AxleStopReason.Custom` | removed — unknown stop reasons fail the request | 0.33.0 |
+| `configureAxle` / `AxleConfiguration` | removed — attach `webSearch` to each `chatCompletions()` provider that needs it | 0.34.0 |
+| `WebSearchBackend` (+ `WebSearchRequest`, `WebSearchResponse`) | removed — a custom search is an `ExecutableTool` passed as `webSearch` | 0.34.0 |
+| `StreamParams.registry` | removed — pass `tools` / `providerTools`; change mid-loop via `onToolBatchComplete` | 0.34.0 |
+| `ToolContext.registry` | removed — mutate the agent in closure scope (`agent.registry`, `agent.skills`) | 0.34.0 |
+| `AIProvider.resolveProviderToolName` / `ResolvedProviderTool` / `nativeName` | removed — providers serve `providerTools` unchanged; bring tools via `AIProvider.tools` | 0.34.0 |
+| `agent.system` (writable) | read-only getter — configured prompt plus the skills catalog | 0.34.0 |
+| `vendor: "together"` | renamed to `"togetherai"` | 0.34.0 |
+| `WEB_SEARCH_FALLBACK_NOT_CONFIGURED` | removed — an unserved provider tool fails the request as a `model` failure with no code | 0.34.0 |
+| `TOOL_OPTIONS_CONFLICT` | removed — there is nothing left to conflict | 0.34.0 |
 
 See [Upgrading](/upgrading).

@@ -37,7 +37,6 @@ interface ExecutableTool<TSchema extends ZodObject<any> = ZodObject<any>> {
 
 ```typescript
 interface ToolContext {
-  registry: ToolRegistry;
   signal: AbortSignal;
   emit: (chunk: ToolProgressChunk) => void;
   reportUsage?: (usage: Stats) => void; // @experimental
@@ -50,6 +49,10 @@ type ToolProgressChunk = string | { type: "turn-event"; event: TurnEvent };
 `emit` with a string surfaces as `action:progress`. Emitting a wrapped
 `TurnEvent` is how nested agents forward their own event stream — it becomes
 `action:child-event`.
+
+(`registry` was removed from `ToolContext` in 0.34.0. A tool that changes the
+agent it runs under uses that agent in closure scope — `agent.registry.add(...)`,
+`agent.skills.add(...)`. See [Upgrading](/upgrading).)
 
 ## ToolResultPart
 
@@ -189,7 +192,21 @@ inherited, so batched subagents still render as subagent activity.
 ## Web search
 
 ```typescript
-braveWebSearch(options: BraveWebSearchOptions): WebSearchBackend
+braveWebSearch(options: BraveWebSearchOptions): ExecutableTool
+```
+
+An executable tool named `web_search` — pass it as `webSearch` to the
+`chatCompletions()` provider that needs it, and request `web_search` as a
+provider tool as usual. (It used to return a backend registered with
+`configureAxle`; both are gone in 0.34.0. See [Upgrading](/upgrading).)
+
+```typescript
+import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
+
+const provider = chatCompletions("https://api.together.ai/v1", {
+  apiKey,
+  webSearch: braveWebSearch({ apiKey: braveKey }),
+});
 ```
 
 ```typescript
@@ -210,23 +227,54 @@ interface BraveWebSearchOptions {
 }
 ```
 
-Register it with [`configureAxle`](/reference/configuration) to serve `web_search`
-on providers with no native equivalent.
-
-### Custom backends
-
 ```typescript
-interface WebSearchBackend {
-  readonly name: string;
-  search(request: WebSearchRequest, context: WebSearchBackendContext): Promise<WebSearchResponse>;
+interface WebSearchResult {
+  title: string;
+  url: string;
+  snippets: string[];
 }
-
-interface WebSearchRequest { query: string }
-interface WebSearchBackendContext { signal: AbortSignal; span?: Span }
-interface WebSearchResponse { results: WebSearchResult[] }
-interface WebSearchResult { title: string; url: string; snippets: string[] }
 ```
 
-The generated fallback tool is named `web_search`, takes
-`{ query: string }` (trimmed, 1–400 characters), and returns JSON
-`{ query, results }`.
+Register it on the provider (above), not with
+[`configureAxle`](/reference/configuration) — the global fallback was removed in
+0.34.0.
+
+### Custom search tools
+
+Any search API works — write an `ExecutableTool` named `web_search` whose
+`execute` returns the results as a string, and pass it as `webSearch`:
+
+```typescript
+import { chatCompletions, type ExecutableTool } from "@fifthrevision/axle";
+import * as z from "zod";
+
+declare const searchIndex: (query: string, signal: AbortSignal) => Promise<{ title: string; url: string; passages: string[] }[]>;
+
+const internalSearchSchema = z.object({ query: z.string().trim().min(1).max(400) });
+
+const internalSearch: ExecutableTool<typeof internalSearchSchema> = {
+  name: "web_search",
+  description: "Search the internal docs index for current information.",
+  schema: internalSearchSchema,
+  async execute({ query }, { signal }) {
+    const hits = await searchIndex(query, signal);
+    return JSON.stringify({
+      query,
+      results: hits.map((h) => ({ title: h.title, url: h.url, snippets: h.passages })),
+    });
+  },
+};
+
+const provider = chatCompletions("http://localhost:11434/v1", {
+  webSearch: internalSearch,
+});
+```
+
+This is also how you point `web_search` at an internal corpus rather than the
+public web. Your agent code doesn't change at all — only what "search" means.
+
+Do forward `signal`, so a cancelled send doesn't leave a search running.
+
+The generated tool takes `{ query: string }` (trimmed, 1–400 characters). The
+Brave tool returns JSON `{ query, results }` where each result is `{ title, url,
+snippets }`.

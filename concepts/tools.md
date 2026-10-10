@@ -65,7 +65,6 @@ async execute(input, ctx) {
   ctx.signal;              // AbortSignal — please forward it to your I/O
   ctx.emit("Fetching…");   // stream progress to the UI
   ctx.reportUsage(usage);  // roll a nested model call's tokens into the parent
-  ctx.registry;            // the live registry
   ctx.span;                // tracing span for this call
 }
 ```
@@ -73,6 +72,11 @@ async execute(input, ctx) {
 `ctx.emit` is what makes a slow tool feel alive — whatever you pass shows up as
 `action:progress` events while `execute` is still running. Without it, a
 ten-second tool just looks frozen to your user.
+
+(`ctx.registry` was removed in 0.34.0. A tool that changes the agent it runs
+under uses that agent in closure scope — `agent.registry.add(...)`,
+`agent.skills.add(...)` — and the change lands on the next provider request,
+even mid-turn. See [The tool registry](/concepts/tool-registry).)
 
 ## Returning more than text
 
@@ -119,29 +123,43 @@ vendor's own name:
 
 | Portable name | Anthropic | OpenAI | Gemini |
 | --- | --- | --- | --- |
-| `web_search` | `web_search_20250305` | `web_search_preview` | `googleSearch` |
-| `code_execution` | — | `code_interpreter` | `codeExecution` |
+| `web_search` | `web_search_20260318` | `web_search` | `googleSearch` |
+| `code_execution` | `code_execution_20260521` | `code_interpreter` | `codeExecution` |
 
 Any other name passes through untouched, so vendor-specific tools work by naming
 them directly. The optional `config` object is raw passthrough — field names and
-placement differ per vendor, so anything you put there is not portable.
+placement differ per vendor, so anything you put there is not portable. (It also
+never reaches a tool served by an attached executable — more on that in [Web
+search](/cookbook/web-search).)
 
 Results come back as `provider-tool` action parts and, for search, as
 [citations](/reference/messages). See [Provider tools](/cookbook/provider-tools).
 
+The provider owns every provider tool: core hands `providerTools` to the
+provider unchanged, and each provider decides how to serve a name — as a tool
+the vendor hosts, as an executable tool the provider brings (`AIProvider.tools`,
+which is how `chatCompletions()` serves an attached `webSearch`), or not at
+all. A provider asked for a tool it cannot serve fails the request (`ok: false`,
+`error.kind` `"model"`, naming the tool) — never silently dropped, except
+OpenRouter's warn-and-skip for names it doesn't map, which predates the change.
+
 ### If a provider has no native search
 
-Ask for `web_search` on a provider that doesn't have one and Axle throws — unless
-you've registered a fallback backend, in which case it quietly substitutes a real
-executable tool.
+Ask for `web_search` on a provider that doesn't host one and the request fails —
+unless you attached a search to that `chatCompletions()` provider, in which
+case it runs as an ordinary tool call.
 
 ```typescript
-import { configureAxle, braveWebSearch } from "@fifthrevision/axle";
+import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
 
-configureAxle({ webSearchFallback: braveWebSearch({ apiKey }) });
+const provider = chatCompletions("http://localhost:11434/v1", {
+  webSearch: braveWebSearch({ apiKey: braveKey }),
+});
 ```
 
-Now the same agent code works against Ollama as against Anthropic. See
+Now the same agent code works against Ollama as against Anthropic — with one
+visible difference: an attached search renders as `tool` parts, not
+`provider-tool` parts, because that is what happened. See
 [Web search](/cookbook/web-search).
 
 ## MCP servers

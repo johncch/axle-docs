@@ -64,8 +64,12 @@ Failures are flat: a `model` failure carries `type`, `message`, `status?`,
 `usage?`, and `raw?` directly on `error` (no nested `error` object since
 0.33.0). To detect a bad key, check
 `!result.ok && result.error.kind === "model" && result.error.type === "authentication"`
-instead of digging through `raw.status` or message strings. See
-[Errors](/reference/errors) for the full union.
+instead of digging through `raw.status` or message strings. Two more `type`
+values worth knowing: `"TimeoutError"` means a `chatCompletions()` request
+timed out (match on it rather than `AbortError`, which now means only your own
+signal fired), and a provider tool no provider serves — `web_search` with
+nothing attached, say — fails the request as a `model` failure naming the tool.
+See [Errors](/reference/errors) for the full union.
 
 ### What `response` holds
 
@@ -159,7 +163,7 @@ That partial state is kept on purpose. A cancelled long generation still cost yo
 money and still produced text — you'll usually want to show it.
 
 For what commits when you cancel, and how `cancel()` differs from `stop()` and
-`clear()`, see [Agent](/concepts/agent#interrupting-three-different-things).
+`clear()`, see [Agent](/concepts/agent#interrupting-four-different-things).
 
 ## Tool errors: ordinary vs. fatal
 

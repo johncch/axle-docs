@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@fifthrevision/axle':
-        specifier: 0.33.0
-        version: 0.33.0(ws@8.21.3)
+        specifier: 0.34.0
+        version: 0.34.0(ws@8.21.3)(zod@4.4.3)
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
@@ -296,9 +296,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fifthrevision/axle@0.33.0':
-    resolution: {integrity: sha512-2k1LtCmIPWGU/gb7sJNYS7X9sWsUxqv9If6uRjjAao7cL9YkoLmqmDFpwMvnr+sWiaEyyd28FRzdq7DEGphQRw==}
+  '@fifthrevision/axle@0.34.0':
+    resolution: {integrity: sha512-0ygvfT9MSq8TquZVmr5IAsI8vKCFjlr19OjvsuNUv4quAcPKcVjqxlJk5P42gy7vTzXGgqcJe+fcT/4Kw9jmTw==}
     engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^4.2.0
 
   '@google/genai@2.27.0':
     resolution: {integrity: sha512-W6F9Y9d4h7cVQNa85IPCOVVP9PiUzve/ZQPBvQnBmnBJcLvxstEw+R2X/RyCH0SOe0HVDQzeKDpDUf6ZRtbmdQ==}
@@ -1445,6 +1447,11 @@ packages:
       utf-8-validate:
         optional: true
 
+  yaml@2.9.1:
+    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
   zod-to-json-schema@3.25.2:
     resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
     peerDependencies:
@@ -1452,9 +1459,6 @@ packages:
 
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
-
-  zod@4.6.5:
-    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -1573,12 +1577,12 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.56.0
 
-  '@anthropic-ai/sdk@0.129.0(zod@4.6.5)':
+  '@anthropic-ai/sdk@0.129.0(zod@4.4.3)':
     dependencies:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
     optionalDependencies:
-      zod: 4.6.5
+      zod: 4.4.3
 
   '@babel/helper-string-parser@7.29.7': {}
 
@@ -1689,17 +1693,18 @@ snapshots:
   '@esbuild/win32-x64@0.21.5':
     optional: true
 
-  '@fifthrevision/axle@0.33.0(ws@8.21.3)':
+  '@fifthrevision/axle@0.34.0(ws@8.21.3)(zod@4.4.3)':
     dependencies:
-      '@anthropic-ai/sdk': 0.129.0(zod@4.6.5)
-      '@google/genai': 2.27.0(@modelcontextprotocol/sdk@1.32.0(zod@4.6.5))
-      '@modelcontextprotocol/sdk': 1.32.0(zod@4.6.5)
+      '@anthropic-ai/sdk': 0.129.0(zod@4.4.3)
+      '@google/genai': 2.27.0(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))
+      '@modelcontextprotocol/sdk': 1.32.0(zod@4.4.3)
       chalk: 6.0.1
       glob: 13.0.6
       marked: 18.0.14
       mime: 4.1.0
-      openai: 7.28.0(ws@8.21.3)(zod@4.6.5)
-      zod: 4.6.5
+      openai: 7.28.0(ws@8.21.3)(zod@4.4.3)
+      yaml: 2.9.1
+      zod: 4.4.3
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@cfworker/json-schema'
@@ -1711,14 +1716,14 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@google/genai@2.27.0(@modelcontextprotocol/sdk@1.32.0(zod@4.6.5))':
+  '@google/genai@2.27.0(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))':
     dependencies:
       google-auth-library: 10.9.1
       p-retry: 4.6.2
       protobufjs: 7.6.5
       ws: 8.21.3
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.32.0(zod@4.6.5)
+      '@modelcontextprotocol/sdk': 1.32.0(zod@4.4.3)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -1736,7 +1741,7 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@modelcontextprotocol/sdk@1.32.0(zod@4.6.5)':
+  '@modelcontextprotocol/sdk@1.32.0(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 2.1.0(hono@4.13.1)
       ajv: 8.20.0
@@ -1753,8 +1758,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.6.5
-      zod-to-json-schema: 3.25.2(zod@4.6.5)
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
     transitivePeerDependencies:
       - supports-color
 
@@ -2544,10 +2549,10 @@ snapshots:
       regex: 6.1.0
       regex-recursion: 6.0.2
 
-  openai@7.28.0(ws@8.21.3)(zod@4.6.5):
+  openai@7.28.0(ws@8.21.3)(zod@4.4.3):
     optionalDependencies:
       ws: 8.21.3
-      zod: 4.6.5
+      zod: 4.4.3
 
   p-retry@4.6.2:
     dependencies:
@@ -2906,12 +2911,12 @@ snapshots:
 
   ws@8.21.3: {}
 
-  zod-to-json-schema@3.25.2(zod@4.6.5):
+  yaml@2.9.1: {}
+
+  zod-to-json-schema@3.25.2(zod@4.4.3):
     dependencies:
-      zod: 4.6.5
+      zod: 4.4.3
 
   zod@4.4.3: {}
-
-  zod@4.6.5: {}
 
   zwitch@2.0.4: {}

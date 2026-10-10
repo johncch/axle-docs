@@ -30,20 +30,47 @@ chatCompletions(baseUrl: string, apiKey: string, options?: Omit<ChatCompletionsO
 ```typescript
 interface ChatCompletionsOptions extends ProviderClientOptions {
   apiKey?: string;
-  vendor?: ChatCompletionsVendor; // "openrouter" | "together"
+  vendor?: ChatCompletionsVendor; // "openrouter" | "togetherai"
+  webSearch?: ExecutableTool; // serves `web_search` requests on this provider
 }
 ```
 
-The vendor is inferred from the hostname when omitted:
+The vendor is inferred from the hostname when omitted (see
+`inferChatCompletionsVendor`, exported for hosts that need the same answer):
 
 | Hostname | Vendor |
 | --- | --- |
 | `openrouter.ai`, `api.openrouter.ai` | `openrouter` |
-| `api.together.ai`, `api.together.xyz` | `together` |
+| `api.together.ai`, `api.together.xyz` | `togetherai` |
 
 Only `openrouter` currently adjusts request behavior; other
 vendors pass both through unchanged. Model IDs are never rewritten — pass the
 slug the gateway lists.
+
+`vendor: "together"` became `"togetherai"` in 0.34.0, matching the id models.dev
+uses. Only an explicit `vendor` needs editing; the Together hostnames are still
+recognized without it. See [Upgrading](/upgrading).
+
+### webSearch
+
+```typescript
+import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
+
+const provider = chatCompletions("https://api.together.ai/v1", {
+  apiKey,
+  webSearch: braveWebSearch({ apiKey: braveKey }),
+});
+```
+
+`chatCompletions()` hosts no search of its own. When a request carries the
+`web_search` provider tool, the provider sends the attached tool to the model
+as an ordinary function tool and the loop runs it as an ordinary tool call —
+so the transcript shows `tool` parts, not `provider-tool` parts. An attached
+tool is used wherever it is attached, including on OpenRouter, which hosts a
+search of its own: don't attach one if you want OpenRouter's. A provider asked
+for a provider tool it has nothing attached for fails the request (`ok: false`,
+`error.kind` `"model"`, naming the tool). See [Web search](/cookbook/web-search)
+and [Provider tools](/cookbook/provider-tools).
 
 Provider `name` is `"anthropic"`, `"openai"`, `"gemini"`, or `"ChatCompletions"`.
 
@@ -54,7 +81,9 @@ Applied when the client is constructed, not per request.
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `maxRetries` | `number` | `2` | Retries after the first request. `0` disables. Must be ≥ 0. |
-| `timeoutMs` | `number` | SDK default | Request timeout. Must be ≥ 1. |
+| `timeoutMs` | `number` | SDK default (`chatCompletions()`: 10 minutes per attempt) | Timeout for one request attempt. Must be ≥ 1. |
+| `headers` | `Record<string, string>` | — | Extra headers sent with every request. |
+| `fetch` | `typeof fetch` | global `fetch` | Replaces the global for this provider's requests. Called as `(url, init)` and must return a real `Response`; retries, `timeoutMs`, and the abort signal apply unchanged. A test that stubbed `globalThis.fetch` can pass a fake here instead. |
 
 Non-integer or out-of-range values throw at construction.
 
@@ -127,12 +156,45 @@ that differs from the publisher's canonical form (casing, or a different author
 prefix — `z-ai/glm-5.3`, not `zai/glm-5.3`), pass OpenRouter's slug. IDs that
 were already OpenRouter slugs are unaffected.
 
-## Removed in 0.33.0: model catalog
+## Removed in 0.33.0: model registry; added in 0.34.0: ModelCatalog
 
 The `@fifthrevision/axle/models` entry point (`Models`, `ModelInfo`,
 `ModelMetadata`) no longer exists. Pass model IDs as plain strings; keep your
 own table (or ask the provider's models API) when you need context windows or
 output ceilings. See [Upgrading](/upgrading).
+
+What 0.34.0 adds instead is a lookup, not a registry: `ModelCatalog` reads the
+models.dev catalog (a canonical `publisher/model` layer plus a per-host layer
+with each host's own ids, limits, and prices) and answers context-window
+questions about it.
+
+```typescript
+import { ModelCatalog } from "@fifthrevision/axle";
+
+const catalog = await ModelCatalog.open({ cachePath: "./.cache/axle-models.json" });
+if (catalog.stale) await catalog.refresh();
+const hit = catalog.contextWindow("openai/gpt-5.5");
+// { window: 400000, id: "openai/gpt-5.5", match: "exact" } | undefined
+```
+
+```typescript
+ModelCatalog.open(options?: ModelCatalogOptions): Promise<ModelCatalog>
+
+interface ModelCatalogOptions {
+  cachePath?: string; // where the slimmed catalog is kept between runs; omit for memory only
+  maxAge?: number; // ms past which the catalog reports `stale`; default one day
+  hosts?: string[]; // models.dev provider ids to keep (`anthropic`, `openrouter`, …); omit for all, `[]` skips hosts
+  baseUrl?: string; // catalog origin; default https://models.dev
+}
+```
+
+`open()` reads the cache and never touches the network; `refresh()` always
+fetches (sending ETags so an unchanged catalog downloads nothing) and never
+throws — a failed fetch keeps the cached copy. `lookup(model, { host?,
+publisher? })` tries the host's own id first when a host is given, then the
+canonical key, then a best-effort normalized match; `contextWindow(model,
+options?)` maps that to `{ window, id, match }`. `size`, `fetchedAt`, and
+`stale` describe the cache. When to refresh is the host's call.
 
 ## Context estimation
 
@@ -170,10 +232,17 @@ this with the agent's own state.
 ```typescript
 interface AIProvider {
   get name(): string;
-  resolveProviderToolName?(name: string, model: string): string | undefined;
+  tools?: ExecutableTool[];
   createStreamingRequest(model: string, params: ProviderStreamParams): AsyncGenerator<AnyStreamChunk>;
 }
 ```
+
+`tools` are executable tools the provider brings: when the model calls a tool
+whose name is not among the caller's tools, the loop runs the provider's tool
+of that name. The caller's tool wins on a name collision. `chatCompletions()`
+uses this for an attached `webSearch`. (`resolveProviderToolName` was removed
+in 0.34.0 — the loop no longer asks a provider what it supports. See
+[Upgrading](/upgrading).)
 
 The request method is internal, and so are its types:
 `ProviderStreamParams` and `AnyStreamChunk` are declared by the package but not
@@ -186,8 +255,11 @@ You *can* implement this interface to add your own provider, but it isn't
 supported — the chunk and conversion contracts aren't stable across releases, so
 expect to keep fixing it.
 
-`resolveProviderToolName` returning `undefined` marks a provider tool as
-unsupported, which is what triggers the [web search fallback](/cookbook/web-search).
+A custom provider receives `providerTools` unchanged, as before — core does not
+read the names and holds no fallback. Serve a name yourself (as a hosted tool
+or via `AIProvider.tools`) or fail the request before sending it: throwing a
+plain `Error` from `createStreamingRequest` surfaces as `ok: false` with
+`error.kind` `"model"`.
 
 ## AxleStopReason
 

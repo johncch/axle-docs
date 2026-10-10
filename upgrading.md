@@ -7,10 +7,96 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.33.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.34.0-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.33.0**.
+Current release: **0.34.0**.
+
+## 0.34.0 — pending turns, skills, provider-owned search
+
+Eleven breaking changes in the library surface (plus CLI changes, which are out
+of scope for this site). The migration guide is
+[`docs/0.34.0-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.34.0-migration.md)
+in the library repo.
+
+**`TurnEvent` gains `pending:queued` and `pending:dropped`.** The Agent now
+announces a `send()` or manual `compact()` when it is accepted, and again if it
+ends before opening its turn. A `switch` over `event.type` with an
+exhaustiveness check stops compiling until it handles both; a renderer that has
+no use for them can ignore them, since `Transcript.apply` already folds them.
+The first event of a send is now `pending:queued`, not `turn:user`.
+
+**`TurnStatus` and the compaction part's status gain `"pending"`.** A queued
+operation previews as a `Turn` with `status: "pending"` — a user turn a send
+will commit, or an agent turn with one `pending` compaction part for a queued
+manual compaction. Pending turns live only in `transcript.pending`, never in
+`turns`, so a renderer that reads `turns` alone can treat the case as
+unreachable.
+
+**`StreamParams.registry` is removed; pass `tools` and `providerTools`.** The
+loop builds every request from the values it was given and never reads a
+registry, so a tool added to a `ToolRegistry` after the call no longer appears
+mid-loop. To change tools or the prompt mid-loop, return them from
+`onToolBatchComplete`, which may now return `{ system?, tools?,
+providerTools? }` (typed as `ToolBatchDecision`). Passing `registry` is a type
+error, and the `TOOL_OPTIONS_CONFLICT` error no longer exists.
+
+**`ToolContext.registry` is gone.** A tool's `execute(input, ctx)` no longer
+receives `ctx.registry`. A tool that changes the agent it runs under uses that
+agent in closure scope: `agent.registry.add(...)`, `agent.skills.add(...)`.
+
+**`configureAxle` and the web search fallback are gone.** Web search on a
+provider without hosted search is now a tool attached to the `chatCompletions()`
+provider that needs it — `chatCompletions(url, { apiKey, webSearch:
+braveWebSearch({ apiKey: braveKey }) })` — instead of a process-wide setting.
+`braveWebSearch()` returns an `ExecutableTool` named `web_search`, and
+`WebSearchBackend`, `WebSearchRequest`, `WebSearchResponse`, and
+`AxleConfiguration` are removed. The `providerTools: [{ type: "provider", name:
+"web_search" }]` request is unchanged. A `chatCompletions()` provider asked for
+a provider tool it cannot serve now fails the request (`ok: false`,
+`error.kind` `"model"`, no error code) instead of dropping the tool or throwing
+`WEB_SEARCH_FALLBACK_NOT_CONFIGURED`.
+
+**`AIProvider.resolveProviderToolName` is gone; `AIProvider.tools` is added.**
+The loop no longer asks a provider whether it supports a provider tool. A
+custom `AIProvider` that implemented `resolveProviderToolName` can delete it; a
+custom provider that relied on the fallback now lists the tool in
+`AIProvider.tools`, which the loop runs when the caller's tools have no tool of
+that name. `ResolvedProviderTool` and `nativeName` are gone.
+
+**`agent.system` is read-only.** It is now a getter returning the configured
+system prompt plus the skills catalog when skills are present. Code that
+assigned `agent.system = ...` stops compiling; set the prompt at construction.
+
+**The Together vendor id is `togetherai`.** `chatCompletions()`'s `vendor`
+option takes `"togetherai"` where it took `"together"`, matching the id
+models.dev uses. Only an explicit `vendor` needs editing; the official Together
+hostnames are still recognized without it.
+
+**`zod` is a peer dependency.** Axle requires `^4.2.0` and uses your project's
+copy. npm 7+ and pnpm install a missing peer automatically; Yarn Classic does
+not, so add it by hand. The ranges of Axle's other dependencies are wider, so an
+existing provider SDK install is reused instead of duplicated.
+
+**`snapshot()` waits for idle instead of taking a place in the queue.** It
+resolves at once when the Agent is idle, otherwise when the Agent next goes
+idle — so `send("a"); const s = agent.snapshot(); send("b"); await s` now holds
+both turns, not just `"a"`. `clear()` no longer cancels a waiting snapshot. To
+save after each operation, use the new `onSettled` hook.
+
+**`chatCompletions()` requests time out after ten minutes per attempt**, and a
+timeout now fails as `TimeoutError` (`"Request timed out after <n>ms"`) instead
+of `AbortError` (`"Request aborted"`). Code that matched `AbortError` to detect
+a timeout should match `TimeoutError`.
+
+Additions in 0.34.0 (not breaking): `agent.skills` (`SkillRegistry` with `add`,
+`remove`, `set`, `has`, `get`, `list`, `size`), `agent.onSettled()` and
+`agent.onIdle()`, `agent.cancel()`, `Transcript.pending` (plus `new
+Transcript(turns, pending)`), `fetch` in every provider factory's client
+options, `ModelCatalog` context-window lookup, and experimental typed decisions
+with `decide()` and the `typesafe()` provider. See [Skills](/concepts/skills),
+[Decisions](/concepts/decisions), and the [migration
+guide](https://github.com/johncch/axle/blob/main/docs/0.34.0-migration.md).
 
 ## 0.33.0 — no registry, flat failures, portable provider tools
 
