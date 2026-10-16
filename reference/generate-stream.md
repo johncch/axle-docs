@@ -46,7 +46,7 @@ Both extend `AxleModelRequestOptions`.
 | `maxContextTokens` | `number` | Context budget in tokens. Must be ≥ 1. |
 | `span` | `Span` | Parent tracing span. |
 | `fileResolver` | `FileResolver` | Resolves deferred file references. |
-| `sessionId` | `string` | Conversation identity forwarded to the provider. Only OpenRouter uses it today (as `session_id`, for sticky routing and dashboard grouping); other providers ignore it. `Agent` passes its own `sessionId`. |
+| `sessionId` | `string` | Conversation identity forwarded to the provider on every step. Only OpenRouter uses it today (as `session_id`, for sticky routing, cache affinity, and dashboard grouping); other providers ignore it. `Agent` passes its own `sessionId`; a call without one gets a fresh id so the steps of its own tool loop stay together. Pass the same id to separate calls to share OpenRouter cache reads across them. |
 | ...request options | | See [Providers](/reference/providers#axlemodelrequestoptions). |
 
 Non-positive limits throw with code `INVALID_OPTIONS`.

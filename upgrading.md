@@ -7,10 +7,47 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.34.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.34.1-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.34.0**.
+Current release: **0.34.1**.
+
+## 0.34.1 — prompt caching on by default
+
+No signature changes. `AxleModelRequestOptions` gains an optional `cache` flag,
+and the default request now asks for caching where asking is required. The
+migration guide is
+[`docs/0.34.1-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.34.1-migration.md)
+in the library repo.
+
+**Anthropic and OpenRouter requests now carry `cache_control`.** Every request
+from `Agent`, `generate()`, and `stream()` to the Anthropic provider — and every
+chat-completions request to the OpenRouter vendor — carries a top-level
+`cache_control: { type: "ephemeral" }`. Before 0.34.1 nothing did, so no
+Anthropic request through Axle was ever served from cache. In a tool loop each
+step reads the conversation so far at 0.1x and writes only the new tail at
+1.25x; a one-shot prompt that is never repeated pays a 25% write premium for no
+read, and a prompt under the model's minimum cacheable length is silently not
+cached. `usage.cachedIn` and `usage.cacheWriteIn` now carry non-zero values on
+these providers. Pass `cache: false` (on the `Agent`, or per `generate()` /
+`stream()` call) to omit the field — it means "do not ask", not "do not cache",
+so OpenAI, Gemini, and Together, which cache automatically, are unaffected by
+either value. An explicit `providerOptions.cache_control` still wins over the
+default, which is how a host gets Anthropic's one-hour TTL. See [Providers &
+models](/concepts/providers#prompt-caching).
+
+**`stream()` and `generate()` without a `sessionId` get one for the call.**
+OpenRouter forwards the cache field to the upstream host, and a hit needs the
+next request to reach the same host — which OpenRouter pins by `session_id`.
+From 0.34.1 a bare call generates an id and sends it on every step of its own
+tool loop, so step 2 onward reads what step 1 wrote. Two separate calls still
+get two ids; pass the same `sessionId` to both to get reads across them.
+`Agent` always sends its own `sessionId`, so agent loops are unchanged.
+
+**Together cached-token usage is recognized.** Some Together models report hits
+as a top-level `usage.cached_tokens` instead of inside
+`prompt_tokens_details`; the usage mapping now reads both, so `cachedIn`
+reflects it. Nothing to change on your side.
 
 ## 0.34.0 — pending turns, skills, provider-owned search
 

@@ -98,6 +98,7 @@ and on `GenerateParams` / `StreamParams`.
 | `maxOutputTokens` | `number` | Output token cap. |
 | `toolChoice` | `ToolChoice` | Tool-use constraint. |
 | `parallelToolCalls` | `boolean` | Ask the provider to avoid parallel tool calls. |
+| `cache` | `boolean` | Whether Axle asks the provider to cache the prompt prefix where asking is required (Anthropic, OpenRouter). Defaults to `true`. Providers that cache on their own (OpenAI, Gemini, Together) are unaffected by either value. An explicit `providerOptions.cache_control` overrides the default. |
 | `providerOptions` | `Record<string, any>` | Raw fields, applied **after** normalized mappings. |
 | `signal` | `AbortSignal` | Aborts the in-flight request. |
 

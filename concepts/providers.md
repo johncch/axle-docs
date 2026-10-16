@@ -160,6 +160,7 @@ await agent.send("...", { maxOutputTokens: 1024 }).final;
 | `maxOutputTokens` | Caps output tokens for the request |
 | `toolChoice` | `"auto"`, `"none"`, `"required"`, or `{ type: "tool", name }` |
 | `parallelToolCalls` | Asks the provider to avoid parallel tool calls |
+| `cache` | Asks the provider to cache the prompt prefix where asking is required (Anthropic, OpenRouter). Defaults to on; `false` omits the field |
 | `providerOptions` | Raw passthrough, applied *after* Axle's mappings |
 | `signal` | Aborts the request |
 
@@ -180,6 +181,44 @@ await agent.send("...", { providerOptions: { temperature: 0.2 } }).final;
 `providerOptions` merges key by key with the agent's defaults and lands last, so
 it can deliberately override Axle's own mapping. It's the escape hatch for
 anything Axle hasn't normalized yet.
+
+### Prompt caching
+
+Axle asks the provider to cache the prompt prefix wherever asking is required.
+Requests to the Anthropic provider — and chat-completions requests to the
+OpenRouter vendor — carry a top-level `cache_control: { type: "ephemeral" }`
+unless you pass `cache: false`. The provider puts one cache breakpoint on the
+last cacheable block and moves it forward as the conversation grows, so in a
+tool loop each step reads everything so far at cache-read rates and writes only
+what the previous step added. OpenAI, Gemini, and Together cache automatically
+and get no field; `cache` is ignored there, at either value.
+
+On by default is the loop's doing. Without it, every step of every tool loop
+re-bills the whole conversation at full price. The trade lands on one-shot
+prompts: a prompt that is never repeated pays the ~25% cache-write premium for
+a read that never comes, and a prompt under the model's minimum cacheable
+length (512 to 4,096 tokens on Anthropic, by model) is silently not cached
+either way. That one-shot case is the case for opting out:
+
+```typescript
+await generate({ provider, model, messages, cache: false });
+new Agent({ provider, model, cache: false });
+```
+
+Two things worth knowing. First, `cache: false` means "do not ask", not "do not
+cache" — the automatic providers are unaffected. Second, an explicit
+`providerOptions.cache_control` still wins over the default, so a host that
+placed its own marker — or wants Anthropic's one-hour TTL instead of the
+five-minute default — is unchanged.
+
+`result.usage` reports what happened: `cachedIn` is tokens read from cache and
+`cacheWriteIn` tokens written, both already counted inside `in` (see [Token
+usage](/concepts/observability#token-usage)). And one OpenRouter wrinkle: a hit
+needs the next request to reach the same upstream host, which OpenRouter pins
+by `session_id`. `Agent` always sends its `sessionId`, and a bare `generate()`
+or `stream()` call gets a fresh id for its own tool loop — so hits across
+separate calls need a `sessionId` you pass to both. Full signatures are in the
+[Providers reference](/reference/providers#axlemodelrequestoptions).
 
 ## Retries and timeouts
 

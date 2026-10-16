@@ -135,7 +135,9 @@ result.usage;
 
 `cachedIn` and `cacheWriteIn` are already counted inside `in`, and `reasoningOut`
 is already inside `out`. Don't add them again — that's the classic
-double-counting bug.
+double-counting bug. Since 0.34.1 these two are populated on Anthropic and
+OpenRouter as well, because Axle asks for caching there by default (see
+[Prompt caching](/concepts/providers#prompt-caching)).
 
 `breakdown` holds one entry per provider+model pair, which is how you reconstruct
 cost when a single operation spans models: a subagent on a cheaper model, a
