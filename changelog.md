@@ -8,6 +8,10 @@ description: Notable changes by release.
 Mirrored from [`CHANGELOG.md`](https://github.com/johncch/axle/blob/main/CHANGELOG.md)
 in the library repository. For upgrade instructions, see [Upgrading](/upgrading).
 
+## [0.34.1] - 2026-10-16
+
+- Enabled prompt caching by default for Anthropic and OpenRouter, with a `cache` opt-out. OpenRouter tool-loop requests now stay on the same session, and Together cached-token usage is recognized.
+
 ## [0.34.0] - 2026-10-10
 
 - **Breaking (CLI):** untrusted folders no longer load project `.axle/` configuration or credentials, and tools that can modify or execute (`exec`, `patch-file`, and `write-file`) are disabled until you run `axle trust` for that folder.
