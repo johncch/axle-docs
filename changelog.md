@@ -8,6 +8,10 @@ description: Notable changes by release.
 Mirrored from [`CHANGELOG.md`](https://github.com/johncch/axle/blob/main/CHANGELOG.md)
 in the library repository. For upgrade instructions, see [Upgrading](/upgrading).
 
+## [0.34.2] - 2026-10-24
+
+- Added `baseUrl` to the shared provider client options, so `anthropic()`, `openai()` and `gemini()` can route requests through a proxy that speaks the vendor's API. `typesafe()` already had it. `chatCompletions()` keeps its base URL as the first argument and rejects the option.
+
 ## [0.34.1] - 2026-10-16
 
 - Enabled prompt caching by default for Anthropic and OpenRouter, with a `cache` opt-out. OpenRouter tool-loop requests now stay on the same session, and Together cached-token usage is recognized.

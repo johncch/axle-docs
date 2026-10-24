@@ -10,7 +10,7 @@ Every release has a full migration guide in the repository under
 `0.13.0-migration.md` through `0.34.1-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.34.1**.
+Current release: **0.34.2**.
 
 ## 0.34.1 — prompt caching on by default
 

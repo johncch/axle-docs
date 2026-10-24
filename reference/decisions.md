@@ -118,16 +118,13 @@ import { typesafe } from "@fifthrevision/axle";
 
 typesafe(apiKey: string, options?: TypesafeOptions): DecisionProvider
 
-interface TypesafeOptions extends ProviderClientOptions {
-  /**
-   * API root serving /v1/systemone. Defaults to https://api.typesafe.ai.
-   * Point it at https://openrouter.ai/api with an OpenRouter key to route through it.
-   */
-  baseUrl?: string;
-}
+type TypesafeOptions = ProviderClientOptions;
 ```
 
-`timeoutMs` defaults to ten seconds per attempt, matching TypeSafe's own SDKs.
+`baseUrl` is the shared client option: the API root serving `/v1/systemone`
+(default `https://api.typesafe.ai`). Point it at `https://openrouter.ai/api`
+with an OpenRouter key to route through it. `timeoutMs` defaults to ten seconds
+per attempt, matching TypeSafe's own SDKs.
 A non-2xx response throws `DECISION_REQUEST_FAILED` with the status and body in
 `details`; a body Axle cannot read throws `DECISION_RESPONSE_INVALID`. The
 model id is passed through unchanged.

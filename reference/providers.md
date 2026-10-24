@@ -28,12 +28,16 @@ chatCompletions(baseUrl: string, apiKey: string, options?: Omit<ChatCompletionsO
 ```
 
 ```typescript
-interface ChatCompletionsOptions extends ProviderClientOptions {
+interface ChatCompletionsOptions extends Omit<ProviderClientOptions, "baseUrl"> {
   apiKey?: string;
   vendor?: ChatCompletionsVendor; // "openrouter" | "togetherai"
   webSearch?: ExecutableTool; // serves `web_search` requests on this provider
 }
 ```
+
+`chatCompletions()` takes its base URL as the first argument, so unlike the
+other factories it does not accept `baseUrl` in its options — passing it is a
+type error.
 
 The vendor is inferred from the hostname when omitted (see
 `inferChatCompletionsVendor`, exported for hosts that need the same answer):
@@ -84,6 +88,7 @@ Applied when the client is constructed, not per request.
 | `timeoutMs` | `number` | SDK default (`chatCompletions()`: 10 minutes per attempt) | Timeout for one request attempt. Must be ≥ 1. |
 | `headers` | `Record<string, string>` | — | Extra headers sent with every request. |
 | `fetch` | `typeof fetch` | global `fetch` | Replaces the global for this provider's requests. Called as `(url, init)` and must return a real `Response`; retries, `timeoutMs`, and the abort signal apply unchanged. A test that stubbed `globalThis.fetch` can pass a fake here instead. |
+| `baseUrl` | `string` | vendor default | Sends requests to a proxy that speaks the vendor's API instead of the vendor. Each SDK appends its own path: `anthropic()` takes the origin (requests go to `${baseUrl}/v1/messages`), `openai()` includes the version (requests go to `${baseUrl}/responses`), `gemini()` takes the origin (requests go to `${baseUrl}/v1beta/models/...`), and `typesafe()` takes the origin (requests go to `${baseUrl}/v1/systemone`). Not accepted by `chatCompletions()`, whose base URL is the first argument. |
 
 Non-integer or out-of-range values throw at construction.
 

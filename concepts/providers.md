@@ -246,6 +246,26 @@ declare const loggingFetch: typeof fetch;
 const provider = chatCompletions("http://localhost:11434/v1", { fetch: loggingFetch });
 ```
 
+### Reaching a proxy instead of the vendor
+
+Sometimes the request shouldn't go to the vendor at all — a gateway that
+speaks the vendor's API, a logging proxy in front of it, a test double. That's
+what `baseUrl` is for. Every first-party factory takes it (`typesafe()`
+included):
+
+```typescript
+const viaProxy = anthropic(apiKey, { baseUrl: "https://proxy.example.com" });
+```
+
+Each SDK appends its own path, so what the base includes differs. For
+`anthropic()` and `gemini()` it's the origin — requests go to
+`/v1/messages` or `/v1beta/models/...` under it. For `openai()` include the
+version (`https://proxy.example.com/v1`; requests go to `/responses` under
+it). For `typesafe()` it's the root serving `/v1/systemone`.
+`chatCompletions()` is the odd one out: its base URL is already the first
+argument, so passing `baseUrl` there is a type error. Full signatures are in
+the [Providers reference](/reference/providers#providerclientoptions).
+
 ## How full is the context?
 
 ```typescript
