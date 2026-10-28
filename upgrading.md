@@ -10,7 +10,39 @@ Every release has a full migration guide in the repository under
 `0.13.0-migration.md` through `0.34.1-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.34.2**.
+Current release: **0.34.3**.
+
+## 0.34.3 — tool arguments validated before `execute`
+
+No signature changes and no migration guide — nothing to rename. This is a
+behavior change inside `execute` dispatch, worth reading because what your
+`execute` receives is now the schema-parsed value rather than the raw
+parameters.
+
+**Invalid tool arguments no longer reach `execute`.** Each call's parameters
+are parsed with the tool's schema first. When they don't match, `execute` is
+not called and the model gets an error tool result with type `validation` —
+`Invalid arguments for getWeather: city: Invalid input: expected string,
+received undefined` — which it can correct in the same turn. Previously the
+raw parameters went straight to `execute`, so a missing or mistyped argument
+surfaced as your own runtime error (usually an `execution` tool error) rather
+than a structured validation message.
+
+**`execute` now receives the parsed value.** Schema defaults and transforms
+apply before your code runs — a `z.number().default(10)` field your tool
+declares arrives as `10` when the model omits it, and a `.transform()` runs
+first. If your `execute` was defensively applying its own defaults, the schema
+value wins; keep them consistent.
+
+**A parallelized tool's call is rejected as a whole when any item is invalid.**
+`parallelize()` builds `{ items: [...] }` from the wrapped tool's schema, so
+one bad item fails validation before any item runs, with the item's path (for
+example `items.2.question`) in the message. Per-item execution failures after
+validation still report per item.
+
+**MCP tools are validated too.** Unknown top-level keys are stripped before
+the call reaches the server — matching a default `z.object()` — rather than
+rejected.
 
 ## 0.34.1 — prompt caching on by default
 

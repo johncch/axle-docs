@@ -84,7 +84,11 @@ type ToolCallResult =
 ```
 
 Runs **before** the registry. Returning `null` or `undefined` falls through to a
-registered tool of that name; if there is none, the call fails.
+registered tool of that name; if there is none, the call fails. On the
+fall-through path the call's arguments are parsed with the tool's schema before
+`execute` — a mismatch returns a `validation` error tool result without calling
+`execute`. A result returned directly from `onToolCall` bypasses validation
+entirely.
 
 ::: warning These two types are not exported
 `ToolCallCallback` and `ToolCallResult` are declared by the package but not

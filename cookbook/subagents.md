@@ -113,7 +113,7 @@ async execute(input, ctx) {
 
 ## Running one tool over many inputs
 
-`parallelize` wraps any tool in a batch version:
+`parallelize` wraps any tool in a parallelized tool:
 
 ```typescript
 import { parallelize } from "@fifthrevision/axle";
@@ -133,9 +133,12 @@ sequential tool calls.
 What you're guaranteed:
 
 - Results preserve input order.
-- Ordinary per-item failures are reported per item, not as a batch failure.
+- The call is validated as a whole first: one invalid item rejects the call
+  before anything runs, with the item's path (for example
+  `items.2.question`) in the `validation` message.
+- Ordinary per-item execution failures are reported per item, not as a batch failure.
 - Fatal and abort errors still propagate and terminate the run.
-- The wrapped tool's `kind` is inherited, so batched subagents still render as
+- The wrapped tool's `kind` is inherited, so parallelized subagents still render as
   subagent activity.
 
 ```typescript
@@ -150,7 +153,7 @@ interface ParallelToolResult<TInput> {
 
 Defaults: `maxItems: 50`, `maxConcurrency: 8`, `maxResultBytes: 20 MiB`.
 
-You can offer both the single and the batch version and let the model choose:
+You can offer both the single and the parallelized version and let the model choose:
 
 ```typescript
 tools: [research, parallelize(research)];

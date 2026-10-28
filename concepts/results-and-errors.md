@@ -165,7 +165,17 @@ money and still produced text — you'll usually want to show it.
 For what commits when you cancel, and how `cancel()` differs from `stop()` and
 `clear()`, see [Agent](/concepts/agent#interrupting-four-different-things).
 
-## Tool errors: ordinary vs. fatal
+## Tool errors: validation vs. execution vs. fatal
+
+A tool call can fail before `execute` ever runs. Each call's arguments are
+parsed with the tool's schema first; when they don't match, `execute` is not
+called and the model gets an error tool result with type `validation` naming
+each issue (`Invalid arguments for getWeather: city: Invalid input: expected
+string, received undefined`). The loop continues, so the model usually corrects
+the call in the same turn. `execute` receives the parsed value, so schema
+defaults and transforms already apply when it runs. A parallelized tool's call
+is rejected as a whole when any item is invalid, with the item's path (for
+example `items.2.question`) in the message.
 
 Inside `execute`, an ordinary throw is handled gracefully:
 

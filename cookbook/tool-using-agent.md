@@ -94,6 +94,12 @@ don't maintain a reducer. See [Streaming to a UI](/cookbook/streaming-ui).
 
 ## Handling tool failures
 
+Arguments are checked before your code runs: when the model passes parameters
+that don't match your schema, `execute` is not called and the model gets a
+`validation` error result naming each issue, which it can correct in the same
+turn. Your `execute` receives the parsed value, so schema defaults and
+transforms already apply.
+
 Most of the time, just throw. The model sees the error and usually works around
 it, and the run continues:
 
