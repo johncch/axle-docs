@@ -56,6 +56,33 @@ non-obvious field pays back more than almost anything else you can do.
 Axle ships no concrete local tools — no filesystem, no shell. That's on purpose:
 what your application should expose is your call, not the library's.
 
+## Validated before `execute`
+
+Every call's arguments are parsed with the tool's schema before `execute`
+runs, so `execute` receives the parsed value — with schema defaults and
+transforms already applied. A `z.number().default(10)` field arrives as `10`
+when the model omits it; you don't re-apply defaults inside `execute`.
+
+When the arguments don't match, `execute` is not called at all. The model
+gets an error tool result it can correct in the same turn instead:
+
+```json
+{
+  "error": {
+    "type": "validation",
+    "message": "Invalid arguments for get_weather: city: Invalid input: expected string, received undefined"
+  }
+}
+```
+
+The message names each issue with its path (`steps.0.label` for a bad nested
+field, `items.1.description` inside a parallelized call), joined with `;`
+when there are several. Because this is an ordinary tool result — not a thrown
+error — the loop continues and the model usually retries with fixed arguments
+in the same turn. An `onToolCall` handler that returns a result for the call
+bypasses this entirely; validation only applies on the fall-through path to a
+registered tool.
+
 ## The tool context
 
 `execute` gets a `ToolContext` as its second argument:
@@ -97,9 +124,13 @@ deferred-reference sources.
 
 ## When a tool fails
 
-An ordinary throw inside `execute` becomes a tool error result that goes back to
-the model, which usually retries or works around it. The run keeps going. That's
-almost always what you want.
+There are two ways a call becomes an error tool result, and they're worth
+telling apart. A **validation** error means the arguments never matched the
+schema — `execute` never ran, and the message names each issue so the model
+can fix the call. An **execution** error means `execute` ran and threw — an
+ordinary throw inside `execute` becomes a tool error result that goes back to
+the model, which usually retries or works around it. The run keeps going in
+both cases. That's almost always what you want.
 
 If you need to kill the run instead, throw `AxleToolFatalError` — that propagates
 out of `send()` rather than resolving as a result. Save it for cases where
@@ -193,6 +224,12 @@ two servers can both offer a `read_file` without colliding.
 Call `refreshTools()` if a server's tool list changes while running, and
 `close()` when you're done.
 
+MCP tools are validated like any other tool: the call's arguments are parsed
+with the converted schema before they reach the server, and unknown top-level
+keys are stripped — matching a default `z.object()` — rather than rejected.
+The schema advertised to the provider carries `additionalProperties: false`,
+as vendors like OpenAI require.
+
 ## Subagents
 
 `createAgentTool` turns a whole `Agent` into a tool, so a parent model can hand
@@ -219,8 +256,8 @@ across unrelated invocations, which gets strange quickly.
 
 ## Running a tool over many inputs
 
-`parallelize` wraps any tool in a batch version that takes an array and runs the
-inner tool concurrently.
+`parallelize` wraps any tool in a parallelized tool: one tool whose single
+call runs the inner tool over many inputs concurrently.
 
 ```typescript
 import { parallelize } from "@fifthrevision/axle";
@@ -228,9 +265,14 @@ import { parallelize } from "@fifthrevision/axle";
 const researchBatch = parallelize(research, { maxConcurrency: 4, maxItems: 20 });
 ```
 
-Results keep their input order. Ordinary per-item failures get reported per item
-instead of failing the batch, while fatal and abort errors still terminate the
-run — same contract as the unbatched tool.
+The call's arguments are validated like any other tool call's, so one invalid
+item rejects the whole call before any item runs — with the item's path (for
+example `items.2.question`) in the validation message. Once running, results
+keep their input order. Ordinary per-item execution failures get reported per
+item instead of failing the call, while fatal and abort errors still terminate
+the run — same contract as the unwrapped tool. The parallelized tool inherits
+the wrapped tool's `kind`, so parallelized subagents still stream their child
+turns under its action.
 
 ## Where they all end up
 

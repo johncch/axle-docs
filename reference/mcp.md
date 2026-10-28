@@ -89,6 +89,12 @@ the tool prefix and registers the results as MCP tools in the registry.
 
 The agent will **not** connect for you, so connect before the first send.
 
+MCP tools are validated like any other tool: call arguments are parsed with
+the converted schema before they reach the server, and unknown top-level keys
+are stripped — matching a default `z.object()` — rather than rejected. The
+schema advertised to the provider carries `additionalProperties: false`, as
+vendors like OpenAI require.
+
 Tool names mustn't collide with local or provider tools, or you'll get
 `TOOL_REGISTRY_DUPLICATE`. Giving each client a distinct `name` is what keeps two
 servers' identically-named tools apart.

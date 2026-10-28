@@ -28,7 +28,7 @@ interface ExecutableTool<TSchema extends ZodObject<any> = ZodObject<any>> {
 | --- | --- |
 | `name` | Must be unique across local, MCP, and provider tools. |
 | `description` | Sent to the model. This is prompt text. |
-| `schema` | Must be a Zod **object**. Use `.describe()` on fields. |
+| `schema` | Must be a Zod **object**. Use `.describe()` on fields. Call arguments are parsed with it before `execute` runs — `execute` receives the parsed value (defaults and transforms applied), and a mismatch returns a `validation` error tool result without calling `execute`. |
 | `kind` | Presentation only. `"agent"` renders as a subagent; execution is identical. |
 | `summarize` | Optional human-readable one-liner for a UI. |
 | `configure` | Optional hook for host-supplied configuration. |
@@ -185,9 +185,12 @@ The generated tool's result parts may change in a minor release.
 :::
 
 Results preserve input order. Ordinary execution errors are reported per item;
-fatal and abort errors propagate and terminate the run. The generated schema
+fatal and abort errors propagate and terminate the run. The call's arguments
+are validated as a whole before anything runs, so one invalid item rejects the
+call with a `validation` error naming the item's path (for example
+`items.1.description`). The generated schema
 requires at least one item and at most `maxItems`. The wrapped tool's `kind` is
-inherited, so batched subagents still render as subagent activity.
+inherited, so parallelized subagents still render as subagent activity.
 
 ## Web search
 

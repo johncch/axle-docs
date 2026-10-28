@@ -163,6 +163,16 @@ model state, never sent to a provider.
 provider-managed tools, MCP tools, and subagents. All share one `ToolRegistry`
 and one flat namespace.
 
+**Tool batch** — the set of separate tool calls one assistant message
+requests. Each call in a tool batch is validated, executed, and answered with
+its own tool result.
+
+**Parallelized tool** — the single tool `parallelize(tool)` returns: one call
+whose arguments carry an `items` array, each item run through the wrapped
+tool's `execute` concurrently, with one ordered result. It is one tool call,
+not a tool batch: its arguments are validated as a whole, so one invalid item
+rejects the call. Not "batch tool".
+
 ## Renamed terms
 
 | Was | Is | Since |
