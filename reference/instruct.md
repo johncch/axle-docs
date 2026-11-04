@@ -76,7 +76,7 @@ toMessage(options?: { metadata?: MessageMetadata }): AxleUserMessage
 parse(final: AxleAssistantMessage | undefined): InstructResponse<TSchema> | null
 ```
 
-`validate()` throws `InstructVariableError` when `vars` resolves to `"required"`
+`validate()` throws `AxleInstructVariableError` when `vars` resolves to `"required"`
 and inputs are missing, and validates the schema is convertible to an example.
 `render()` validates first.
 

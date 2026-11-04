@@ -78,7 +78,7 @@ work. A handle cancelled while still queued emits `pending:dropped` and commits
 nothing.
 
 Strings are wrapped in an `Instruct` with `vars: "optional"`. A supplied
-`Instruct` is cloned, then validated — `InstructVariableError` throws
+`Instruct` is cloned, then validated — `AxleInstructVariableError` throws
 synchronously from `send()` if a required variable is missing.
 
 ### SendMessageOptions
@@ -88,6 +88,7 @@ defaults; `providerOptions` merges key-by-key.
 
 | Option | Type | Description |
 | --- | --- | --- |
+| `after` | `Continuation<T>?` | Continuation to run after this send's turn settles. Holds the queue; inline turns run via `ctx.send()`. See [after — continuations](#after-continuations). |
 | `fileResolver` | `FileResolver` | Overrides the agent's resolver for this send. |
 | `metadata` | `MessageMetadata` | Host-owned metadata attached to the user message and copied to the user turn. Providers ignore it. |
 | `signal` | `AbortSignal` | Cancels this send. |
@@ -111,19 +112,54 @@ interface AgentResult<T = string> {
   error?: undefined;
   turn: Turn;
   usage: Stats;
+  after?: InlineTurn[];
 }
 
 interface AgentErrorResult {
   ok: false;
   response?: undefined;
-  error: AxleFailure;
+  error: AxleProviderFailure;
   turn: Turn | undefined;
   usage: Stats;
+  after?: InlineTurn[];
 }
+
+type InlineTurn = { userTurn: Turn } & (
+  Omit<AgentResult<unknown>, "after"> | Omit<AgentErrorResult, "after">
+);
 ```
 
-`AxleFailure` is one of `{ kind: "model" }`, `{ kind: "refusal" }`, or
-`{ kind: "parse" }` — see [Errors](/reference/errors).
+`AxleProviderFailure` is `{ kind: "api" }`, `{ kind: "incomplete" }`, `{ kind: "refusal" }`, or
+`{ kind: "parse" }` — see [Errors](/reference/errors). `after` is present only
+when the send carried a continuation: the inline turns it ran, in order.
+
+## after — continuations
+
+```typescript
+type Continuation<T = string> = (
+  result: AgentResult<T> | AgentErrorResult,
+  ctx: ContinuationContext,
+) => void | Promise<void>;
+
+interface ContinuationContext {
+  send(message: string | Instruct<undefined>, options?: InlineSendOptions): Promise<AgentResult<string> | AgentErrorResult>;
+  send<TSchema extends OutputSchema>(instruct: Instruct<TSchema>, options?: InlineSendOptions): Promise<AgentResult<ParsedSchema<TSchema>> | AgentErrorResult>;
+  readonly signal: AbortSignal;
+  readonly id: string;
+  readonly messages: readonly AxleMessage[];
+  readonly pending: readonly Turn[];
+}
+
+type InlineSendOptions = Omit<SendMessageOptions, "after">;
+```
+
+The continuation runs after the send's turn settles with a result (`ok` or
+not); a rejected handle skips it. It holds the queue until it returns and
+`ctx.send()` runs inline turns — ordinary turns except they start at once with
+no `pending:queued`. A continuation that throws rejects the handle and the
+queue continues. `cancel()` during a continuation aborts `ctx.signal` and any
+inline turn in flight; `stop()` keeps its tool-batch meaning for an inline turn;
+`clear()` never touches a continuation.
 
 ## stop()
 
@@ -173,11 +209,14 @@ unsubscribe function.
 onSettled(callback: SettledCallback): () => void
 ```
 
-Fires once after every send or manual compaction that ran, however it ended:
-after its `turn:end` when it opened a turn, and before its handle settles. The
-agent is at rest and the next queued operation has not started, so a host that
-reads its `Transcript.turns` inside the callback gets turns and messages that
-match. An operation cancelled while still queued never ran and does not fire.
+Fires after every turn that commits — once per send unless the send carries a
+continuation, in which case it also fires for each inline turn under that
+turn's own id (which no `pending:queued` announced) — and once for an operation
+that ran without opening a turn, however it ended: after its `turn:end` when
+it opened a turn, and before its handle settles. The agent is at rest and the
+next queued operation has not started, so a host that reads its
+`Transcript.turns` inside the callback gets turns and messages that match. An
+operation cancelled while still queued never ran and does not fire.
 
 ```typescript
 type SettledCallback = (
@@ -311,56 +350,25 @@ hasTools(): boolean
 MCP tools resolve lazily on the first send after registration, once per client.
 The client must already be connected.
 
-## Serializable definitions
+## Serializable sessions
+
+`AgentSession` (`{ sessionId, messages }`) is the saved form of a
+conversation. There is no serializable agent recipe in core
+(`AgentDefinition`, `createAgentConfig()`, and friends were removed in 0.35.0):
+a host that saves which recipe an agent ran stores that in its own shape (a
+path, a name, the parsed recipe) and rebuilds `AgentConfig` from it directly.
 
 ```typescript
-createAgentConfig(
-  definition: AgentDefinition,
-  resolver: AgentDefinitionResolver,
-): Promise<AgentConfig>
-```
+declare const providers: Record<string, import("@fifthrevision/axle").AIProvider>;
+declare const tools: Record<string, import("@fifthrevision/axle").ExecutableTool>;
 
-Throws `AxleError` when `definition.version !== 1`, when no model can be
-resolved, or when the definition declares `tools` or `skills` but the resolver
-returns none. Provider tools and MCP clients are constructed from the definition when the
-resolver omits them.
-
-### AgentDefinition
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `version` | `1` | Schema version. |
-| `name` | `string?` | Agent name. |
-| `provider` | `ProviderDefinition` | `{ type: string; config?: Record<string, unknown> }`. `type` is host-defined. |
-| `model` | `string?` | Falls back to the resolver's model. |
-| `system` | `string?` | System instruction. |
-| `request` | `AgentDefinitionRequestOptions?` | Portable request defaults. |
-| `tools` | `ToolDefinitionRef[]?` | `{ name, config? }`. |
-| `providerTools` | `ProviderToolDefinitionRef[]?` | `{ name, config? }`. |
-| `mcps` | `MCPConfig[]?` | MCP client configs. |
-| `skills` | `SkillDefinitionRef[]?` | `{ name }` — resolved to `Skill[]` by the host. |
-
-### Related types
-
-```typescript
-type AgentDefinitionResolver = (definition: AgentDefinition) => MaybePromise<ResolvedAgentDefinition>;
-
-interface ResolvedAgentDefinition {
-  provider: AIProvider;
-  model?: string;
-  tools?: ExecutableTool[];
-  providerTools?: ProviderTool[];
-  mcps?: MCP[];
-  skills?: Skill[];
-}
-
-interface AgentSession {
-  sessionId: string;
-  messages: AxleMessage[];
-}
-
-interface SavedAgent {
-  definition: AgentDefinition;
-  session: AgentSession;
-}
+const agent = new Agent(
+  {
+    provider: providers[saved.recipe.provider],
+    model: saved.recipe.model,
+    system: saved.recipe.system,
+    tools: saved.recipe.tools?.map((name) => tools[name]),
+  },
+  saved.session,
+);
 ```

@@ -118,7 +118,7 @@ const readFile: ExecutableTool = {
   },
 };
 
-const fileResolver: FileResolver = async ({ ref, accepted, signal }) => {
+const fileResolver: FileResolver = async ({ ref, protocol, accepted, signal }) => {
   const { id } = ref as { id: string };
   await authorize(id); // the ref crossed a model boundary — re-check it
 

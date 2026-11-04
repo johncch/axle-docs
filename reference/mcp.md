@@ -101,7 +101,7 @@ servers' identically-named tools apart.
 
 ## Serializable configuration
 
-`MCPConfig` is serializable, so it can live inside an
-[`AgentDefinition`](/reference/agent#agentdefinition). `createAgentConfig()` will
-construct `MCP` instances from `definition.mcps` when your resolver doesn't
-supply them — though those instances still need connecting.
+`MCPConfig` is serializable, so it can live in your own saved recipe shape
+alongside the session (core carries no `AgentDefinition` since 0.35.0).
+Construct `MCP` instances from your recipe's `mcps` when rebuilding the
+`AgentConfig` — though those instances still need connecting.

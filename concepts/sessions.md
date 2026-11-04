@@ -109,51 +109,32 @@ mistake to make once.
 ## Storing agent recipes
 
 If your application lets users *configure* agents rather than hardcoding them,
-`AgentDefinition` is a serializable description that uses references instead of
-objects:
+keep the recipe in your own shape — a path, a name, the parsed recipe file —
+and rebuild `AgentConfig` from it directly. Core carries no serializable agent
+recipe (`AgentDefinition`, `createAgentConfig()`, and friends were removed in
+0.35.0): the definition mirrored `AgentConfig` field for field, and every host
+resolved providers, tools, MCPs, and skills from its own configuration anyway.
 
 ```typescript
-const definition: AgentDefinition = {
-  version: 1,
-  name: "researcher",
-  provider: { type: "anthropic", config: { apiKeyEnv: "ANTHROPIC_API_KEY" } },
-  model: "claude-sonnet-4-5",
-  system: "You research topics thoroughly.",
-  request: { maxOutputTokens: 2048 },
-  tools: [{ name: "web_search" }],
-  skills: [{ name: "pdf-fill" }],
-};
+// your shape, your store
+const saved = await db.loadAgent(id); // { recipe, session }
+
+declare const providers: Record<string, import("@fifthrevision/axle").AIProvider>;
+declare const tools: Record<string, import("@fifthrevision/axle").ExecutableTool>;
+
+const agent = new Agent(
+  {
+    provider: providers[saved.recipe.provider],
+    model: saved.recipe.model,
+    system: saved.recipe.system,
+    tools: saved.recipe.tools?.map((name) => tools[name]),
+  },
+  saved.session,
+);
 ```
 
-It isn't executable on its own — by design. You supply a resolver that turns
-references into runtime objects, and `createAgentConfig()` combines the two:
-
-```typescript
-import { createAgentConfig } from "@fifthrevision/axle";
-
-const config = await createAgentConfig(definition, async (def) => ({
-  provider: myProviderFor(def.provider),
-  tools: def.tools?.map((ref) => myToolFor(ref)),
-}));
-
-const agent = new Agent(config, session);
-```
-
-`provider.type` is yours to define — core doesn't interpret it. `"anthropic"`,
-`"openai"`, `"gemini"`, `"chatcompletions"` are the conventional values, but the
-meaning is whatever your resolver says it is.
-
-Your resolver only has to supply what core can't build itself. Provider tools and
-MCP clients get constructed straight from the definition if the resolver returns
-none. A provider is always required, and declaring `tools` or `skills` without
-returning resolved tools or skills throws.
-
-`SavedAgent` is the pair — `{ definition, session }`. That's the shape to store
-when a user should be able to reopen an agent they configured, not just resume a
-conversation.
-
-Harness concerns like file resolvers, tracing, transport, and stores stay outside
-the definition on purpose. Keep those in your own configuration.
+Harness concerns like file resolvers, tracing, transport, and stores stay
+outside the recipe on purpose. Keep those in your own configuration.
 
 ## Long conversations
 

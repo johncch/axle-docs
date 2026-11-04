@@ -17,7 +17,7 @@ needs one, and the same agent code runs everywhere.
 ```typescript
 import { chatCompletions, braveWebSearch, Agent } from "@fifthrevision/axle";
 
-const provider = chatCompletions("http://localhost:11434/v1", {
+const provider = chatCompletions({ baseUrl: "http://localhost:11434/v1",
   webSearch: braveWebSearch({
     apiKey: process.env.BRAVE_API_KEY!,
     maxResults: 5,
@@ -54,7 +54,7 @@ hosts, as an executable tool the provider brings, or not at all.
   OpenRouter, which hosts a search of its own. Don't attach one if you want
   OpenRouter's.
 - **Neither** → the request fails before anything is sent: `ok: false` with
-  `error.kind` `"model"` and a message naming the tool. There is no error code.
+  `error.kind` `"api"` and a message naming the tool. There is no error code.
 
 The nice property here is that the failure is loud. You won't accidentally ship
 an agent that quietly can't search.
@@ -134,7 +134,7 @@ const internalSearch: ExecutableTool<typeof internalSearchSchema> = {
   },
 };
 
-const provider = chatCompletions("http://localhost:11434/v1", {
+const provider = chatCompletions({ baseUrl: "http://localhost:11434/v1",
   webSearch: internalSearch,
 });
 ```

@@ -19,7 +19,7 @@ tool attached to the `chatCompletions()` provider that needs it:
 ```typescript
 import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
 
-const provider = chatCompletions("https://api.together.ai/v1", {
+const provider = chatCompletions({ baseUrl: "https://api.together.ai/v1",
   apiKey,
   webSearch: braveWebSearch({ apiKey: braveKey }),
 });

@@ -71,7 +71,7 @@ template — build it once, fill it in many times. If you'd rather mutate in pla
 `setInputs()` and `addInput()` do that.
 
 By default `vars` is `"required"`, so a missing variable throws
-`InstructVariableError` at send time and tells you exactly which ones are
+`AxleInstructVariableError` at send time and tells you exactly which ones are
 missing. Switch to `"optional"` if you want unmatched placeholders left as
 literal text:
 

@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@fifthrevision/axle':
-        specifier: 0.34.3
-        version: 0.34.3(ws@8.21.3)(zod@4.4.3)
+        specifier: 0.35.0
+        version: 0.35.0(ws@8.21.3)(zod@4.4.3)
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
@@ -296,14 +296,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fifthrevision/axle@0.34.3':
-    resolution: {integrity: sha512-mz9UYTJlxRPqIO+5oWU8nwSb7O46qo4Us94Sk8PCNOBUPLZrPPA61ry4Y0piwHdetFCh3jwDm2ee7hQN3r8gaA==}
+  '@fifthrevision/axle@0.35.0':
+    resolution: {integrity: sha512-QqEH+6T8KykhJDcGQDsp5C8qWJUpwds36CiskJEOpUGJdHKeRNr1P2T8hVJmlY83bmbJU2pX+Y6XGjirLA2shA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^4.2.0
 
-  '@google/genai@2.27.0':
-    resolution: {integrity: sha512-W6F9Y9d4h7cVQNa85IPCOVVP9PiUzve/ZQPBvQnBmnBJcLvxstEw+R2X/RyCH0SOe0HVDQzeKDpDUf6ZRtbmdQ==}
+  '@google/genai@2.32.0':
+    resolution: {integrity: sha512-60c79uXpR0a47bmGqDxbXEBuQUalNmwo5mx5kqb91jIW4FoqpsLSt86DeVhRhtH5+s/16Wqxt3sXzFQn2U1OHQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.25.2
@@ -1693,10 +1693,10 @@ snapshots:
   '@esbuild/win32-x64@0.21.5':
     optional: true
 
-  '@fifthrevision/axle@0.34.3(ws@8.21.3)(zod@4.4.3)':
+  '@fifthrevision/axle@0.35.0(ws@8.21.3)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.129.0(zod@4.4.3)
-      '@google/genai': 2.27.0(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))
+      '@google/genai': 2.32.0(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))
       '@modelcontextprotocol/sdk': 1.32.0(zod@4.4.3)
       chalk: 6.0.1
       glob: 13.0.6
@@ -1716,7 +1716,7 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@google/genai@2.27.0(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))':
+  '@google/genai@2.32.0(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))':
     dependencies:
       google-auth-library: 10.9.1
       p-retry: 4.6.2

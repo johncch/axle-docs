@@ -171,7 +171,7 @@ provider unchanged, and each provider decides how to serve a name — as a tool
 the vendor hosts, as an executable tool the provider brings (`AIProvider.tools`,
 which is how `chatCompletions()` serves an attached `webSearch`), or not at
 all. A provider asked for a tool it cannot serve fails the request (`ok: false`,
-`error.kind` `"model"`, naming the tool) — never silently dropped, except
+`error.kind` `"api"`, naming the tool) — never silently dropped, except
 OpenRouter's warn-and-skip for names it doesn't map, which predates the change.
 
 ### If a provider has no native search
@@ -183,7 +183,7 @@ case it runs as an ordinary tool call.
 ```typescript
 import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
 
-const provider = chatCompletions("http://localhost:11434/v1", {
+const provider = chatCompletions({ baseUrl: "http://localhost:11434/v1",
   webSearch: braveWebSearch({ apiKey: braveKey }),
 });
 ```

@@ -193,7 +193,7 @@ type FileResolver = (request: FileResolveRequest) => Promise<ResolvedFileSource>
 interface FileResolveRequest {
   file: DeferredFileInfo;
   ref: unknown;
-  provider: FileProviderId; // "anthropic" | "openai" | "gemini" | "chatcompletions"
+  protocol: Protocol; // "messages" | "responses" | "generateContent" | "chatCompletions"
   model: string;
   accepted: FileResolveFormat[]; // "base64" | "url" | "text" | "gemini-file-uri"
   signal?: AbortSignal;
@@ -260,14 +260,14 @@ interface UsageEntry extends TokenStats {
 }
 
 interface Stats extends TokenStats {
-  breakdown?: UsageEntry[]; // @experimental
+  breakdown: UsageEntry[]; // @experimental — one row per request
 }
 ```
 
 `breakdown` entries **explain** the aggregate rather than adding to it, so don't
 sum them on top.
 
-Helpers: `createStats()`, `addStats(target, source)`, `mergeStats(...)`.
+Helpers: `createStats()`, `addStats(total, usage?)`, `mergeStats(...)`, `attributeStats(tokens, source)`, and `computeCost(usage, catalog)`. `breakdown` rows carry `provider`, `model`, `requestedModel`, `agent?`, and `at`.
 
 ## Compaction helpers
 

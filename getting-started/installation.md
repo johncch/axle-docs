@@ -60,7 +60,7 @@ const provider = anthropic(process.env.ANTHROPIC_API_KEY!);
 Running against a local model? No key needed:
 
 ```typescript
-const local = chatCompletions("http://localhost:11434/v1");
+const local = chatCompletions({ baseUrl: "http://localhost:11434/v1" });
 ```
 
 [Providers & models](/concepts/providers) covers the full list, plus retry and
