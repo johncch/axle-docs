@@ -13,7 +13,7 @@ export default defineConfig({
       { text: 'Reference', link: '/reference/agent', activeMatch: '/reference/' },
       { text: 'Cookbook', link: '/cookbook/tool-using-agent', activeMatch: '/cookbook/' },
       {
-        text: 'v0.34.3',
+        text: 'v0.35.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Upgrading', link: '/upgrading' },
@@ -44,6 +44,7 @@ export default defineConfig({
           { text: 'Anatomy of a send', link: '/concepts/anatomy-of-a-send' },
           { text: 'Turns & Transcripts', link: '/concepts/transcripts' },
           { text: 'Turn events', link: '/concepts/turn-events' },
+          { text: 'Continuations', link: '/concepts/continuations' },
           { text: 'Sessions & persistence', link: '/concepts/sessions' },
           { text: 'Compaction', link: '/concepts/compaction' },
           { text: 'Skills', link: '/concepts/skills' },

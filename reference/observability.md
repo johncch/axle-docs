@@ -128,6 +128,51 @@ interface TokenUsage {
 `TokenUsage` is the observability shape; `Stats` is the result shape. They carry
 the same numbers under different names.
 
+## Usage: Stats, breakdown, and cost
+
+```typescript
+interface TokenStats {
+  in: number;
+  out: number;
+  cachedIn?: number; // already inside in
+  cacheWriteIn?: number; // already inside in
+  reasoningOut?: number; // already inside out
+}
+
+interface UsageEntry extends TokenStats {
+  provider?: string; // provider id; absent when unknown
+  model: string; // what the response reported (or the requested model)
+  requestedModel: string; // what you passed in
+  agent?: string; // Agent name, when it has one
+  at: string; // ISO 8601, when the provider finished
+}
+
+interface Stats extends TokenStats {
+  breakdown: UsageEntry[]; // one row per request, in request order (@experimental)
+}
+```
+
+`addStats(total, usage)` appends rows; `mergeStats(...usages)` sums totals and
+concatenates rows. `createStats()` is `{ in: 0, out: 0, breakdown: [] }`.
+`attributeStats(tokens, { provider, model, requestedModel, agent?, requests? })`
+builds a `Stats` from a raw count — what `ctx.reportUsage` takes when a tool
+calls a model API directly.
+
+```typescript
+import { computeCost } from "@fifthrevision/axle";
+
+computeCost(usage: Stats, catalog?: ModelCatalog): Cost;
+
+interface Cost {
+  usd: number;
+  priced: PricedEntry[]; // UsageEntry & { usd }
+  unpriced: UnpricedEntry[]; // UsageEntry & { reason }
+  pricedWith?: string; // fetchedAt of the pricing catalog
+}
+
+type UnpricedReason = "no-catalog" | "no-provider" | "unlisted" | "no-price";
+```
+
 ## TraceWriter
 
 ```typescript

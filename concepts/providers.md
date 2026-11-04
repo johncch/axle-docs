@@ -10,19 +10,25 @@ API call. You make one, hand it to an `Agent` (or to `stream()` / `generate()`),
 and then mostly forget about it.
 
 ```typescript
-import { anthropic, openai, gemini, chatCompletions } from "@fifthrevision/axle";
+import { anthropic, openai, gemini, chatCompletions, openrouter, togetherai } from "@fifthrevision/axle";
 
 const a = anthropic(process.env.ANTHROPIC_API_KEY!);
 const o = openai(process.env.OPENAI_API_KEY!);
 const g = gemini(process.env.GEMINI_API_KEY!);
-const local = chatCompletions("http://localhost:11434/v1");
+const local = chatCompletions({ baseUrl: "http://localhost:11434/v1" });
 ```
 
 `chatCompletions` points at any OpenAI-compatible endpoint — Ollama, vLLM,
-OpenRouter, Together, LM Studio. It recognizes a few known hostnames
-(OpenRouter, Together) and adjusts, or you can tell it which vendor you're
-talking to (`vendor: "openrouter" | "togetherai"` — `"together"` became
-`"togetherai"` in 0.34.0; see [Upgrading](/upgrading)).
+OpenRouter, Together, LM Studio. It takes one options object (`{ baseUrl, apiKey,
+id?, dialect? }`). The official hostnames still infer `id` and `dialect`
+automatically — OpenRouter's `https://openrouter.ai/api/v1` gets
+`openrouterDialect`, Together's hosts get `togetheraiDialect` — or pass your own
+for a proxy (`{ baseUrl: "https://gateway.example.com/v1", apiKey, id:
+"openrouter", dialect: openrouterDialect }`). Prefer the `openrouter(apiKey)` and
+`togetherai(apiKey)` presets when you're talking to those services directly, and
+`bedrock(apiKey, { protocol, region })` for Amazon Bedrock (protocol follows the
+model: `messages` for Claude, `responses` or `chatCompletions` for what Mantle
+serves).
 
 ## Switching providers
 
@@ -79,7 +85,7 @@ const model = "anthropic/claude-sonnet-4-5";
 new Agent({ provider: anthropic(key), model });
 
 // through OpenRouter — passes it straight through
-new Agent({ provider: chatCompletions("https://openrouter.ai/api/v1", key), model });
+new Agent({ provider: openrouter(key), model });
 ```
 
 Same string, no branching. Switching between a first-party provider and an
@@ -117,24 +123,31 @@ const model = "openai/gpt-5.5";
 and `ModelMetadata` exports were removed in 0.33.0 — see
 [Upgrading](/upgrading).)
 
-What 0.34.0 adds is narrower: `ModelCatalog`, a lookup over the models.dev
-catalog for answering "how big is this model's window?" without keeping your
-own table. Open the cache (memory-only, or a path to persist between runs),
-refresh when it's stale, and ask:
+What 0.35.0 keeps is narrower: `ModelCatalog`, a synchronous, immutable index
+over the models.dev catalog for answering "how big is this model's window?"
+without keeping your own table — and `computeCost(usage, catalog)` for pricing
+a `Stats` at each request's own tier. Load saved JSON, refresh when it's stale,
+and ask:
 
 ```typescript
-import { ModelCatalog } from "@fifthrevision/axle";
+import { ModelCatalogStore, catalogFile, computeCost } from "@fifthrevision/axle";
 
-const catalog = await ModelCatalog.open({ cachePath: "./.cache/axle-models.json" });
-if (catalog.stale) await catalog.refresh();
-const hit = catalog.contextWindow("openai/gpt-5.5");
+const file = catalogFile("./.cache/axle-models.json");
+const catalogs = new ModelCatalogStore({ providers: ["anthropic"] });
+catalogs.load(await file.read());
+const snapshot = await catalogs.refreshIfStale();
+if (snapshot) await file.write(snapshot);
+const catalog = catalogs.current;
+const hit = catalog?.contextWindow("openai/gpt-5.5");
 // { window, id, match } | undefined
 ```
 
-`open()` never touches the network; `refresh()` always fetches but never
-throws. When to refresh is your call — drive a compaction threshold or a
-progress meter with it, not accounting. Full signatures are in the [Providers
-reference](/reference/providers#removed-in-0330-model-registry-added-in-0340-modelcatalog).
+`new ModelCatalog(data)` takes its data as given; `fetchModelsDev()` fetches
+`CatalogData` (version 4) and `parseCatalogData()` reads saved JSON. `lookup`
+and `contextWindow` take `{ provider }`, not `{ host }`. When to refresh is
+your call — drive a compaction threshold or a progress meter with it; price
+with `computeCost`. Full signatures are in the [Providers
+reference](/reference/providers#model-catalog-and-cost).
 
 ## Request options
 
@@ -243,27 +256,32 @@ replaces the global for that provider's requests — handy for logging or tests:
 ```typescript
 declare const loggingFetch: typeof fetch;
 
-const provider = chatCompletions("http://localhost:11434/v1", { fetch: loggingFetch });
+const provider = chatCompletions({ baseUrl: "http://localhost:11434/v1", fetch: loggingFetch });
 ```
 
 ### Reaching a proxy instead of the vendor
 
 Sometimes the request shouldn't go to the vendor at all — a gateway that
 speaks the vendor's API, a logging proxy in front of it, a test double. That's
-what `baseUrl` is for. Every first-party factory takes it (`typesafe()`
-included):
+what the protocol constructors are for: `messages()`, `responses()`,
+`generateContent()`, and `chatCompletions()` each take `{ baseUrl, apiKey, …
+}` and speak one wire format at any base URL.
 
 ```typescript
-const viaProxy = anthropic(apiKey, { baseUrl: "https://proxy.example.com" });
+import { messages, responses, generateContent } from "@fifthrevision/axle";
+
+const viaProxy = messages({ baseUrl: "https://proxy.example.com", apiKey });
+const viaOpenAIProxy = responses({ baseUrl: "https://proxy.example.com/v1", apiKey });
+const viaGeminiProxy = generateContent({ baseUrl: "https://proxy.example.com", apiKey });
 ```
 
-Each SDK appends its own path, so what the base includes differs. For
-`anthropic()` and `gemini()` it's the origin — requests go to
-`/v1/messages` or `/v1beta/models/...` under it. For `openai()` include the
-version (`https://proxy.example.com/v1`; requests go to `/responses` under
-it). For `typesafe()` it's the root serving `/v1/systemone`.
-`chatCompletions()` is the odd one out: its base URL is already the first
-argument, so passing `baseUrl` there is a type error. Full signatures are in
+`anthropic()`, `openai()`, and `gemini()` are now presets — the protocol
+constructor at the service's own base URL — so they no longer take `baseUrl`.
+(`typesafe()` keeps its `baseUrl`, and `openrouter()` takes one for OpenRouter's
+regional hosts.) A preset passes its base URL explicitly, so the SDKs' own
+environment variables no longer redirect it. Each preset accepts a namespaced
+model id and strips the prefix; a raw constructor sends the id as given — pass
+`resolveModel` if you relied on the preset's stripping. Full signatures are in
 the [Providers reference](/reference/providers#providerclientoptions).
 
 ## How full is the context?

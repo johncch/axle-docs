@@ -9,58 +9,70 @@ Conceptual guide: [Providers & models](/concepts/providers).
 
 ## Factories
 
+A provider says two things separately: the wire `protocol` it speaks and the `id` of the service it reaches (the models.dev provider id, stamped on usage rows).
+
 ```typescript
-import { anthropic, openai, gemini, chatCompletions } from "@fifthrevision/axle";
+import { anthropic, openai, gemini, openrouter, togetherai, bedrock } from "@fifthrevision/axle";
 
 anthropic(apiKey: string, options?: ProviderClientOptions): AIProvider
 openai(apiKey: string, options?: ProviderClientOptions): AIProvider
 gemini(apiKey: string, options?: ProviderClientOptions): AIProvider
-```
-
-### chatCompletions
-
-Three overloads for any OpenAI-compatible endpoint:
-
-```typescript
-chatCompletions(baseUrl: string, options?: ChatCompletionsOptions): AIProvider
-chatCompletions(baseUrl: string, apiKey?: string): AIProvider
-chatCompletions(baseUrl: string, apiKey: string, options?: Omit<ChatCompletionsOptions, "apiKey">): AIProvider
+openrouter(apiKey: string, options?: Omit<ChatCompletionsOptions, "baseUrl" | "apiKey" | "id" | "dialect"> & { baseUrl?: string }): AIProvider
+togetherai(apiKey: string, options?: Omit<ChatCompletionsOptions, "baseUrl" | "apiKey" | "id" | "dialect">): AIProvider
+bedrock(apiKey: string, options: BedrockOptions): AIProvider
 ```
 
 ```typescript
-interface ChatCompletionsOptions extends Omit<ProviderClientOptions, "baseUrl"> {
+interface BedrockOptions extends ProviderClientOptions {
+  protocol: "messages" | "responses" | "chatCompletions";
+  region: string; // e.g. "us-east-1"
+}
+```
+
+`bedrock()` follows the model: `messages` for Claude, `responses` or `chatCompletions` for what Mantle serves. Claude on Bedrock takes inference-profile ids (`us.anthropic.claude-haiku-4-5-20251001-v1:0`).
+
+### Protocol constructors
+
+Each protocol builds a provider at any base URL:
+
+```typescript
+import { messages, responses, generateContent, chatCompletions } from "@fifthrevision/axle";
+
+messages(options: ProtocolOptions & { baseUrl: string; id?: string; resolveModel?: (model: string) => string }): AIProvider
+responses(options: ProtocolOptions & { baseUrl: string; id?: string; resolveModel?: (model: string) => string }): AIProvider
+generateContent(options: ProtocolOptions & { baseUrl: string; id?: string; resolveModel?: (model: string) => string }): AIProvider
+chatCompletions(options: ChatCompletionsOptions & { baseUrl: string }): AIProvider
+```
+
+```typescript
+interface ChatCompletionsOptions extends ProviderClientOptions {
+  baseUrl: string;
   apiKey?: string;
-  vendor?: ChatCompletionsVendor; // "openrouter" | "togetherai"
+  id?: string; // usage-row label, e.g. "openrouter"
+  dialect?: ChatCompletionsDialect; // openrouterDialect | togetheraiDialect
+  resolveModel?: (model: string) => string;
   webSearch?: ExecutableTool; // serves `web_search` requests on this provider
 }
 ```
 
-`chatCompletions()` takes its base URL as the first argument, so unlike the
-other factories it does not accept `baseUrl` in its options — passing it is a
-type error.
+The official hostnames infer `id` and `dialect` when omitted:
 
-The vendor is inferred from the hostname when omitted (see
-`inferChatCompletionsVendor`, exported for hosts that need the same answer):
+| Hostname | `id` | `dialect` |
+| --- | --- | --- |
+| `openrouter.ai`, `api.openrouter.ai` | `openrouter` | `openrouterDialect` |
+| `api.together.ai`, `api.together.xyz` | `togetherai` | `togetheraiDialect` |
 
-| Hostname | Vendor |
-| --- | --- |
-| `openrouter.ai`, `api.openrouter.ai` | `openrouter` |
-| `api.together.ai`, `api.together.xyz` | `togetherai` |
+A `chatCompletions()` provider without the OpenRouter dialect no longer reads OpenRouter's `reasoning_details` or the `content` of a citation from responses; behind a proxy to OpenRouter, pass `dialect: openrouterDialect` to keep reasoning continuity and cited text. Model IDs are never rewritten — pass the slug the gateway lists.
 
-Only `openrouter` currently adjusts request behavior; other
-vendors pass both through unchanged. Model IDs are never rewritten — pass the
-slug the gateway lists.
-
-`vendor: "together"` became `"togetherai"` in 0.34.0, matching the id models.dev
-uses. Only an explicit `vendor` needs editing; the Together hostnames are still
-recognized without it. See [Upgrading](/upgrading).
+`vendor` and `inferChatCompletionsVendor` were removed in 0.35.0; `chatCompletions({ baseUrl }).id` gives what the hostname implies. `ChatCompletionsVendor` is removed. See [Upgrading](/upgrading).
 
 ### webSearch
 
 ```typescript
-import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
+import { chatCompletions, braveWebSearch, openrouterDialect } from "@fifthrevision/axle";
 
-const provider = chatCompletions("https://api.together.ai/v1", {
+const provider = chatCompletions({
+  baseUrl: "https://api.together.xyz/v1",
   apiKey,
   webSearch: braveWebSearch({ apiKey: braveKey }),
 });
@@ -73,10 +85,8 @@ so the transcript shows `tool` parts, not `provider-tool` parts. An attached
 tool is used wherever it is attached, including on OpenRouter, which hosts a
 search of its own: don't attach one if you want OpenRouter's. A provider asked
 for a provider tool it has nothing attached for fails the request (`ok: false`,
-`error.kind` `"model"`, naming the tool). See [Web search](/cookbook/web-search)
+`error.kind` `"api"`, naming the tool). See [Web search](/cookbook/web-search)
 and [Provider tools](/cookbook/provider-tools).
-
-Provider `name` is `"anthropic"`, `"openai"`, `"gemini"`, or `"ChatCompletions"`.
 
 ## ProviderClientOptions
 
@@ -88,9 +98,10 @@ Applied when the client is constructed, not per request.
 | `timeoutMs` | `number` | SDK default (`chatCompletions()`: 10 minutes per attempt) | Timeout for one request attempt. Must be ≥ 1. |
 | `headers` | `Record<string, string>` | — | Extra headers sent with every request. |
 | `fetch` | `typeof fetch` | global `fetch` | Replaces the global for this provider's requests. Called as `(url, init)` and must return a real `Response`; retries, `timeoutMs`, and the abort signal apply unchanged. A test that stubbed `globalThis.fetch` can pass a fake here instead. |
-| `baseUrl` | `string` | vendor default | Sends requests to a proxy that speaks the vendor's API instead of the vendor. Each SDK appends its own path: `anthropic()` takes the origin (requests go to `${baseUrl}/v1/messages`), `openai()` includes the version (requests go to `${baseUrl}/responses`), `gemini()` takes the origin (requests go to `${baseUrl}/v1beta/models/...`), and `typesafe()` takes the origin (requests go to `${baseUrl}/v1/systemone`). Not accepted by `chatCompletions()`, whose base URL is the first argument. |
 
-Non-integer or out-of-range values throw at construction.
+Non-integer or out-of-range values throw `AxleError` (`INVALID_OPTIONS`) at construction.
+
+`baseUrl` on the first-party factories was removed in 0.35.0 — they are presets at the service's own base URL. To send the same requests elsewhere, call the protocol constructor with that base URL. `typesafe()` keeps its `baseUrl`, and `openrouter()` takes one for OpenRouter's regional hosts.
 
 ## AxleModelRequestOptions
 
@@ -138,19 +149,19 @@ Agent-level and send-level options merge shallowly, with send-level winning.
 ## Model naming
 
 Providers accept plain vendor ids (`"claude-sonnet-4-5"`) and publisher-namespaced
-ids (`"anthropic/claude-sonnet-4-5"`). First-party providers strip a matching
-prefix and **throw** on a mismatched one:
+ids (`"anthropic/claude-sonnet-4-5"`). Presets strip a matching
+prefix and **throw** (`INVALID_OPTIONS`) on a mismatched one:
 
 ```typescript
 anthropic(key); // model "openai/gpt-5.1" → throws
 ```
 
-| Provider | Accepted prefixes |
+| Preset | Accepted prefixes |
 | --- | --- |
 | `anthropic()` | `anthropic/` |
 | `openai()` | `openai/` |
 | `gemini()` | `google/`, `gemini/` |
-| `chatCompletions()` | Any — passed through, or remapped by vendor |
+| `openrouter()` / `togetherai()` / `chatCompletions()` | Any — passed through (a raw protocol constructor sends the id as given; pass `resolveModel` to strip) |
 
 Because namespaced ids are also what OpenRouter's API expects, the same model
 string works against a first-party provider and an inference gateway without
@@ -162,45 +173,54 @@ that differs from the publisher's canonical form (casing, or a different author
 prefix — `z-ai/glm-5.3`, not `zai/glm-5.3`), pass OpenRouter's slug. IDs that
 were already OpenRouter slugs are unaffected.
 
-## Removed in 0.33.0: model registry; added in 0.34.0: ModelCatalog
+## Model catalog and cost
 
 The `@fifthrevision/axle/models` entry point (`Models`, `ModelInfo`,
-`ModelMetadata`) no longer exists. Pass model IDs as plain strings; keep your
-own table (or ask the provider's models API) when you need context windows or
-output ceilings. See [Upgrading](/upgrading).
+`ModelMetadata`) no longer exists (removed in 0.33.0). Pass model IDs as plain strings.
 
-What 0.34.0 adds instead is a lookup, not a registry: `ModelCatalog` reads the
-models.dev catalog (a canonical `publisher/model` layer plus a per-host layer
-with each host's own ids, limits, and prices) and answers context-window
-questions about it.
+`ModelCatalog` is a synchronous, immutable index over `CatalogData` (version 4: a canonical `publisher/model` layer plus a per-provider layer with each provider's own ids, limits, and prices). Loading and refreshing live in `ModelCatalogStore`, which never touches storage.
 
 ```typescript
-import { ModelCatalog } from "@fifthrevision/axle";
+import { ModelCatalog, ModelCatalogStore, catalogFile, fetchModelsDev, parseCatalogData } from "@fifthrevision/axle";
 
-const catalog = await ModelCatalog.open({ cachePath: "./.cache/axle-models.json" });
-if (catalog.stale) await catalog.refresh();
-const hit = catalog.contextWindow("openai/gpt-5.5");
-// { window: 400000, id: "openai/gpt-5.5", match: "exact" } | undefined
+const file = catalogFile("./.cache/axle-models.json");
+const catalogs = new ModelCatalogStore({ providers: ["anthropic"] });
+catalogs.load(await file.read());
+const snapshot = await catalogs.refreshIfStale();
+if (snapshot) await file.write(snapshot);
+const catalog = catalogs.current; // ModelCatalog | undefined
+const hit = catalog?.contextWindow("openai/gpt-5.5", { provider: "openai" });
+// { window, id, match } | undefined
 ```
 
 ```typescript
-ModelCatalog.open(options?: ModelCatalogOptions): Promise<ModelCatalog>
+new ModelCatalog(data: CatalogData)
+new ModelCatalogStore(options?: ModelCatalogStoreOptions)
 
-interface ModelCatalogOptions {
-  cachePath?: string; // where the slimmed catalog is kept between runs; omit for memory only
-  maxAge?: number; // ms past which the catalog reports `stale`; default one day
-  hosts?: string[]; // models.dev provider ids to keep (`anthropic`, `openrouter`, …); omit for all, `[]` skips hosts
+interface ModelCatalogStoreOptions {
+  providers?: string[]; // models.dev provider ids to keep; omit for all
+  maxAge?: number; // ms past which refreshIfStale() fetches; default one day
+  timeout?: number; // fetch timeout; default 10s
   baseUrl?: string; // catalog origin; default https://models.dev
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
 }
+
+fetchModelsDev(options?: FetchModelsDevOptions): Promise<CatalogData>
+parseCatalogData(json: string): CatalogData | undefined
+catalogFile(path: string): CatalogStorage
 ```
 
-`open()` reads the cache and never touches the network; `refresh()` always
-fetches (sending ETags so an unchanged catalog downloads nothing) and never
-throws — a failed fetch keeps the cached copy. `lookup(model, { host?,
-publisher? })` tries the host's own id first when a host is given, then the
-canonical key, then a best-effort normalized match; `contextWindow(model,
-options?)` maps that to `{ window, id, match }`. `size`, `fetchedAt`, and
-`stale` describe the cache. When to refresh is the host's call.
+`fetchModelsDev({ providers, previous, timeout, baseUrl, signal })` resolves to `CatalogData` or rejects with `CatalogFetchError` (network, timeout, HTTP error, wrong shape). With `previous`, unchanged layers download nothing (ETags). `refresh()` never rejects for the network (resolves the new snapshot or `undefined`) and concurrent calls share one fetch; nothing refreshes on its own. `lookup(model, { provider })` / `contextWindow(model, { provider })` replace the old `{ host }` option; `CatalogMatch.match` is now `"provider" | "exact" | "prefix"`.
+
+```typescript
+import { computeCost } from "@fifthrevision/axle";
+
+const cost = computeCost(usage, catalog);
+// { usd, priced: PricedEntry[], unpriced: UnpricedEntry[], pricedWith? }
+```
+
+`computeCost` is synchronous, never throws, and prices each `breakdown` row at the tier its own `in` selects (with cache/reasoning rates where listed). Unpriced rows carry `reason: "no-catalog" | "no-provider" | "unlisted" | "no-price"`.
 
 ## Context estimation
 
@@ -237,11 +257,14 @@ this with the agent's own state.
 
 ```typescript
 interface AIProvider {
-  get name(): string;
+  readonly protocol: Protocol; // "messages" | "responses" | "generateContent" | "chatCompletions"
+  readonly id?: string; // models.dev provider id; stamped on usage rows
   tools?: ExecutableTool[];
   createStreamingRequest(model: string, params: ProviderStreamParams): AsyncGenerator<AnyStreamChunk>;
 }
 ```
+
+`name` was replaced by `protocol` + `id` in 0.35.0 (`"anthropic"` → `protocol: "messages", id: "anthropic"`; `"OpenAI"` → `responses`/`openai`; `"Gemini"` → `generateContent`/`google`; `"ChatCompletions"` → `chatCompletions`/vendor id). A provider with no `id` (a local server) leaves usage rows without `provider`.
 
 `tools` are executable tools the provider brings: when the model calls a tool
 whose name is not among the caller's tools, the loop runs the provider's tool
@@ -263,9 +286,8 @@ expect to keep fixing it.
 
 A custom provider receives `providerTools` unchanged, as before — core does not
 read the names and holds no fallback. Serve a name yourself (as a hosted tool
-or via `AIProvider.tools`) or fail the request before sending it: throwing a
-plain `Error` from `createStreamingRequest` surfaces as `ok: false` with
-`error.kind` `"model"`.
+or via `AIProvider.tools`) or fail the request before sending it: throwing an
+`AxleError` from `createStreamingRequest` surfaces per the [Errors](/reference/errors) rules.
 
 ## AxleStopReason
 

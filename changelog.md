@@ -8,6 +8,15 @@ description: Notable changes by release.
 Mirrored from [`CHANGELOG.md`](https://github.com/johncch/axle/blob/main/CHANGELOG.md)
 in the library repository. For upgrade instructions, see [Upgrading](/upgrading).
 
+## [0.35.0] - 2026-11-03
+
+- **Breaking:** `AxleFailure` is now `AxleProviderFailure` (old names removed); `model` failures split into `api` and `incomplete`, and every setup mistake throws a coded `AxleError` (`INVALID_OPTIONS`, `PROVIDER_UNSUPPORTED`, `FILE_UNREADABLE`, `MCP_NOT_CONNECTED`, …) instead of resolving `ok: false`. `InstructVariableError` is now `AxleInstructVariableError`, `TaskError` is gone, and `isAxleError`/`AxleErrorCode` narrow catches. See [Upgrading](/upgrading).
+- **Breaking:** providers are a `protocol` (`messages`, `responses`, `generateContent`, `chatCompletions`) plus an `id`, replacing `AIProvider.name`; `ModelCatalog` says `provider` not `host`. New protocol constructors `messages()`, `responses()`, `generateContent()`, `chatCompletions({ baseUrl, … })`, plus `openrouter()`, `togetherai()`, and `bedrock()` presets. First-party `baseUrl` moved to the constructors; `chatCompletions()` takes one options object and `vendor` is now `id` + `dialect`.
+- **Breaking:** `ModelCatalog` no longer fetches — build it from `CatalogData` via `fetchModelsDev()` + `ModelCatalogStore` + `catalogFile()`; `lookup`/`contextWindow` take `{ provider }`, data is version 4. New `computeCost(usage, catalog)` prices per-request `breakdown` rows.
+- **Breaking:** `usage.breakdown` is one row per request (with `agent`, `at`, `requestedModel`), `Stats.breakdown` is required — use `attributeStats()` for hand-built usage. `UsageEntry.provider` is the provider `id` (`google`, `openai`, vendor id) and optional.
+- **Breaking:** `AgentDefinition` and `createAgentConfig()` are removed; rebuild `AgentConfig` from your own saved recipe plus `AgentSession`. Turns carry `failure` (not `error`), `turn:end` carries `reason` (`stop` | `length`), cancelled tool calls emit `action:cancelled`, cancelled compactions emit `compaction:cancelled`, and `CompactionPart` gains `trigger`.
+- Added `after` continuations on `send()`: run inline turns via `ctx.send()` after the turn settles, listed under `result.after`. `onSettled` now fires per committed turn, tool batches run concurrently, and the Gemini SDK floor is 2.31.0.
+
 ## [0.34.3] - 2026-10-28
 
 - Tool call arguments are now parsed with the tool's schema before `execute`. Invalid arguments no longer reach `execute`: the model gets an error tool result with type `validation` naming each issue (for example `description: Invalid input: expected string, received undefined`) and can correct the call in the same turn. `execute` receives the parsed value, so schema defaults and transforms now apply. A parallelized tool's call is rejected as a whole when any item is invalid. MCP tools are validated too, and unknown top-level keys are dropped before the call reaches the server, matching a default `z.object()`, rather than rejected.

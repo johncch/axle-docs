@@ -70,8 +70,8 @@ mkdirSync(WORK, { recursive: true });
 // Docs show imports once per page and omit them in later blocks, so a block
 // without its own axle import gets one injected. A block that *does* import is
 // left alone — that way a wrong import name is caught rather than papered over.
-const AXLE_IMPORT = `import { Agent, Instruct, MCP, Transcript, ToolRegistry, SkillRegistry, PromptCompactor, Tracer, LogWriter, SimpleWriter, anthropic, openai, gemini, chatCompletions, inferChatCompletionsVendor, generate, stream, decide, typesafe, choice, noul, score, createAgentConfig, createAgentTool, parallelize, braveWebSearch, loadSkill, parseSkillMarkdown, renderSkillsCatalog, createViewSkillTool, ModelCatalog, loadFileContent, estimateContextUsage, parseResponse, getCompactionStamp, validateCompactedMessages, createStats, addStats, mergeStats, AxleError, AxleAbortError, AxleAgentAbortError, AxleToolFatalError, InstructVariableError, AxleStopReason } from "@fifthrevision/axle";\n` +
-  `import type { AIProvider, AgentConfig, AgentDefinition, AgentHandle, AgentSession, AgentResult, AxleMessage, AxleAssistantMessage, AxleUserMessage, AxleToolCallMessage, AxleFailure, Citation, CompactionCallback, CompactionConfig, ContentPart, ContextUsage, ExecutableTool, FileInfo, FileResolver, GenerateResult, MessageMetadata, ProviderTool, ShouldCompactOnTriggerCallback, Span, SpanData, Stats, StreamEvent, StreamResult, ToolBatchDecision, ToolContext, ToolDefinition, ToolResultPart, TraceWriter, Turn, TurnEvent, TurnPart, ActionPart, TextPart, ThinkingPart, Annotation, Skill, SkillDefinitionRef, SkillFrontmatter, DecisionProvider, DecideParams, DecideResult, DecisionQuestion, DecisionQuestions, DecisionAnswer, DecisionAnswers, DecisionInput, DecisionJson, DecisionRefusal, NoulQuestion, NoulAnswer, ChoiceQuestion, ChoiceAnswer, ScoreQuestion, ScoreAnswer, AnswerFor, DecisionRequestParams, DecisionResponse, TypesafeOptions, ModelCatalogOptions, CatalogMatch, CatalogModel, ContextWindowMatch, ModelCost, SettledCallback, SettledOperation, IdleCallback, PendingDropReason } from "@fifthrevision/axle";\n`;
+const AXLE_IMPORT = `import { Agent, Instruct, MCP, Transcript, ToolRegistry, SkillRegistry, PromptCompactor, Tracer, LogWriter, SimpleWriter, anthropic, openai, gemini, chatCompletions, openrouter, togetherai, bedrock, openrouterDialect, togetheraiDialect, generate, stream, decide, typesafe, choice, noul, score, createAgentTool, parallelize, braveWebSearch, loadSkill, renderSkillsCatalog, createViewSkillTool, ModelCatalog, ModelCatalogStore, catalogFile, fetchModelsDev, parseCatalogData, computeCost, loadFileContent, estimateContextUsage, parseResponse, getCompactionStamp, validateCompactedMessages, createStats, addStats, mergeStats, attributeStats, AxleError, AxleErrorCode, isAxleError, AxleAbortError, AxleAgentAbortError, AxleToolFatalError, AxleInstructVariableError, AxleStopReason } from "@fifthrevision/axle";\n` +
+  `import type { AIProvider, AgentConfig, AgentHandle, AgentSession, AgentResult, AxleMessage, AxleAssistantMessage, AxleUserMessage, AxleProviderFailure, Citation, CompactionCallback, CompactionConfig, ContentPart, ContextUsage, ExecutableTool, FileInfo, FileResolver, GenerateResult, MessageMetadata, ProviderTool, Span, SpanData, Stats, StreamEvent, StreamResult, ToolContext, ToolDefinition, ToolResultPart, TraceWriter, Turn, TurnEvent, TurnPart, ActionPart, TextPart, ThinkingPart, Annotation, Skill, DecisionProvider, DecideParams, DecideResult, DecisionQuestion, DecisionQuestions, DecisionAnswer, DecisionAnswers, DecisionInput, DecisionJson, DecisionRefusal, NoulQuestion, NoulAnswer, ChoiceQuestion, ChoiceAnswer, ScoreQuestion, ScoreAnswer, AnswerFor, DecisionRequestParams, DecisionResponse, TypesafeOptions, CatalogMatch, CatalogModel, ContextWindowMatch, ModelCost, SettledCallback, SettledOperation, IdleCallback, PendingDropReason, Continuation, ContinuationContext, InlineTurn, InlineSendOptions, Cost, UsageEntry, TokenStats } from "@fifthrevision/axle";\n`;
 
 const ZOD_IMPORT = `import * as z from "zod";\n`;
 
@@ -80,7 +80,7 @@ const ZOD_IMPORT = `import * as z from "zod";\n`;
 const AMBIENT = `
 import type {
   Agent as A, AIProvider, Instruct as I, ExecutableTool, ProviderTool, MCP as M,
-  Transcript as T, AxleMessage, AgentSession, AgentDefinition, Turn, TurnPart,
+  Transcript as T, AxleMessage, AgentSession, Turn, TurnPart,
   TurnEvent, FileResolver, ToolRegistry as R, ToolContext,
   PromptCompactor as P, TraceWriter,
 } from "@fifthrevision/axle";
@@ -97,7 +97,7 @@ declare global {
   const messages: AxleMessage[];
   const previousMessages: AxleMessage[];
   const newMessages: AxleMessage[];
-  const definition: AgentDefinition;
+  const definition: any;
   const turn: Turn;
   const ctx: ToolContext;
   const fileResolver: FileResolver;

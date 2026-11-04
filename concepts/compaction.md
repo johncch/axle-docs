@@ -190,13 +190,15 @@ in whatever turn context is natural:
 - `afterTurn` → at the tail
 - `manual` → in its own engine-opened turn
 
-The part moves from `running` to `complete` or `error`. A compaction that
+The part carries `trigger` (`manual`, `beforeTurn`, `afterTurn`) and moves from `running` to `complete`, `cancelled`, or `error`. A compaction that
 `shouldCompactOnTrigger` declined never appears at all.
 
 A settled `complete` part means the message swap applied, atomically. An `error`
 part records a failed attempt — and importantly, that's **non-fatal for automatic
 triggers**: the send carries on with the conversation uncompacted. A failed
-manual `compact()` rejects, since you asked for it directly.
+manual `compact()` rejects, since you asked for it directly. A compaction stopped
+by a cancel ends `cancelled` (`compaction:cancelled`) with `status: "cancelled"`
+and no `error` — only a failed compactor emits `compaction:error`.
 
 ## Cancelling mid-compaction
 

@@ -45,6 +45,39 @@ user types <code v-pre>{{braces}}</code> at you, nothing explodes. And an
 `Instruct` you pass in gets cloned, so you can reuse and even mutate the same
 object afterwards without affecting a send in flight.
 
+## after — continuations run after the turn settles
+
+A send can carry `after`, a program that runs once the turn settles, holds the
+queue until it returns, and runs further turns inline:
+
+```typescript
+declare const judge: (result: unknown) => Promise<{ ok: boolean; feedback: string }>;
+
+const handle = agent.send("Summarize the report.", {
+  after: async (result, ctx) => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const verdict = await judge(result);
+      if (verdict.ok) break;
+      result = await ctx.send(verdict.feedback);
+    }
+  },
+});
+agent.send("Next question."); // waits until the continuation returns
+```
+
+The continuation runs after the send's turn settles with a result, `ok` or
+not; a turn whose handle rejects (cancelled, a fatal tool error, a setup
+failure) skips it. `ctx.send()` runs an inline turn — the same arguments as
+`send()` without `after`, an ordinary turn in every way except it starts at
+once with no `pending:queued`. Inline sends run one at a time in call order
+and return a promise, not a handle. `ctx` also carries `signal`, `id` (the
+send's user turn id), and read-only `messages` and `pending`.
+
+The handle resolves when the continuation returns, with the inline turns
+listed under `result.after`. A plain send's result has no `after`. A manual
+`compact()` carries no continuation, and an inline turn carries none. Full
+types are in the [Agent reference](/reference/agent#after-continuations).
+
 ## Sends line up in a queue
 
 Call `send()` while a turn is running and it waits its turn. Sends never run
@@ -197,9 +230,11 @@ const unsubscribe = agent.on((event) => {
 then on, so you wire them once rather than per turn.
 [Turn events](/concepts/turn-events) covers what you'll receive.
 
-Two more subscriptions cover the operation lifecycle. `onSettled()` fires once
-after each send or manual compaction that ran, however it ended — after its
-`turn:end`, before its handle settles — handing you the session and exactly
+Two more subscriptions cover the operation lifecycle. `onSettled()` fires after
+every turn that commits — once per send unless the send carries a continuation,
+in which case it also fires for each inline turn under that turn's own id — and
+once for an operation that ran without opening a turn, however it ended: after
+its `turn:end`, before its handle settles — handing you the session and exactly
 what the handle is about to settle with. That's the hook for saving after each
 operation without awaiting the queue empty the way `snapshot()` does. The agent
 awaits your callback, so returning a promise holds the handle and the next

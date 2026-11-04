@@ -54,11 +54,18 @@ interface Turn<TAnnotation extends Annotation = Annotation> {
   metadata?: Record<string, unknown>;
   timing?: TimingInfo;
   usage?: Stats;
-  error?: { type: string; message: string };
+  failure?: TurnFailure;
+  reason?: "stop" | "length";
 }
 
 type TurnStatus = "pending" | "streaming" | "complete" | "cancelled" | "error";
 interface TimingInfo { start: string; end?: string } // ISO timestamps
+
+type TurnFailure =
+  | { kind: "api"; type: string; message: string; status?: number }
+  | { kind: "incomplete"; type: string; message: string }
+  | { kind: "refusal"; message: string; text?: string; category?: string }
+  | { kind: "parse"; message: string };
 ```
 
 A `pending` turn is a preview of a turn the Agent accepted but hasn't opened —
@@ -87,7 +94,7 @@ Every part has `id`, `type`, optional `annotations`, and optional `timing`.
 | `CitationPart` | `citations: Citation[]`, `providerMetadata?` |
 | `FilePart` | `file: FileInfo` |
 | `ThinkingPart` | `summary?`, `raw?`, `continuity?`, `providerMetadata?` |
-| `CompactionPart` | `status: "pending" \| "running" \| "complete" \| "error"`, `summary?`, `progress?`, `error?` |
+| `CompactionPart` | `trigger: "manual" \| "beforeTurn" \| "afterTurn"`, `status: "pending" \| "running" \| "complete" \| "cancelled" \| "error"`, `summary?`, `progress?`, `error?` |
 
 ### ThinkingPart
 
@@ -195,7 +202,9 @@ component keyed by id.
 | --- | --- |
 | `turn:user` | `turn` — the complete user turn |
 | `turn:start` | `turnId`, `timing?` |
-| `turn:end` | `turnId`, `status`, `usage`, `timing?` |
+| `turn:end` | `turnId`, `status`, `usage`, `failure?`, `reason?`, `timing?` |
+
+`failure` is a `TurnFailure` (the provider's answer that ended the turn `ok: false`, without `usage`/`raw`/`cause`); `reason` is `"stop"` or `"length"` when the turn ended with a final answer. The old `error` event is gone — match `turn:end`'s `failure` instead.
 
 ### Part streaming
 
@@ -220,6 +229,7 @@ Openings carry the full part; deltas carry only ids and the delta.
 | `action:input` | `turnId`, `partId`, `input` — what the provider tool was asked to do (added in 0.33.0) |
 | `action:progress` | `turnId`, `partId`, `chunk` |
 | `action:complete` | `turnId`, `partId`, `result`, `timing?` |
+| `action:cancelled` | `turnId`, `partId`, `timing?` — the call never ran or was interrupted; `status: "cancelled"`, no `result` |
 | `action:error` | `turnId`, `partId`, `error`, `timing?` |
 | `action:child-event` | `turnId`, `partId`, `event` — a nested `TurnEvent` |
 
@@ -229,19 +239,19 @@ Openings carry the full part; deltas carry only ids and the delta.
 | --- | --- |
 | `compaction:update` | `turnId`, `partId`, `update: { summary?; progress? }` |
 | `compaction:complete` | `turnId`, `partId`, `summary?`, `timing?` |
-| `compaction:error` | `turnId`, `partId`, `error`, `timing?` |
+| `compaction:cancelled` | `turnId`, `partId`, `timing?` — stopped by a cancel; `status: "cancelled"`, no `error` |
+| `compaction:error` | `turnId`, `partId`, `error`, `timing?` — the compactor failed |
 
 The part itself arrives through `part:start` with `status: "running"`.
 `compaction:complete` sets `progress: 1`.
 
-### Annotations and errors
+### Annotations
 
 | Event | Fields |
 | --- | --- |
 | `annotation:start` | `target`, `annotation` |
 | `annotation:update` | `target`, `annotation` |
 | `annotation:end` | `target`, `annotation` |
-| `error` | `turnId?`, `error: { type, message }` |
 
 ```typescript
 type AnnotationTarget =

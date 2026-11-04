@@ -92,8 +92,8 @@ Usage rolls up automatically, and `breakdown` tells you where it all went:
 
 ```typescript
 result.usage.in; // total across parent and children
-for (const entry of result.usage.breakdown ?? []) {
-  console.log(entry.provider, entry.model, entry.in, entry.out);
+for (const entry of result.usage.breakdown) {
+  console.log(entry.provider, entry.model, entry.agent, entry.in, entry.out);
 }
 ```
 

@@ -20,7 +20,8 @@ interface Turn {
   metadata?: Record<string, unknown>;
   timing?: { start: string; end?: string };
   usage?: Stats;
-  error?: { type: string; message: string };
+  failure?: TurnFailure; // when the send resolved ok: false
+  reason?: "stop" | "length"; // how the final answer ended, when there was one
 }
 ```
 
@@ -102,7 +103,9 @@ Parts are a discriminated union on `type`, so a `switch` covers them exhaustivel
 | `file` | A `FileInfo` attached to a user turn |
 | `citation` | An unanchored source list the provider emitted on its own |
 | `action` | A tool call, subagent run, or provider tool — see below |
-| `compaction` | A compaction event, rendered as a divider or summary |
+| `compaction` | A compaction event, rendered as a divider or summary (`trigger`, `status`, `summary`) |
+
+A failed turn carries `failure` (`kind`, `message`, plus `type`/`status`/`text`/`category` where the kind has them) instead of an `error` object, and a turn cut off at the output limit carries `reason: "length"` (`"stop"` when the final answer finished). The old `turn.error` field is gone.
 
 Action parts discriminate further on `kind`:
 

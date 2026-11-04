@@ -23,7 +23,7 @@ the same two-state union:
 const result = await agent.send("...").final;
 
 if (!result.ok) {
-  result.error.kind; // "model" | "refusal" | "parse"
+  result.error.kind; // "api" | "incomplete" | "refusal" | "parse"
   result.error.message; // always there
   return;
 }
@@ -41,13 +41,16 @@ and `StreamResult` carry `messages`, `final`, and `stopped` instead. `Agent`
 doesn't expose the loop budgets (`maxSteps`, `maxContextTokens`), so there's no
 `stopped` on its results — see [Stops aren't errors](#stops-arent-errors).
 
-### The three kinds of failure
+### The four kinds of failure
 
 | `kind` | What happened |
 | --- | --- |
-| `model` | The provider returned an error — rate limit, bad request, overload. `type` names it (`"authentication"` when your key was rejected); `status` carries the HTTP status when there was one |
+| `api` | The request didn't complete: rejected, failed mid-way, connection broke. `type` names it (`"authentication"` when your key was rejected); `status` carries the HTTP status when there was one; `usage` is usually absent |
+| `incomplete` | The request completed but stopped for a reason that isn't a usable end. `type` is the stop reason verbatim (or `FinishReasonError`, `IncompleteStream`, `RESPONSES_API_INCOMPLETE`); `usage` is present — the call was charged |
 | `refusal` | The provider declined the request or blocked its output — a safety refusal, a content filter, a blocked prompt. `text` and `category` carry what the provider said, when it said anything |
 | `parse` | The response didn't match your `Instruct` schema |
+
+`api` is what `model` was before 0.35.0, split on what the API did. A `switch` on `kind` with an exhaustiveness check stops compiling until it handles both new arms.
 
 A refusal is not a model error and not an empty success. Before 0.33.0 an
 Anthropic refusal arrived as `ok: true` with `finishReason: "error"`, an OpenAI
@@ -60,16 +63,17 @@ refused `agent.send()` the agent's history ends with the user message. A refusal
 the model writes as ordinary text is still a normal `ok: true` answer; only
 provider-marked refusals take this branch.
 
-Failures are flat: a `model` failure carries `type`, `message`, `status?`,
-`usage?`, and `raw?` directly on `error` (no nested `error` object since
+Failures are flat: an `api` failure carries `type`, `message`, `status?`,
+`usage?`, `raw?` directly on `error` (no nested `error` object since
 0.33.0). To detect a bad key, check
-`!result.ok && result.error.kind === "model" && result.error.type === "authentication"`
+`!result.ok && result.error.kind === "api" && result.error.type === "authentication"`
 instead of digging through `raw.status` or message strings. Two more `type`
 values worth knowing: `"TimeoutError"` means a `chatCompletions()` request
 timed out (match on it rather than `AbortError`, which now means only your own
 signal fired), and a provider tool no provider serves — `web_search` with
-nothing attached, say — fails the request as a `model` failure naming the tool.
-See [Errors](/reference/errors) for the full union.
+nothing attached, say — fails the request as an `api` failure naming the tool.
+A bad model id or tool choice no longer resolves at all — it throws
+`AxleError` (`INVALID_OPTIONS`) before any request. See [Errors](/reference/errors) for the full union.
 
 ### What `response` holds
 
@@ -120,14 +124,35 @@ Non-positive limits are a caller bug, so those throw at call time.
 | `AxleAgentAbortError` | An `Agent` handle was cancelled, or its queue was cleared |
 | `AxleAbortError` | A `stream()` handle was cancelled |
 | `AxleToolFatalError` | A tool threw `AxleToolFatalError` — the run can't continue |
-| `InstructVariableError` | A required <code v-pre>{{variable}}</code> had no input |
-| `AxleError` | Configuration mistakes — duplicate tool name, conflicting options, invalid limits |
+| `AxleInstructVariableError` | A required <code v-pre>{{variable}}</code> had no input |
+| `AxleError` | Configuration and setup mistakes — duplicate tool name, bad model id, unsupported feature, unreadable file, unconnected MCP, invalid limits (`code` says which) |
 
-Every one of these is either "you cancelled it" or "something's wired wrong."
-Neither belongs in a result union you'd branch on.
+A result's `ok: false` now carries one thing only: the provider's answer to a
+request that went out. Everything else throws a coded `AxleError` before any
+request is sent — a loop limit below 1, a bad model id, an unsupported
+reasoning setting, a tool choice naming an absent tool, a non-PDF file on a
+provider with no wire shape for it, an unreadable host file, an MCP tool called
+before `connect()`. A host that checked `result.ok` and then fixed its
+configuration from the message now does that in a `catch`:
 
-They all extend `AxleError`, which carries a `code`, optional `details`, and a
-`toJSON()` that serializes the whole cause chain — so logging one is a one-liner.
+```typescript
+import { isAxleError } from "@fifthrevision/axle";
+declare const fixSetup: (message: string) => void;
+
+try {
+  const result = await generate({ provider, model, messages, toolChoice: { type: "tool", name: "nope" } });
+} catch (error) {
+  if (isAxleError(error) && error.code === "INVALID_OPTIONS") fixSetup(error.message);
+}
+```
+
+`isAxleError` narrows to the payload union (it tests for an `AxleErrorCode`,
+so it holds across duplicate package copies — prefer it over
+`instanceof AxleError`). Every one of these is either "you cancelled it" or
+"something's wired wrong." Neither belongs in a result union you'd branch on.
+
+They all carry a `code`, optional `details`, and a `toJSON()` that serializes
+the whole cause chain — so logging one is a one-liner.
 
 ## Cancellation
 

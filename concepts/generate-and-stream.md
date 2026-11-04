@@ -102,6 +102,12 @@ removed in 0.34.0 — the loop never reads one, so a tool added to a
 the prompt mid-loop, return them from `onToolBatchComplete`, below. See
 [Upgrading](/upgrading).)
 
+When the model requests several tool calls in one message, they all start at
+once — the step's tool phase takes as long as its longest call, and results
+answer in request order. `tool:exec-start` fires for every call up front and
+completions interleave in finish order, so key on `id`. A fatal tool error or a
+cancelled run aborts the batch's other calls through `ctx.signal`.
+
 There's also `onToolCall`, which intercepts tool calls without registering
 `ExecutableTool` objects at all:
 

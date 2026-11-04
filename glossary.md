@@ -173,6 +173,15 @@ tool's `execute` concurrently, with one ordered result. It is one tool call,
 not a tool batch: its arguments are validated as a whole, so one invalid item
 rejects the call. Not "batch tool".
 
+**Continuation** — a program a send carries under `after`: runs once the turn
+settles, holds the queue, and runs inline turns via `ctx.send()`. See
+[Continuations](/concepts/continuations).
+
+**Protocol** — the wire format a provider speaks (`messages`, `responses`,
+`generateContent`, `chatCompletions`). A provider is a `protocol` plus an `id`
+(the models.dev provider id stamped on usage rows). See [Providers &
+models](/concepts/providers).
+
 ## Renamed terms
 
 | Was | Is | Since |
@@ -201,7 +210,20 @@ rejects the call. Not "batch tool".
 | `AIProvider.resolveProviderToolName` / `ResolvedProviderTool` / `nativeName` | removed — providers serve `providerTools` unchanged; bring tools via `AIProvider.tools` | 0.34.0 |
 | `agent.system` (writable) | read-only getter — configured prompt plus the skills catalog | 0.34.0 |
 | `vendor: "together"` | renamed to `"togetherai"` | 0.34.0 |
-| `WEB_SEARCH_FALLBACK_NOT_CONFIGURED` | removed — an unserved provider tool fails the request as a `model` failure with no code | 0.34.0 |
+| `WEB_SEARCH_FALLBACK_NOT_CONFIGURED` | removed — an unserved provider tool fails the request as an `api` failure with no code | 0.34.0 |
 | `TOOL_OPTIONS_CONFLICT` | removed — there is nothing left to conflict | 0.34.0 |
+| `AxleFailure` / `GenerateError` | `AxleProviderFailure` | 0.35.0 |
+| `AxleFailure` `{ kind: "model" }` | `{ kind: "api" }` + `{ kind: "incomplete" }` | 0.35.0 |
+| `InstructVariableError` | `AxleInstructVariableError` | 0.35.0 |
+| `TaskError` | removed — never thrown | 0.35.0 |
+| `AIProvider.name` | `AIProvider.protocol` + `AIProvider.id` | 0.35.0 |
+| `ModelCatalog.open()` / `cachePath` / `ready` / `refresh()` / `state` / `hosts` | `ModelCatalogStore` + `catalogFile()` + `fetchModelsDev()` + `parseCatalogData()`; `lookup`/`contextWindow` take `{ provider }` | 0.35.0 |
+| `anthropic()` / `openai()` / `gemini()` `baseUrl` | protocol constructors `messages()` / `responses()` / `generateContent()` with `baseUrl` | 0.35.0 |
+| `chatCompletions(url, …)` / `vendor` / `inferChatCompletionsVendor` | `chatCompletions({ baseUrl, … })`; `vendor` is `id` + `dialect` (`openrouterDialect` / `togetheraiDialect`) | 0.35.0 |
+| `ChatCompletionsVendor` | removed — `chatCompletions({ baseUrl }).id` gives what the hostname implies | 0.35.0 |
+| `Turn.error` / `error` turn event | `Turn.failure` / `turn:end` `failure` | 0.35.0 |
+| `error.type === "aborted"` tool result | `action:cancelled`, `status: "cancelled"` | 0.35.0 |
+| `AgentDefinition` / `createAgentConfig()` / `SavedAgent` | removed — rebuild `AgentConfig` from your own recipe shape + `AgentSession` | 0.35.0 |
+| `FileProviderId` / `provider` in file + `PROVIDER_UNSUPPORTED` details | `Protocol` / `protocol` | 0.35.0 |
 
 See [Upgrading](/upgrading).

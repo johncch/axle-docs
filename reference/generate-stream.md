@@ -145,7 +145,7 @@ type GenerateResult<TResponse = AxleAssistantMessage> =
       response?: undefined;
       final?: AxleAssistantMessage;
       messages: AxleMessage[];
-      error: AxleFailure;
+      error: AxleProviderFailure;
       usage?: Stats;
       stopped?: "max-steps" | "token-limit";
     };
@@ -213,7 +213,7 @@ Correlated by `id`.
 | `provider-tool:input` | `id`, `name`, `input` — what the tool was asked to do |
 | `provider-tool:complete` | `id`, `name`, `output?` — the tool's printed output when the provider reports one stream |
 | `provider-tool:error` | `id`, `name`, `error: { type, message }` — the provider reported failure |
-| `error` | `error: AxleFailure` |
+| `error` | `error: AxleProviderFailure` |
 
 `provider-tool:input` (added in 0.33.0) fires when the provider says what the
 tool was asked to do — before the search runs on Anthropic, together with the

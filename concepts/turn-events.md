@@ -43,15 +43,14 @@ Every event after `turn:user` carries a `turnId`, and part-level events carry a
 `partId` — the same stable ids you render against.
 
 - **Pending lifecycle** — `pending:queued`, `pending:dropped`
-- **Turn lifecycle** — `turn:user`, `turn:start`, `turn:end`
+- **Turn lifecycle** — `turn:user`, `turn:start`, `turn:end` (carries `failure?` and `reason?`)
 - **Part streaming** — `part:start`, `text:delta`, `text:citation`,
   `thinking:raw-delta`, `thinking:summary-delta`, `thinking:update`, `part:end`
 - **Actions** — `action:args-delta`, `action:running`, `action:progress`,
-  `action:complete`, `action:error`
+  `action:complete`, `action:cancelled`, `action:error`
 - **Nesting** — `action:child-event`, wrapping a subagent's own turn events
-- **Compaction** — `compaction:update`, `compaction:complete`, `compaction:error`
+- **Compaction** — `compaction:update`, `compaction:complete`, `compaction:cancelled`, `compaction:error`
 - **Annotations** — `annotation:start`, `annotation:update`, `annotation:end`
-- **Error** — `error`
 
 ### The first event of a send is pending:queued
 
@@ -84,7 +83,13 @@ A tool call shows up as an `action` part moving through states:
 2. `action:args-delta` — argument JSON streaming in, not yet parseable
 3. `action:running` with parsed `parameters` — execution has begun
 4. `action:progress` — whatever the tool passed to `ctx.emit`
-5. `action:complete` or `action:error`
+5. `action:complete`, `action:cancelled`, or `action:error`
+
+A cancelled call ends `action:cancelled` with `status: "cancelled"` and no
+`result` — a call that never got to run (turn cancelled while the model was
+still streaming it, or before its batch started) settles the same way before
+`turn:end`. Match `status === "cancelled"` instead of the old
+`error.type === "aborted"` shape.
 
 `Transcript` folds all five into one `action` part whose `status` and `detail`
 you can render directly. The `pendingArgs` field it maintains during phase 2

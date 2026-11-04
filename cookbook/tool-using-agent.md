@@ -50,6 +50,9 @@ agent.on((event) => {
     case "action:complete":
       console.log(`[tool] done`);
       break;
+    case "action:cancelled":
+      console.log(`[tool] cancelled`);
+      break;
     case "action:error":
       console.error(`[tool] failed: ${event.error.message}`);
       break;

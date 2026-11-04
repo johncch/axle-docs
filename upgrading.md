@@ -7,10 +7,28 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.34.1-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.35.0-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.34.3**.
+Current release: **0.35.0**.
+
+## 0.35.0 — errors that throw, providers as protocol + id, per-request usage, continuations
+
+The full guide is
+[`docs/0.35.0-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.35.0-migration.md)
+in the library repo. Read it end to end — this is the largest breaking release since 0.30.0.
+
+**`AxleFailure` is `AxleProviderFailure`, and `model` is two kinds.** `result.error.kind` is now `api | incomplete | refusal | parse`. `api` is a rejected/failed request (with `status` when there was one); `incomplete` is a completed request that stopped without a usable end (with `usage`). Update `switch` exhaustiveness checks and `error.type === "Error"` setup-fix branches.
+
+**Setup mistakes throw.** Bad options, unsupported features, unreadable files, and unconnected MCP calls throw `AxleError` with a `code` (`INVALID_OPTIONS`, `PROVIDER_UNSUPPORTED`, `FILE_UNREADABLE`, `MCP_NOT_CONNECTED`, …) before any request. Move config-fix code from `if (!result.ok)` into `catch`, guarded by `isAxleError(error)`. A bad key still resolves `ok: false` as `api`/`authentication`.
+
+**Providers split into `protocol` + `id`.** `AIProvider.name` is gone. Use the protocol constructors — `messages({ baseUrl, apiKey, … })`, `responses(…)`, `generateContent(…)`, `chatCompletions({ baseUrl, apiKey, id?, dialect? })` — or the presets `anthropic()`, `openai()`, `gemini()`, `openrouter()`, `togetherai()`, `bedrock()`. First-party `baseUrl` moved to the constructors (SDK env vars no longer redirect presets); `chatCompletions()` takes one options object and `vendor` is now `id` + `dialect` (`openrouterDialect` / `togetheraiDialect` behind a proxy). `FileResolver` and `PROVIDER_UNSUPPORTED` details name `protocol`, and `UsageEntry.provider` is the `id`.
+
+**`ModelCatalog` is built from data.** `ModelCatalog.open()`, `cachePath`, `ready`, `refresh()`, `state`, `hosts`, and ` inferChatCompletionsVendor` are gone. New flow: `catalogFile(path)` storage + `new ModelCatalogStore({ providers })` → `load()` → `refresh()`/`refreshIfStale()` → `current`. `fetchModelsDev()` fetches `CatalogData` (version 4); `parseCatalogData()` reads saved JSON; `lookup`/`contextWindow` take `{ provider }`. New `computeCost(usage, catalog)` prices each row at its own tier.
+
+**`usage.breakdown` is per request, and required.** Rows carry `agent`, `at`, and `requestedModel`; totals are unchanged. Group rows to aggregate (don't key tables by `provider + model`). Hand-built `Stats` need rows — use `attributeStats()`. `FileResolver`-style custom usage and `ctx.reportUsage` must include `requestedModel`.
+
+**Turns and events.** `turn.error` and the `error` event are gone — read `turn.failure` / `turn:end`'s `failure`. `turn:end` also carries `reason` (`stop` | `length`). Cancelled tool calls are `action:cancelled` (`status: "cancelled"`), cancelled compactions are `compaction:cancelled`, and `CompactionPart` gains `trigger`. `AgentDefinition`/`createAgentConfig()` are removed — rebuild `AgentConfig` from your own recipe shape. New `after` continuations run inline turns after the send settles (see [Agent](/concepts/agent#after-continuations-run-after-the-turn-settles)).
 
 ## 0.34.3 — tool arguments validated before `execute`
 
@@ -123,7 +141,7 @@ braveWebSearch({ apiKey: braveKey }) })` — instead of a process-wide setting.
 `AxleConfiguration` are removed. The `providerTools: [{ type: "provider", name:
 "web_search" }]` request is unchanged. A `chatCompletions()` provider asked for
 a provider tool it cannot serve now fails the request (`ok: false`,
-`error.kind` `"model"`, no error code) instead of dropping the tool or throwing
+`error.kind` `"api"`, no error code) instead of dropping the tool or throwing
 `WEB_SEARCH_FALLBACK_NOT_CONFIGURED`.
 
 **`AIProvider.resolveProviderToolName` is gone; `AIProvider.tools` is added.**

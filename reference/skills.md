@@ -103,8 +103,3 @@ present, and is read-only.
 | --- | --- | --- |
 | `AgentConfig.skills` | `Skill[]?` | Seeds `agent.skills`. |
 | `Agent.skills` | `SkillRegistry` | readonly. |
-| `AgentDefinition.skills` | `SkillDefinitionRef[]?` | `{ name }` — resolved to `Skill[]` by the host. |
-| `ResolvedAgentDefinition.skills` | `Skill[]?` | |
-
-`createAgentConfig()` throws when the definition names skills and the resolver
-returns none, as with tools.

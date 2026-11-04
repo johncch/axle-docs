@@ -130,7 +130,7 @@ There are two different numbers here and they get confused constantly, so:
 
 ```typescript
 result.usage;
-// { in, out, cachedIn?, cacheWriteIn?, reasoningOut?, breakdown? }
+// { in, out, cachedIn?, cacheWriteIn?, reasoningOut?, breakdown: UsageEntry[] }
 ```
 
 `cachedIn` and `cacheWriteIn` are already counted inside `in`, and `reasoningOut`
@@ -139,29 +139,60 @@ double-counting bug. Since 0.34.1 these two are populated on Anthropic and
 OpenRouter as well, because Axle asks for caching there by default (see
 [Prompt caching](/concepts/providers#prompt-caching)).
 
-`breakdown` holds one entry per provider+model pair, which is how you reconstruct
-cost when a single operation spans models: a subagent on a cheaper model, a
-compaction call on a fast one.
+`breakdown` holds one row per provider request, in request order — not one row
+per model. A step that fans out (Anthropic `pause_turn` follow-ups, a tool loop
+with several steps) yields one row per request, each with that request's own
+`in` and `out`, so each row can be priced at the tier its prompt size selects.
+The top-level `in`/`out` are still the totals.
 
 ```typescript
-for (const entry of result.usage.breakdown ?? []) {
-  console.log(entry.provider, entry.model, entry.in, entry.out);
+for (const entry of result.usage.breakdown) {
+  console.log(entry.provider, entry.model, entry.agent, entry.in, entry.out);
 }
 ```
 
-Entries *explain* the aggregate; they don't add to it.
+Each row also carries `requestedModel` (what you asked for — differs from
+`model` when the provider reports another id), `agent` (the `Agent.name` that
+made the request, when it has one — subagent rows sit between the parent's own
+rows), and `at` (ISO 8601, when the provider finished). `provider` is the
+provider's `id` (`"anthropic"`, `"openai"`, `"google"`, `"openrouter"` — note
+Gemini rows changed from `"Gemini"` to `"google"` in 0.35.0) and is absent for
+a provider with no `id`.
 
-If you write a tool that calls a model, report its usage so it rolls up:
+Entries *explain* the aggregate; they don't add to it. A reader that assumed
+one row per model — a cost table keyed by `provider + model`, say — now groups
+the rows first. To price a `Stats`, use `computeCost`:
 
 ```typescript
+import { computeCost } from "@fifthrevision/axle";
+
+const cost = computeCost(usage, catalog);
+// { usd, priced, unpriced, pricedWith? }
+```
+
+If you write a tool that calls a model, report its usage so it rolls up.
+`breakdown` is required — a hand-built `Stats` needs rows, so build it with
+`attributeStats`:
+
+```typescript
+import { attributeStats } from "@fifthrevision/axle";
+
 async execute(input, ctx) {
   const r = await generate({ provider, model, messages });
   if (r.usage) ctx.reportUsage?.(r.usage);
   return "...";
 }
+
+// a tool that calls a model API directly:
+ctx.reportUsage(
+  attributeStats(
+    { in: 900, out: 120 },
+    { provider: "openai", model: "gpt-5", requestedModel: "gpt-5" },
+  ),
+);
 ```
 
-`createAgentTool` already does this for you.
+`createAgentTool` already does the `reportUsage` part for you.
 
 ## Next
 

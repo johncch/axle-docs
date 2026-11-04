@@ -206,7 +206,7 @@ provider tool as usual. (It used to return a backend registered with
 ```typescript
 import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
 
-const provider = chatCompletions("https://api.together.ai/v1", {
+const provider = chatCompletions({ baseUrl: "https://api.together.ai/v1",
   apiKey,
   webSearch: braveWebSearch({ apiKey: braveKey }),
 });
@@ -268,7 +268,7 @@ const internalSearch: ExecutableTool<typeof internalSearchSchema> = {
   },
 };
 
-const provider = chatCompletions("http://localhost:11434/v1", {
+const provider = chatCompletions({ baseUrl: "http://localhost:11434/v1",
   webSearch: internalSearch,
 });
 ```
