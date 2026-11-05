@@ -46,6 +46,11 @@ interface ToolContext {
 type ToolProgressChunk = string | { type: "turn-event"; event: TurnEvent };
 ```
 
+`signal` is the batch's signal, not the run's: it aborts when the run's signal
+aborts, with the run's reason, and when a sibling call in the same batch fails
+fatally, with that sibling's error as the reason. A tool that rethrows its
+signal's reason is reported as `aborted`, not as a second fatal.
+
 `emit` with a string surfaces as `action:progress`. Emitting a wrapped
 `TurnEvent` is how nested agents forward their own event stream — it becomes
 `action:child-event`.
@@ -238,9 +243,9 @@ interface WebSearchResult {
 }
 ```
 
-Register it on the provider (above), not with
-[`configureAxle`](/reference/configuration) — the global fallback was removed in
-0.34.0.
+Register it on the provider (above). The process-global `configureAxle`
+fallback it used to replace was removed in 0.34.0 — see
+[Upgrading](/upgrading).
 
 ### Custom search tools
 

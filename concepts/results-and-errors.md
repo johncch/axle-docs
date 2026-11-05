@@ -225,6 +225,13 @@ Default to ordinary throws. Models are pretty good at recovering from a tool tha
 says "that didn't work." Reserve fatal for when continuing would be incoherent —
 the environment your tool operates on is gone.
 
+The two also differ in what they do to the rest of the batch, since a step's
+calls [run at once](/concepts/tools#one-batch-all-at-once). An ordinary throw is
+one call's result and touches no sibling. A fatal error aborts the siblings
+through their `ctx.signal`, waits for each to settle, and appends no tool results
+message at all — whatever the others produced is discarded. The rejection
+carries the usage every call reported before it was cut short.
+
 One nicety: a subagent's fatal errors get re-wrapped before they reach the
 parent, so the parent never accidentally adopts the child conversation's
 messages. Usage is preserved for accounting.

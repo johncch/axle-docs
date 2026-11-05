@@ -52,6 +52,17 @@ compaction. A turn's `status` runs `pending` → `streaming` → `complete` |
 only in `Transcript.pending`. Never a single assistant message; never a
 provider request.
 
+**Turn reason** — how an agent turn's final answer ended, carried on `turn:end`
+and kept on the `Turn` as `reason`: `"stop"` when the model finished, `"length"`
+when it hit the output token limit. Absent when the turn ended before a final
+answer arrived; a step that asked for tools never ends one.
+
+**Turn failure** — how an agent turn failed, carried on `turn:end` and kept on
+the `Turn` as `failure`: the provider's answer from a send that resolved
+`ok: false`, minus what only the result needs (`usage`, `raw`, `cause`). Present
+only on a turn whose `status` is `error` and whose send resolved — a turn that
+ended because the call threw has none.
+
 **Send** — the Agent API verb: one scheduled conversation exchange
 (`agent.send(...)`), executed as a FIFO queue item. The host-facing unit of "the
 agent took its turn."
@@ -143,6 +154,12 @@ started; that is live state and is never saved. The Agent holds no
 transcript — it emits events and keeps only the active `messages`. Lose the
 turns, lose the transcript.
 
+**Sink** — a consumer-owned fold over the `TurnEvent` stream, attached with
+`agent.on(sink.apply)`. A sink folds what it needs from each event and ignores
+the rest, exposes a readonly view, and is restored by seeding its constructor
+with the persisted view. `Transcript` is the shipped sink; the Agent knows none
+of them.
+
 **Session** — the continuable identity of a conversation (`sessionId`).
 `AgentSession` is its serialized form: the pure continuation
 `{ sessionId, messages }` that `agent.snapshot()` captures and the `Agent`
@@ -165,7 +182,8 @@ and one flat namespace.
 
 **Tool batch** — the set of separate tool calls one assistant message
 requests. Each call in a tool batch is validated, executed, and answered with
-its own tool result.
+its own tool result. The calls run concurrently; the results answer in request
+order. See [One batch, all at once](/concepts/tools#one-batch-all-at-once).
 
 **Parallelized tool** — the single tool `parallelize(tool)` returns: one call
 whose arguments carry an `items` array, each item run through the wrapped
@@ -176,6 +194,19 @@ rejects the call. Not "batch tool".
 **Continuation** — a program a send carries under `after`: runs once the turn
 settles, holds the queue, and runs inline turns via `ctx.send()`. See
 [Continuations](/concepts/continuations).
+
+**Inline turn** — a turn a continuation runs through `ctx.send()`. An ordinary
+send turn in every way but one: it starts at once in the held slot, so it has no
+pending phase and announces no `pending:queued`. It commits to messages, settles
+through `onSettled` under its own id, and is listed on its operation's result
+under `after`. Inline turns run one at a time, FIFO. See
+[Continuations](/concepts/continuations).
+
+**Model** — the model id as the provider names it: what goes on the request, and
+what the response reported back. The same weights carry different ids at
+different providers (`claude-sonnet-4-5-20250929` at `anthropic`,
+`anthropic.claude-sonnet-4-5-v1:0` at `amazon-bedrock`), which is why Axle keeps
+no model table. See [Providers & models](/concepts/providers#naming-models).
 
 **Protocol** — the wire format a provider speaks (`messages`, `responses`,
 `generateContent`, `chatCompletions`). A provider is a `protocol` plus an `id`
@@ -210,6 +241,24 @@ produces it, you store it, `parseCatalogData()` reads it back, and you may
 amend it. The catalog itself never fetches; `ModelCatalogStore` is what loads
 and refreshes it. Not the *skills* catalog, which is a section of the system
 prompt. See [Model catalog & cost](/concepts/model-catalog).
+
+**Failure** — the `ok: false` arm of a result: an `AxleProviderFailure` of kind
+`api`, `incomplete`, `refusal` or `parse`. A failure is always the provider's
+answer to a request that went out. It is a value on a result, never thrown.
+
+**Rejection** — a handle or promise that throws an `AxleError`: a mistake in the
+setup or the message, a local file that could not be read, a tool that ended the
+run, a cancel, or a broken invariant. Nothing was sent, or what was sent is
+carried on the error. See [Results & errors](/concepts/results-and-errors).
+
+**UsageEntry** — one row of `Stats.breakdown`: the usage of one provider
+request, tagged with the provider that served it (its `AIProvider.id`, absent
+when it has none), `model` (what the response reported, or the requested one
+when it reported none), `requestedModel` (what the caller passed, before
+`resolveModel`), `agent` when the `Agent` that made it has a name, and `at`.
+Rows stay in request order and are never summed per model, because a provider
+bills each request at the tier its own prompt size selects. They explain the
+aggregate `in` / `out` and are never added to it again.
 
 **Cost** — what `computeCost(usage, catalog)` returns for a `Stats`: `usd`, the
 sum of `priced` (rows with their own `usd`), and `unpriced` (rows with a

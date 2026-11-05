@@ -64,8 +64,8 @@ five-minute read and it makes everything after it easier.
 **Primitives** is the layer underneath: `generate()` and `stream()`, for when you
 want the tool loop without a conversation.
 
-**Building blocks** are the pieces both layers use — providers, `Instruct`,
-tools, results, observability. Dip in as you need them.
+**Building blocks** are the pieces both layers use — providers, the model
+catalog, `Instruct`, tools, results, observability. Dip in as you need them.
 
 **API Reference** is the exhaustive listing: what a thing accepts, what it
 returns. It doesn't teach, it just tells you.

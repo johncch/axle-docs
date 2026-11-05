@@ -115,7 +115,7 @@ agent.registry.add(editingTools);
 tool loop at turn open and again at every tool-batch boundary, so host-side
 mutations land on the **next provider request** — between turns, or mid-turn
 when a tool mutates the agent in closure scope. Either way, the
-[steer playbook](/concepts/agent#the-steer-playbook) gives you a clean boundary
+[steer playbook](/cookbook/cancellation#the-steer-playbook) gives you a clean boundary
 to change things at.
 :::
 

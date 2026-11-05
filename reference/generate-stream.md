@@ -223,15 +223,3 @@ must handle `error` as well. On `complete`, `output` carries the tool's printed
 output when the provider reports one stream (code execution); search results
 live on the finished message part's `continuity`, not on the event. See
 [Messages & parts](/reference/messages#providertool-parts).
-
-## Removed in 0.32.0: generateStep()
-
-```typescript
-// @check-skip — removed in 0.32.0, kept here so the name resolves
-generateStep(params): Promise<ModelResult>
-```
-
-`generateStep()` performed exactly one provider request — no loop, no tool
-execution. It no longer exists: there is no non-streaming request to make.
-Call `stream()` with `maxSteps: 1` and read `final`, or `generate()` with the
-same option. Custom providers implement `createStreamingRequest` only.
