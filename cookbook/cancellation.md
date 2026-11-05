@@ -5,16 +5,11 @@ description: stop, clear, cancel, and the interjection pattern.
 
 # Interrupting & cancelling
 
-There are four mechanisms here, and they're genuinely not interchangeable. This
-table is the short version — the rest of the page is the detail.
-
-| Call | Effect on the active turn | Effect on the queue | Work already done |
-| --- | --- | --- | --- |
-| `agent.stop()` | Ends at the next tool-batch boundary | Untouched | Kept and committed |
-| `agent.cancel()` | Aborted immediately | Untouched | Partially preserved |
-| `agent.clear()` | Untouched | Cancelled | N/A |
-| `handle.cancel()` | Aborted immediately (that send) | Untouched | Partially preserved |
-| `signal` on send | Same as `cancel()` | | |
+There are four mechanisms here, and they're genuinely not interchangeable:
+`agent.stop()`, `agent.cancel()`, `agent.clear()` and `handle.cancel()` (a
+`signal` on the send behaves like `handle.cancel()`). [Agent →
+Interrupting](/concepts/agent#interrupting-four-different-things) is where the
+four are compared; this page is the recipes.
 
 ## stop(): let the work finish
 
@@ -29,13 +24,9 @@ The tool batch that's in flight — including parallel calls — runs to complet
 and commits. Then the handle settles without another provider request. Nothing
 gets wasted, and the history stays coherent.
 
-What comes back may surprise you the first time. A stopped turn ends on its
-tool-call exchange, so a plain send resolves with whatever text that step
-produced — often an empty string. An `Instruct` send may come back `ok: false`
-with a parse error, simply because no final answer exists yet. That's by design,
-not a bug.
-
-`stop()` won't interrupt a provider request or a tool that's already running. If
+What comes back may surprise you the first time: a stopped turn ends on its
+tool-call exchange, so there is often no final answer to resolve with. `stop()`
+also won't interrupt a provider request or a tool that's already running — if
 you need a hard stop, that's `cancel()`.
 
 ## The steer playbook
@@ -191,7 +182,10 @@ check catches both.
 ## Cancellation inside tools
 
 Your tools have to cooperate here. Without forwarding the signal, cancelling
-stops the agent while your work keeps running in the background:
+stops the agent while your work keeps running in the background. `ctx.signal`
+also aborts when a sibling call in the same batch throws `AxleToolFatalError`,
+so forwarding it is what keeps a doomed batch from being held open by the calls
+that were still working:
 
 ```typescript
 async execute({ url }, ctx) {

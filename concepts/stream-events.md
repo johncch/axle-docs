@@ -86,7 +86,7 @@ handle.onToolBatchComplete((message) => {
 
 `"finish"` ends the run without another provider request — every tool in that
 batch has already completed and committed, so nothing is lost. This is the
-primitive [`agent.stop()`](/concepts/agent#the-steer-playbook) is built on, if
+primitive [`agent.stop()`](/concepts/agent#stop-wind-down-gracefully) is built on, if
 you want that behaviour in your own loop.
 
 ## Waiting on a deferred call

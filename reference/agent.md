@@ -111,6 +111,9 @@ interface AgentHandle<T> {
 }
 ```
 
+`AgentHandle` and `StreamHandle` both satisfy the exported `Handle<T>`
+(`{ cancel, final }`), so code that only cancels and awaits can take either.
+
 ### AgentResult
 
 ```typescript

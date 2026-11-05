@@ -103,6 +103,11 @@ A tool call shows up as an `action` part moving through states:
 4. `action:progress` — whatever the tool passed to `ctx.emit`
 5. `action:complete`, `action:cancelled`, or `action:error`
 
+Those phases describe one call. A step's calls [run at
+once](/concepts/tools#one-batch-all-at-once), so in a batch every call reaches
+phase 1 before any reaches phase 5, and phases 2 to 5 interleave across calls in
+finish order. Key on the part's `id`, never on "the running tool".
+
 A cancelled call ends `action:cancelled` with `status: "cancelled"` and no
 `result` — a call that never got to run (turn cancelled while the model was
 still streaming it, or before its batch started) settles the same way before
