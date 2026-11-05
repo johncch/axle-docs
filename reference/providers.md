@@ -33,7 +33,9 @@ interface BedrockOptions extends ProviderClientOptions {
 
 ### Protocol constructors
 
-Each protocol builds a provider at any base URL:
+Each protocol builds a provider at any base URL. A preset is one of these with a
+base URL, an `id` and (where it applies) a `dialect` or `resolveModel` already
+filled in — see [Presets](/concepts/providers#presets).
 
 ```typescript
 import { messages, responses, generateContent, chatCompletions } from "@fifthrevision/axle";
@@ -55,12 +57,19 @@ interface ChatCompletionsOptions extends ProviderClientOptions {
 }
 ```
 
-The official hostnames infer `id` and `dialect` when omitted:
+Every constructor infers `id` from the base URL's hostname when it recognizes
+one, and `chatCompletions()` infers `dialect` the same way. A hostname matches
+its own subdomains too (`api.openrouter.ai` resolves through `openrouter.ai`).
+Anything else leaves `id` `undefined`, and usage rows from that provider carry
+no `provider`.
 
-| Hostname | `id` | `dialect` |
-| --- | --- | --- |
-| `openrouter.ai`, `api.openrouter.ai` | `openrouter` | `openrouterDialect` |
-| `api.together.ai`, `api.together.xyz` | `togetherai` | `togetheraiDialect` |
+| Constructor | Hostname | `id` | `dialect` |
+| --- | --- | --- | --- |
+| `messages()` | `api.anthropic.com` | `anthropic` | — |
+| `responses()` | `api.openai.com` | `openai` | — |
+| `generateContent()` | `generativelanguage.googleapis.com` | `google` | — |
+| `chatCompletions()` | `openrouter.ai` | `openrouter` | `openrouterDialect` |
+| `chatCompletions()` | `api.together.ai`, `api.together.xyz` | `togetherai` | `togetheraiDialect` |
 
 A `chatCompletions()` provider without the OpenRouter dialect no longer reads OpenRouter's `reasoning_details` or the `content` of a citation from responses; behind a proxy to OpenRouter, pass `dialect: openrouterDialect` to keep reasoning continuity and cited text. Model IDs are never rewritten — pass the slug the gateway lists.
 
