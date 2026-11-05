@@ -310,3 +310,15 @@ import { TurnEventBuilder } from "@fifthrevision/axle";
 Converts `StreamEvent`s into `TurnEvent`s — the same translation `Agent` does
 internally. You'd only need this if you're driving `stream()` directly but still
 want render-layer events.
+
+## renderTerminalMarkdown
+
+```typescript
+renderTerminalMarkdown(text: string): string;
+```
+
+Markdown in, ANSI-styled terminal text out. Exported from
+`@fifthrevision/axle/ui` only — it's what a terminal renderer needs for a
+turn's text parts, and it's the same rendering `SimpleWriter`'s
+[`markdown` option](/reference/observability#simplewriter) applies to event
+messages.
