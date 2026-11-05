@@ -37,14 +37,14 @@ npm install @fifthrevision/axle zod
 - **An API key** for Anthropic, OpenAI, or Gemini — or a local
   OpenAI-compatible endpoint like Ollama or vLLM, which needs no key at all.
 
-## The three entry points
+## The two entry points
 
 Most of the time you'll only use the first one.
 
 | Import | What's in it |
 | --- | --- |
 | `@fifthrevision/axle` | Everything: `Agent`, `Instruct`, providers, `stream()`, `generate()`, tools, MCP, errors. |
-| `@fifthrevision/axle/ui` | A type-only surface for renderers: `Turn`, `TurnEvent`, `Transcript`, `Citation`, `Stats`. Import this in UI code so you don't pull three provider SDKs into your browser bundle. |
+| `@fifthrevision/axle/ui` | The render surface: the `Turn`, `TurnEvent`, `Citation` and `Stats` types, plus three runtime values — `Transcript`, `computeCost` and `renderTerminalMarkdown`. Import this in UI code so you don't pull three provider SDKs into your browser bundle. |
 
 ## API keys
 

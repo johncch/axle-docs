@@ -151,4 +151,4 @@ or `appendixTokens` is negative.
 | Import | Contains |
 | --- | --- |
 | `@fifthrevision/axle` | The full runtime surface. |
-| `@fifthrevision/axle/ui` | Type-only render surface plus `Transcript` — no provider SDKs. |
+| `@fifthrevision/axle/ui` | The render surface: the render-layer types plus `Transcript`, `computeCost` and `renderTerminalMarkdown` — no provider SDKs. |

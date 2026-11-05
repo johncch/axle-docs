@@ -107,13 +107,12 @@ rejects `"openai/gpt-5.1"` before it costs you a round trip.
 Accepted prefixes are what you'd guess, with one convenience: `gemini()` takes
 both `google/` and `gemini/`.
 
-### No model registry — but there is a ModelCatalog
+### No model registry
 
 There is no model registry. Axle ships no list of models, no context windows, no
-output ceilings — model IDs are plain strings your application owns. If you need
-a ceiling or a capability flag, keep your own table or ask the provider's models
-API. A model hosted by several vendors has a different ID on each, so a shared
-constant could never be portable with `chatCompletions()` anyway.
+output ceilings — model IDs are plain strings your application owns. A model
+hosted by several vendors has a different ID on each, so a shared constant could
+never be portable with `chatCompletions()` anyway.
 
 ```typescript
 const model = "openai/gpt-5.5";
@@ -123,31 +122,11 @@ const model = "openai/gpt-5.5";
 and `ModelMetadata` exports were removed in 0.33.0 — see
 [Upgrading](/upgrading).)
 
-What 0.35.0 keeps is narrower: `ModelCatalog`, a synchronous, immutable index
-over the models.dev catalog for answering "how big is this model's window?"
-without keeping your own table — and `computeCost(usage, catalog)` for pricing
-a `Stats` at each request's own tier. Load saved JSON, refresh when it's stale,
-and ask:
-
-```typescript
-import { ModelCatalogStore, catalogFile, computeCost } from "@fifthrevision/axle";
-
-const file = catalogFile("./.cache/axle-models.json");
-const catalogs = new ModelCatalogStore({ providers: ["anthropic"] });
-catalogs.load(await file.read());
-const snapshot = await catalogs.refreshIfStale();
-if (snapshot) await file.write(snapshot);
-const catalog = catalogs.current;
-const hit = catalog?.contextWindow("openai/gpt-5.5");
-// { window, id, match } | undefined
-```
-
-`new ModelCatalog(data)` takes its data as given; `fetchModelsDev()` fetches
-`CatalogData` (version 4) and `parseCatalogData()` reads saved JSON. `lookup`
-and `contextWindow` take `{ provider }`, not `{ host }`. When to refresh is
-your call — drive a compaction threshold or a progress meter with it; price
-with `computeCost`. Full signatures are in the [Providers
-reference](/reference/providers#model-catalog-and-cost).
+When you do need a ceiling, a capability flag or a price, there is an opt-in
+data layer for it: `ModelCatalog` indexes the models.dev catalog, and
+`computeCost(usage, catalog)` prices a `Stats` with it. Neither is a registry —
+you load and store the data, and the runtime never consults it. See [Model
+catalog & cost](/concepts/model-catalog).
 
 ## Request options
 
@@ -296,8 +275,15 @@ your messages and tool payloads. They're not what the provider will bill you.
 They're good enough to drive a compaction threshold or a progress meter, and not
 good enough for accounting. For real numbers, read `result.usage` after a send.
 
+What `agent.context()` can't tell you is how full "full" is — it reports no
+limit, because the runtime keeps no table of windows. [Model catalog &
+cost](/concepts/model-catalog#budgeting-the-window) is where the limit comes
+from.
+
 ## Next
 
 - [Agent](/concepts/agent) — the thing that uses a provider
+- [Model catalog & cost](/concepts/model-catalog) — windows, prices, and where
+  `provider.id` lands
 - [Tools](/concepts/tools) — including the provider-managed kind
 - [Providers reference](/reference/providers) — every factory signature

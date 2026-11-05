@@ -182,6 +182,22 @@ settles, holds the queue, and runs inline turns via `ctx.send()`. See
 (the models.dev provider id stamped on usage rows). See [Providers &
 models](/concepts/providers).
 
+**Catalog data** — `CatalogData`, the plain JSON a `ModelCatalog` indexes: a
+canonical layer of models keyed `publisher/model`, a provider layer of each
+provider's own ids with its limits and prices, plus `fetchedAt`, `etags` and
+`coverage` (the provider filter it was fetched with). `fetchModelsDev()`
+produces it, you store it, `parseCatalogData()` reads it back, and you may
+amend it. The catalog itself never fetches; `ModelCatalogStore` is what loads
+and refreshes it. Not the *skills* catalog, which is a section of the system
+prompt. See [Model catalog & cost](/concepts/model-catalog).
+
+**Cost** — what `computeCost(usage, catalog)` returns for a `Stats`: `usd`, the
+sum of `priced` (rows with their own `usd`), and `unpriced` (rows with a
+`reason`: `no-catalog`, `no-provider`, `unlisted` or `no-price`). `pricedWith`
+is the `fetchedAt` of the catalog that priced the rows. Each row is priced by
+the catalog's provider layer at the tier its own `in` selects, cache and
+reasoning tokens at their own rate where the provider lists one.
+
 ## Renamed terms
 
 | Was | Is | Since |

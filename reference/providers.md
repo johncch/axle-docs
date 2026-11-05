@@ -175,13 +175,19 @@ were already OpenRouter slugs are unaffected.
 
 ## Model catalog and cost
 
+Conceptual guide: [Model catalog & cost](/concepts/model-catalog).
+
 The `@fifthrevision/axle/models` entry point (`Models`, `ModelInfo`,
 `ModelMetadata`) no longer exists (removed in 0.33.0). Pass model IDs as plain strings.
 
-`ModelCatalog` is a synchronous, immutable index over `CatalogData` (version 4: a canonical `publisher/model` layer plus a per-provider layer with each provider's own ids, limits, and prices). Loading and refreshing live in `ModelCatalogStore`, which never touches storage.
+::: warning Experimental
+`ModelCatalog`, `ModelCatalogStore`, the catalog functions and `computeCost`
+are marked `@experimental`: they are new in 0.35.0 and may change in a minor
+release.
+:::
 
 ```typescript
-import { ModelCatalog, ModelCatalogStore, catalogFile, fetchModelsDev, parseCatalogData } from "@fifthrevision/axle";
+import { ModelCatalogStore, catalogFile } from "@fifthrevision/axle";
 
 const file = catalogFile("./.cache/axle-models.json");
 const catalogs = new ModelCatalogStore({ providers: ["anthropic"] });
@@ -193,25 +199,192 @@ const hit = catalog?.contextWindow("openai/gpt-5.5", { provider: "openai" });
 // { window, id, match } | undefined
 ```
 
-```typescript
-new ModelCatalog(data: CatalogData)
-new ModelCatalogStore(options?: ModelCatalogStoreOptions)
+### ModelCatalog
 
-interface ModelCatalogStoreOptions {
-  providers?: string[]; // models.dev provider ids to keep; omit for all
+```typescript
+class ModelCatalog {
+  constructor(data: CatalogData);
+  get fetchedAt(): string; // ISO 8601, read back from the data
+  get coverage(): "all" | string[]; // the provider filter the data was fetched with
+  lookup(model: string, options?: { provider?: string; publisher?: string }): CatalogMatch | undefined;
+  contextWindow(model: string, options?: { provider?: string; publisher?: string }): ContextWindowMatch | undefined;
+}
+```
+
+A synchronous, immutable index over `CatalogData` (version 4: a canonical
+`publisher/model` layer plus a per-provider layer with each provider's own ids,
+limits and prices). It never fetches — new data means a new catalog — and takes
+its data as given, so read saved JSON with `parseCatalogData`, not `JSON.parse`.
+Loading and refreshing live in `ModelCatalogStore`, which never touches storage.
+
+`lookup` resolves in three steps and `match` reports which one answered. Both
+options are optional; `{ provider }` and `{ publisher }` replace the old
+`{ host }`.
+
+| `match` | How it matched |
+| --- | --- |
+| `"provider"` | `options.provider`'s own ids, compared case-insensitively. When the model id's publisher *is* the provider, the bare name is tried too (`anthropic/claude-sonnet-5` matches the provider's `claude-sonnet-5`). The only match that carries `cost`. |
+| `"exact"` | the canonical `publisher/model` key — a bare id is qualified with `options.publisher` when one is given — or a unique exact match on the normalized model name |
+| `"prefix"` | a unique prefix match on the normalized name |
+
+Normalizing drops trailing build tags (`mlx`, `latest`, `gguf`, `q4_0`, `fp16`,
+`bf16`) and ignores punctuation, case and the publisher, which is what makes a
+local runtime's `gemma4:26b-mlx` findable. An ambiguous name — two models
+normalize alike, or several share the prefix — returns `undefined`, as does no
+match at all.
+
+```typescript
+interface CatalogMatch {
+  id: string; // the canonical publisher/model id, or provider/id for a model only that provider lists
+  match: "provider" | "exact" | "prefix";
+  model: CatalogModel;
+  cost?: ModelCost; // provider matches only
+}
+
+interface ContextWindowMatch {
+  window: number; // model.limit.context
+  id: string;
+  match: "provider" | "exact" | "prefix";
+}
+```
+
+A provider match merges that provider's own `limit` over the canonical model's,
+so `model.limit` is the limit for the service you named.
+
+### CatalogModel and ModelCost
+
+```typescript
+interface CatalogModel {
+  name: string;
+  limit: { context: number; output?: number; input?: number };
+  reasoning: boolean;
+  toolCall: boolean;
+  structuredOutput?: boolean;
+  attachment: boolean;
+  modalities: { input: string[]; output: string[] };
+  knowledge?: string; // training cutoff
+}
+
+interface ModelCost {
+  input: number; // USD per million tokens
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  reasoning?: number;
+  tiers?: {
+    size: number;
+    input: number;
+    output: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+    reasoning?: number;
+  }[];
+}
+```
+
+A `tiers` entry prices a request whose context exceeds `size`; entries ascend by
+size, and the last one a request exceeds wins.
+
+### ModelCatalogStore
+
+```typescript
+class ModelCatalogStore {
+  constructor(options?: ModelCatalogStoreOptions);
+  get current(): ModelCatalog | undefined;
+  load(json: string | undefined): void;
+  refresh(): Promise<string | undefined>;
+  refreshIfStale(): Promise<string | undefined>;
+  snapshot(): string | undefined;
+}
+
+interface ModelCatalogStoreOptions extends Omit<FetchModelsDevOptions, "previous"> {
+  providers?: string[]; // models.dev provider ids to keep; omit for all, [] to skip the layer
   maxAge?: number; // ms past which refreshIfStale() fetches; default one day
   timeout?: number; // fetch timeout; default 10s
   baseUrl?: string; // catalog origin; default https://models.dev
-  fetch?: typeof fetch;
+  signal?: AbortSignal;
+}
+```
+
+- `load(json)` takes the saved JSON and ignores anything that is not usable
+  `CatalogData` — missing, corrupt, or written by an older Axle. It never
+  throws, and `current` stays as it was.
+- `refresh()` fetches with the current data's ETags and makes the result
+  current. It resolves the JSON snapshot to save, or `undefined` when the fetch
+  failed: it never rejects for the network. Concurrent calls share one fetch.
+  Nothing refreshes on its own.
+- `refreshIfStale()` is `refresh()` when there is no data or it is older than
+  `maxAge`, and otherwise resolves `undefined`.
+- `snapshot()` is the current data as JSON, or `undefined` when there is none.
+
+### Storage
+
+```typescript
+catalogFile(path: string): CatalogStorage
+
+interface CatalogStorage {
+  read(): Promise<string | undefined>;
+  write(json: string): Promise<void>;
+}
+```
+
+`catalogFile` writes atomically (temp file, then rename) and creates the parent
+directory; an unreadable or missing file reads as `undefined`. The store only
+ever hands out and takes JSON text, so any `CatalogStorage` — a database row, an
+object store — works the same way.
+
+### fetchModelsDev
+
+```typescript
+fetchModelsDev(options?: FetchModelsDevOptions): Promise<CatalogData>
+
+interface FetchModelsDevOptions {
+  providers?: string[]; // models.dev provider ids to keep; omit for all, [] skips the provider layer
+  previous?: CatalogData; // send its ETags; an unchanged layer downloads nothing
+  timeout?: number; // whole-fetch budget in ms; default 10_000
+  baseUrl?: string; // default https://models.dev
   signal?: AbortSignal;
 }
 
-fetchModelsDev(options?: FetchModelsDevOptions): Promise<CatalogData>
-parseCatalogData(json: string): CatalogData | undefined
-catalogFile(path: string): CatalogStorage
+class CatalogFetchError extends Error {} // cause holds the underlying error
 ```
 
-`fetchModelsDev({ providers, previous, timeout, baseUrl, signal })` resolves to `CatalogData` or rejects with `CatalogFetchError` (network, timeout, HTTP error, wrong shape). With `previous`, unchanged layers download nothing (ETags). `refresh()` never rejects for the network (resolves the new snapshot or `undefined`) and concurrent calls share one fetch; nothing refreshes on its own. `lookup(model, { provider })` / `contextWindow(model, { provider })` replace the old `{ host }` option; `CatalogMatch.match` is now `"provider" | "exact" | "prefix"`.
+Fetches both layers and slims them to what the catalog reads. It rejects with
+`CatalogFetchError` when either layer cannot be fetched or parsed — a network
+failure, the timeout, an HTTP error status, a body of the wrong shape — and
+there is no partial result, so the data you already had remains the best you
+have. `fetchedAt` is always the time of this fetch, even for a layer that came
+back `304`. The `providers` filter is recorded as `coverage`, and a `previous`
+fetched under a different filter is not reused for the provider layer (its
+canonical layer still is).
+
+### CatalogData
+
+```typescript
+interface CatalogData {
+  version: 4;
+  fetchedAt: string; // ISO 8601
+  etags: { models?: string; api?: string };
+  coverage: "all" | string[];
+  models: Record<string, CatalogModel>; // keyed publisher/model
+  providers: Record<string, Record<string, ProviderEntry>>; // provider id → its own model ids
+}
+
+interface ProviderEntry {
+  canonical?: string; // key into models
+  model?: CatalogModel; // for a model only this provider lists
+  limit?: Partial<CatalogModel["limit"]>; // overrides the canonical limit
+  cost?: ModelCost;
+}
+```
+
+Plain JSON, and yours to edit before building a catalog: a negotiated price, a
+self-hosted model, a test fixture with no network. `parseCatalogData(json)`
+returns it, or `undefined` for text that is not JSON or is another version or
+shape — which means there is no usable copy and the answer is to fetch.
+`ProviderEntry` is not exported; it is the shape inside `CatalogData.providers`.
+
+### computeCost
 
 ```typescript
 import { computeCost } from "@fifthrevision/axle";
@@ -220,7 +393,28 @@ const cost = computeCost(usage, catalog);
 // { usd, priced: PricedEntry[], unpriced: UnpricedEntry[], pricedWith? }
 ```
 
-`computeCost` is synchronous, never throws, and prices each `breakdown` row at the tier its own `in` selects (with cache/reasoning rates where listed). Unpriced rows carry `reason: "no-catalog" | "no-provider" | "unlisted" | "no-price"`.
+```typescript
+computeCost(usage: Stats, catalog?: ModelCatalog): Cost;
+```
+
+Synchronous, never throws. It prices each `breakdown` row on its own: the row's
+`provider` and `model` (then `requestedModel`) are looked up in the provider
+layer, the tier is the one the row's own `in` selects, and cached, cache-write
+and reasoning tokens are priced at their own rates where the provider lists
+them, the rest at the plain input/output rate. `usd` sums `priced` only.
+`pricedWith` is the catalog's `fetchedAt`, absent when no row was priced.
+
+Unpriced rows carry `reason`:
+
+| `reason` | Meaning |
+| --- | --- |
+| `no-catalog` | no catalog was passed |
+| `no-provider` | the row has no `provider` id |
+| `unlisted` | the catalog has no `"provider"` match for that provider and model |
+| `no-price` | the provider lists the model but no price |
+
+Full `Cost`, `PricedEntry` and `UnpricedEntry` shapes are in the [Observability
+reference](/reference/observability#usage-stats-breakdown-and-cost).
 
 ## Context estimation
 
@@ -251,7 +445,9 @@ interface ContextUsage {
 ```
 
 Heuristic and computed locally — not provider-reported. `agent.context()` calls
-this with the agent's own state.
+this with the agent's own state and no `limit`, so its result carries neither
+`limit` nor `free`; pass one yourself — from
+[`catalog.contextWindow()`](#modelcatalog), say — to get them.
 
 ## AIProvider
 

@@ -62,6 +62,7 @@ export default defineConfig({
         text: 'Building blocks',
         items: [
           { text: 'Providers & models', link: '/concepts/providers' },
+          { text: 'Model catalog & cost', link: '/concepts/model-catalog' },
           { text: 'Instruct', link: '/concepts/instruct' },
           { text: 'Tools', link: '/concepts/tools' },
           { text: 'The tool registry', link: '/concepts/tool-registry' },
