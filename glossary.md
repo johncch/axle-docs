@@ -182,6 +182,26 @@ settles, holds the queue, and runs inline turns via `ctx.send()`. See
 (the models.dev provider id stamped on usage rows). See [Providers &
 models](/concepts/providers).
 
+**Provider** — the service that serves and bills a request, named by its
+models.dev id (`anthropic`, `amazon-bedrock`, `openrouter`). In code, the
+`AIProvider` an `Agent` takes: a protocol configured with a base URL, auth and
+(on `chatCompletions`) a dialect, carrying that id as `id`. A provider whose
+service Axle doesn't recognize — a local server — has no `id`. Two providers can
+share one (Bedrock in two regions). Presets like `anthropic()` are shorthand for
+a protocol constructor with the configuration filled in. Prices are per provider
+and model, so usage is priced by `id`. One exception to the naming: the
+`provider` field of a thinking or provider-tool `continuity` names the wire
+format the continuity came from, because continuity is stored in conversation
+history.
+
+**Publisher** — who trained and released the model, and the first half of a
+canonical `publisher/model` id. A model's publisher never changes with where it
+is served, which is what makes the namespaced form portable.
+
+**Host** — whose hardware ran a request, when that differs from the provider: a
+router such as OpenRouter bills the request and forwards it to a host. Axle
+records no hosts, and models.dev doesn't price by them.
+
 **Catalog data** — `CatalogData`, the plain JSON a `ModelCatalog` indexes: a
 canonical layer of models keyed `publisher/model`, a provider layer of each
 provider's own ids with its limits and prices, plus `fetchedAt`, `etags` and
