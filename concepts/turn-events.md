@@ -5,8 +5,9 @@ description: The event stream an Agent emits — render-shaped, and best consume
 
 # Turn events
 
-`agent.on()` emits `TurnEvent` — the stream that builds the
-[turns](/concepts/transcripts) you just met. Organized into turns and parts with
+`agent.on()` emits `AgentEvent` — the stream that builds the
+[turns](/concepts/transcripts) you just met, plus the operation lifecycle
+around them. The turn events are organized into turns and parts with
 stable ids, shaped for drawing a conversation rather than for driving a loop.
 
 A turn is an Agent concept, so this is the *only* place turn events come from.
@@ -42,15 +43,32 @@ already handles the edge cases you haven't hit yet.
 Every event after `turn:user` carries a `turnId`, and part-level events carry a
 `partId` — the same stable ids you render against.
 
+- **Operation lifecycle** — `operation:start`, `after:start`, `after:end`, `operation:end`, `agent:idle`
 - **Pending lifecycle** — `pending:queued`, `pending:dropped`
 - **Turn lifecycle** — `turn:user`, `turn:start`, `turn:end` (carries `failure?` and `reason?`)
 - **Part streaming** — `part:start`, `text:delta`, `text:citation`,
   `thinking:raw-delta`, `thinking:summary-delta`, `thinking:update`, `part:end`
-- **Actions** — `action:args-delta`, `action:running`, `action:progress`,
-  `action:complete`, `action:cancelled`, `action:error`
+- **Actions** — `action:args-delta`, `action:running`, `action:waiting`, `action:input`,
+  `action:progress`, `action:complete`, `action:cancelled`, `action:error`
 - **Nesting** — `action:child-event`, wrapping a subagent's own turn events
 - **Compaction** — `compaction:update`, `compaction:complete`, `compaction:cancelled`, `compaction:error`
 - **Annotations** — `annotation:start`, `annotation:update`, `annotation:end`
+
+### The operation around the turns
+
+A send is an **operation** — a queued unit of work that produces turns. The
+lifecycle events frame it: `operation:start { id, kind }` when it takes the
+queue, `after:start` / `after:end` around its continuation if it carries one,
+`operation:end { id, outcome }` when the handle settles, and `agent:idle` when
+nothing is left queued behind it. The outcome is `complete`, `cancelled`, or
+`error` with a message.
+
+You rarely render these — they're for status bars, queue badges, and "agent is
+working" indicators — but one companion is worth knowing: `agent.status` reads
+`{ phase: "idle" }` or `{ phase: "busy", id }`, and already shows the new value
+by the time the event that moved it reaches your callback. The callback type is
+`AgentEventCallback`, taking the whole `AgentEvent`; every `AgentEvent` is still
+a `TurnEvent`, so `agent.on(transcript.apply)` keeps working unchanged.
 
 ### The first event of a send is pending:queued
 
@@ -90,6 +108,13 @@ A cancelled call ends `action:cancelled` with `status: "cancelled"` and no
 still streaming it, or before its batch started) settles the same way before
 `turn:end`. Match `status === "cancelled"` instead of the old
 `error.type === "aborted"` shape.
+
+A deferred call skips the running phase entirely — nothing executes. The part
+opens `pending`, moves to `waiting` when the validated call reaches your
+handler (`action:waiting`, carrying the tool call `id` as `callId` plus `name`
+and `input`), and closes with the answer. Its `kind` is `"deferred"`, with
+`status` running `pending` → `waiting` → `complete` | `cancelled` | `error`.
+See [Tools](/concepts/tools#deferred-tools).
 
 `Transcript` folds all five into one `action` part whose `status` and `detail`
 you can render directly. The `pendingArgs` field it maintains during phase 2

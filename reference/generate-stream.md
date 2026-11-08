@@ -39,11 +39,12 @@ Both extend `AxleModelRequestOptions`.
 | `model` | `string` | **Required.** |
 | `messages` | `AxleMessage[]` | **Required** (optional with `instruct`). |
 | `system` | `string` | System instruction. |
-| `tools` | `ExecutableTool[]` | Local tools. |
+| `tools` | `AnyTool[]` | Executable and deferred tools. |
 | `providerTools` | `ProviderTool[]` | Provider-managed tools. |
-| `onToolCall` | `ToolCallCallback` | Intercepts tool calls before the registry. |
+| `onToolCall` | `ToolCallCallback` | Answers calls to the deferred tools in `tools`. Executable tools never reach it. |
 | `maxSteps` | `number` | Cap on model requests. Must be ≥ 1. |
 | `maxContextTokens` | `number` | Context budget in tokens. Must be ≥ 1. |
+| `streamStallMs` | `number` | Longest gap in milliseconds between two chunks from the provider on one step's stream, the wait for the first included. When it passes, the request aborts and the run ends `ok: false` with `{ kind: "api", type: "StreamStall" }`; nothing is retried. Unset by default. Must exceed a reasoning model's silent thinking. |
 | `span` | `Span` | Parent tracing span. |
 | `fileResolver` | `FileResolver` | Resolves deferred file references. |
 | `sessionId` | `string` | Conversation identity forwarded to the provider on every step. Only OpenRouter uses it today (as `session_id`, for sticky routing, cache affinity, and dashboard grouping); other providers ignore it. `Agent` passes its own `sessionId`; a call without one gets a fresh id so the steps of its own tool loop stay together. Pass the same id to separate calls to share OpenRouter cache reads across them. |
@@ -72,30 +73,25 @@ becomes the parsed value instead of a message.
 ### onToolCall
 
 ```typescript
-type ToolCallCallback = (
-  name: string,
-  parameters: Record<string, unknown>,
-  ctx: ToolContext,
-) => Promise<ToolCallResult | null | undefined>;
+import type { DeferredCall, ToolCallCallback, ToolContext } from "@fifthrevision/axle";
+import type { ToolResultPart } from "@fifthrevision/axle";
 
-type ToolCallResult =
-  | { type: "success"; content: string | ToolResultPart[] }
-  | { type: "error"; error: { type: string; message: string; fatal?: boolean; retryable?: boolean } };
+type ToolCallCallback = (
+  call: DeferredCall,
+  ctx: ToolContext,
+) => string | ToolResultPart[] | void | Promise<string | ToolResultPart[] | void>;
 ```
 
-Runs **before** the registry. Returning `null` or `undefined` falls through to a
-registered tool of that name; if there is none, the call fails. On the
-fall-through path the call's arguments are parsed with the tool's schema before
-`execute` — a mismatch returns a `validation` error tool result without calling
-`execute`. A result returned directly from `onToolCall` bypasses validation
-entirely.
-
-::: warning These two types are not exported
-`ToolCallCallback` and `ToolCallResult` are declared by the package but not
-exported, so you can't annotate your handler with them. Write the callback
-inline — it's contextually typed from `GenerateParams` / `StreamParams` — or
-copy the shape above.
-:::
+Answers calls to the deferred tools in `tools`. The call arrives with its
+arguments already validated against the tool's schema (`{ id, name, input }`);
+the handler returns what an `execute` would, throws to hand the model an
+`execution` error result, and returns nothing for a call it does not answer —
+which stays waiting for `toolCall(id)`, the tool's `timeout`, or cancellation.
+Executable tools never reach the handler; the call's arguments are validated
+before the handler runs, and a mismatch returns a `validation` error tool
+result without calling it. `generate()` has no handle, so a call the handler
+does not answer — or any call when there is no handler — fails at once with an
+`execution` error naming the tool.
 
 ## Handles
 
@@ -104,6 +100,7 @@ interface StreamHandle {
   on(callback: (event: StreamEvent) => void): void;
   onToolBatchComplete(callback: ToolBatchCompleteCallback): void;
   cancel(reason?: unknown): void;
+  toolCall(id: string): WaitingToolCall | undefined;
   readonly final: Promise<StreamResult>;
 }
 
@@ -198,9 +195,10 @@ Correlated by `id`.
 
 | Event | Fields |
 | --- | --- |
-| `tool:request` | `id`, `name`, `kind?` (`"tool"` \| `"agent"`) |
+| `tool:request` | `id`, `name`, `kind?` (`"tool"` \| `"agent"` \| `"deferred"`) |
 | `tool:args-delta` | `id`, `name`, `delta`, `accumulated` |
-| `tool:exec-start` | `id`, `name`, `parameters` |
+| `tool:exec-start` | `id`, `name`, `parameters` — never fires for deferred calls |
+| `tool:waiting` | `id`, `name`, `input` — the validated deferred call, handed to `onToolCall`; answer it or wait for `toolCall(id)` |
 | `tool:exec-delta` | `id`, `name`, `chunk` |
 | `tool:exec-complete` | `id`, `name`, `result`, `usage?` |
 | `tool:exec-error` | `id`, `name`, `error: { type: "fatal" \| "aborted"; message }`, `usage?` |

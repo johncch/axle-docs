@@ -24,7 +24,7 @@ Extends `AxleModelRequestOptions` minus `signal`.
 | `sessionId` | `string` | `crypto.randomUUID()` | Stable conversation id. |
 | `system` | `string` | — | System/developer instruction. |
 | `name` | `string` | — | Agent name; appears on spans as `agentName`. |
-| `tools` | `ExecutableTool[]` | — | Local executable tools. |
+| `tools` | `AnyTool[]` | — | Executable tools the agent runs, and deferred tools answered through `agent.onToolCall()`. |
 | `providerTools` | `ProviderTool[]` | — | Provider-managed tools. |
 | `skills` | `Skill[]` | — | Skills disclosed in the system prompt and loaded on demand through the `view-skill` tool. See [Skills](/concepts/skills). |
 | `mcps` | `MCP[]` | — | MCP clients, resolved lazily on first send. |
@@ -36,6 +36,8 @@ Extends `AxleModelRequestOptions` minus `signal`.
 | `parallelToolCalls` | `boolean` | — | Ask the provider to avoid parallel tool calls. |
 | `cache` | `boolean` | — | Ask the provider to cache the prompt prefix where asking is required (Anthropic, OpenRouter). Defaults to on. |
 | `providerOptions` | `Record<string, any>` | — | Raw passthrough, applied after normalized mappings. |
+| `turnTimeoutMs` | `number` | — | Longest a turn may run, from opening to `turn:end` — every model step, tool call, and deferred wait included. When it elapses the turn is cancelled with `{ type: "timeout", limitMs }` as the abort reason (see `isTimeoutReason`); on the send's own turn the handle rejects and `operation:end` carries it as `{ type: "cancelled", reason }`. A send's own value overrides it. |
+| `streamStallMs` | `number` | — | Longest gap between two chunks from the provider — as `stream()`'s `streamStallMs`. When it passes, the step fails `ok: false` with `{ kind: "api", type: "StreamStall" }`; not retried. A send's own value overrides it. |
 
 When both `config.sessionId` and `session.sessionId` are supplied, the restored
 session id wins.
@@ -59,6 +61,9 @@ session id wins.
 | `skills` | `SkillRegistry` | readonly — the skills disclosed in the system prompt; mutating it rebuilds the `view-skill` tool and lands on the next provider request |
 | `requestOptions` | `Omit<AxleModelRequestOptions, "signal">` | readonly |
 | `fileResolver` | `FileResolver \| undefined` | readonly |
+| `turnTimeoutMs` | `number \| undefined` | readonly |
+| `streamStallMs` | `number \| undefined` | readonly |
+| `status` | `AgentStatus` | `{ phase: "idle" }`, or `{ phase: "busy", id }` with the running operation's id. Busy covers `onStart` callbacks, the continuation, and `onSettled` — changes only at `operation:start` and `agent:idle`, and already reads the new value when the event that moved it is delivered. |
 | `sessionId` | `string` | mutable |
 | `system` | `string \| undefined` | readonly getter — the configured system prompt, then the skills catalog when skills are present |
 | `messages` | `AxleMessage[]` | Getter returning a **copy** of the active conversation. |
@@ -92,6 +97,9 @@ defaults; `providerOptions` merges key-by-key.
 | `fileResolver` | `FileResolver` | Overrides the agent's resolver for this send. |
 | `metadata` | `MessageMetadata` | Host-owned metadata attached to the user message and copied to the user turn. Providers ignore it. |
 | `signal` | `AbortSignal` | Cancels this send. |
+| `id` | `string` | Id for the send's user turn — the one `pending:queued`, `turn:user`, and `onSettled` carry. Generated when omitted. |
+| `turnTimeoutMs` | `number` | This send's turn timeout, overriding the agent's `turnTimeoutMs`. |
+| `streamStallMs` | `number` | This send's stall limit, overriding the agent's `streamStallMs`. |
 | ...request options | | `reasoning`, `maxOutputTokens`, `toolChoice`, `parallelToolCalls`, `cache`, `providerOptions`. (`temperature`, `topP`, and `stop` were removed in 0.33.0 — use `providerOptions`.) |
 
 ### AgentHandle
@@ -150,16 +158,17 @@ interface ContinuationContext {
   readonly pending: readonly Turn[];
 }
 
-type InlineSendOptions = Omit<SendMessageOptions, "after">;
+type InlineSendOptions = Omit<SendMessageOptions, "after" | "signal">;
 ```
 
 The continuation runs after the send's turn settles with a result (`ok` or
 not); a rejected handle skips it. It holds the queue until it returns and
 `ctx.send()` runs inline turns — ordinary turns except they start at once with
-no `pending:queued`. A continuation that throws rejects the handle and the
-queue continues. `cancel()` during a continuation aborts `ctx.signal` and any
-inline turn in flight; `stop()` keeps its tool-batch meaning for an inline turn;
-`clear()` never touches a continuation.
+no `pending:queued`, carry the send's id as `threadId` on their user turn and
+`Turn`, and fire no hook of their own. A continuation that throws rejects the
+handle and the queue continues. `cancel()` during a continuation aborts
+`ctx.signal` and any inline turn in flight; `stop()` keeps its tool-batch
+meaning for an inline turn; `clear()` never touches a continuation.
 
 ## stop()
 
@@ -197,11 +206,69 @@ cleared.
 ## on()
 
 ```typescript
-on(callback: (event: TurnEvent) => void): () => void
+on(callback: (event: AgentEvent) => void): () => void
 ```
 
-Registers a turn-event callback for all subsequent sends. Returns an
-unsubscribe function.
+Registers an event callback for all subsequent sends. Returns an unsubscribe
+function. `AgentEvent` is the turn events plus the operation lifecycle
+(`operation:start`, `after:start` / `after:end`, `operation:end`, `agent:idle`).
+`TurnEventCallback` is removed — annotate with `AgentEventCallback`.
+
+## onStart()
+
+```typescript
+onStart(callback: StartCallback): () => void
+```
+
+Called each time an operation takes the queue, before its turn opens — never
+inside `send()` itself. `status` is already `busy` with the operation's id, and
+`operation:start` has been emitted.
+
+```typescript
+type StartCallback = (operation: StartedOperation) => void | Promise<void>;
+
+interface StartedOperation {
+  kind: "send" | "compaction";
+  id: string; // the one its pending:queued turn carried
+  signal: AbortSignal; // aborts when the operation is cancelled
+}
+```
+
+The operation does not start its work until every callback has settled, and all
+callbacks run together. One that throws skips the work and the continuation:
+the pending turn is dropped with the error, `onSettled` still runs with it as
+the result, and the handle rejects with it. A `cancel()` while callbacks run
+aborts `operation.signal`, and the work is skipped once they return. An
+operation cancelled while still queued never starts and does not fire.
+
+Do not await `send()`, `compact()`, or `snapshot()` on this agent from inside a
+callback: the callback holds the queue they wait for, so the nested call
+deadlocks.
+
+## onToolCall()
+
+```typescript
+onToolCall(handler: ToolCallCallback): () => void
+```
+
+Answers the agent's deferred tool calls. One handler per agent, the dispatcher
+over every deferred tool: registering another replaces it, and the returned
+function removes it if it is still the one in place. The handler in place when
+a turn opens is the one that turn uses. The contract is `execute`'s — return
+the result, throw to give the model an error, and return nothing for a call no
+branch answers. See [Deferred tools](/concepts/tools#deferred-tools).
+
+## toolCall()
+
+```typescript
+toolCall(id: string): WaitingToolCall | undefined
+```
+
+The deferred call with this tool call id while the active turn is waiting on
+it; `undefined` once it has settled or when no turn is running. `answer` gives
+the model the result and `fail` an `execution` error carrying the message — the
+two outcomes `onToolCall` has. Whichever of the handler, this, the tool's
+`timeout`, and `cancel()` comes first settles the call.
 
 ## onSettled()
 
@@ -209,12 +276,11 @@ unsubscribe function.
 onSettled(callback: SettledCallback): () => void
 ```
 
-Fires after every turn that commits — once per send unless the send carries a
-continuation, in which case it also fires for each inline turn under that
-turn's own id (which no `pending:queued` announced) — and once for an operation
-that ran without opening a turn, however it ended: after its `turn:end` when
-it opened a turn, and before its handle settles. The agent is at rest and the
-next queued operation has not started, so a host that reads its
+Fires once for every operation that started, however it ended — one send, one
+call: after its turn and its continuation, before `operation:end` is emitted
+and its handle settles. Inline turns a continuation sent do not fire it on
+their own; their outcome arrives under the send's `result.after`. The agent is
+at rest and the next queued operation has not started, so a host that reads its
 `Transcript.turns` inside the callback gets turns and messages that match. An
 operation cancelled while still queued never ran and does not fire.
 

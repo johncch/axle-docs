@@ -130,6 +130,36 @@ Default to ordinary throws — models are surprisingly good at recovering from a
 tool that says "that didn't work." Save fatal for when carrying on would be
 incoherent.
 
+## Asking the caller instead
+
+When the answer needs a person — an approval, a missing credential, a choice
+only the user can make — don't throw and hope. Declare a deferred tool and let
+the caller answer:
+
+```typescript
+import { isCall, type DeferredTool } from "@fifthrevision/axle";
+
+const approveDeploy = {
+  type: "deferred",
+  name: "approve_deploy",
+  description: "Ask the person whether to deploy, and wait for their answer",
+  schema: z.object({ summary: z.string() }),
+} satisfies DeferredTool;
+
+const agent = new Agent({ provider, model, tools: [setName, approveDeploy] });
+
+agent.onToolCall((call) => {
+  if (!isCall(approveDeploy, call)) return;
+  return prompt(`Deploy? ${call.input.summary} (yes/no)`);
+});
+```
+
+The model calls `approve_deploy` like any other tool, `prompt` resolves with
+the person's answer, and the turn continues with it. A branch that returns
+nothing leaves the call waiting — answer it later from anywhere that holds the
+agent with `agent.toolCall(id)?.answer("yes")`, or bound the wait with the
+tool's `timeout`. See [Deferred tools](/concepts/tools#deferred-tools).
+
 ## Forwarding cancellation
 
 Please pass `ctx.signal` into your I/O. Without it, `handle.cancel()` stops the
@@ -157,6 +187,6 @@ For a hard cap on model requests, drive the loop yourself with
 
 ## See also
 
-- [Tools](/concepts/tools) — provider tools, MCP, subagents
+- [Tools](/concepts/tools) — provider tools, deferred tools, MCP, subagents
 - [Streaming to a UI](/cookbook/streaming-ui)
 - [Subagents & parallelism](/cookbook/subagents)

@@ -230,19 +230,37 @@ const unsubscribe = agent.on((event) => {
 then on, so you wire them once rather than per turn.
 [Turn events](/concepts/turn-events) covers what you'll receive.
 
-Two more subscriptions cover the operation lifecycle. `onSettled()` fires after
-every turn that commits — once per send unless the send carries a continuation,
-in which case it also fires for each inline turn under that turn's own id — and
-once for an operation that ran without opening a turn, however it ended: after
-its `turn:end`, before its handle settles — handing you the session and exactly
-what the handle is about to settle with. That's the hook for saving after each
-operation without awaiting the queue empty the way `snapshot()` does. The agent
-awaits your callback, so returning a promise holds the handle and the next
-queued operation; a callback that throws can't affect the operation. `onIdle()`
-fires each time the agent goes from busy to idle, after the last operation's
-`onSettled` callbacks — the place to close whatever your host opened when work
-began. Neither fires for an operation cancelled while still queued: it never
-ran. See the [Agent reference](/reference/agent#onsettled).
+Beside the turn events, `on()` delivers the operation's lifecycle — the frame
+around the turns: `operation:start` when a send or compaction takes the queue,
+`after:start` / `after:end` around its continuation, `operation:end` with the
+outcome, and `agent:idle` when nothing is left behind it. The callback type is
+`AgentEventCallback`. If all you want is "is it working," skip the events and
+read `agent.status` — `{ phase: "idle" }`, or `{ phase: "busy", id }` with the
+running operation's id. It already reads the new value by the time the event
+that moved it reaches you.
+
+Two hooks run at the edges of an operation. `onStart()` fires once an
+operation holds the queue, before its turn opens, with `{ kind, id, signal }` —
+and it can refuse the work by throwing, which drops the pending turn and
+rejects the handle without running anything:
+
+```typescript
+agent.onStart(({ kind, id }) => {
+  if (shuttingDown) throw new Error("shutting down");
+});
+```
+
+`onSettled()` fires once per operation that ran — one send, one call, however
+it ended: after its turn and its continuation, before its handle settles —
+handing you the session and exactly what the handle is about to settle with.
+That's the hook for saving after each operation without awaiting the queue
+empty the way `snapshot()` does. The agent awaits your callback, so returning
+a promise holds the handle and the next queued operation; a callback that
+throws can't affect the operation. `onIdle()` fires each time the agent goes
+from busy to idle, after the last operation's `onSettled` callbacks — the
+place to close whatever your host opened when work began. Neither fires for an
+operation cancelled while still queued: it never ran. See the [Agent
+reference](/reference/agent#onsettled).
 
 ## Reading the conversation
 
@@ -258,6 +276,14 @@ conversation, that's [compaction](/concepts/compaction). `system` is derived —
 set the prompt at construction; skills append their own section (see
 [Skills](/concepts/skills)).
 
+A send takes options beyond the message. `id` names the send's user turn —
+the id its `pending:queued` preview, its committed turn, and `onSettled` all
+carry (generated when omitted, so pass one when an outside system needs to
+correlate). And two timeouts bound the work: `turnTimeoutMs` cancels a turn
+that runs too long — every step, tool call, and deferred wait included — while
+`streamStallMs` fails a step whose provider stream goes silent. Both are unset
+by default, and both can be set on the agent or per send.
+
 ## Tools and MCP
 
 Supply tools at construction or add them later. MCP servers resolve lazily —
@@ -271,7 +297,11 @@ agent.registry; // the ToolRegistry, if you want to poke at it
 agent.skills; // the SkillRegistry — add/remove/set at any time, lands on the next request
 ```
 
-See [Tools](/concepts/tools) and [Skills](/concepts/skills).
+`tools` takes executable and deferred tools side by side. An executable tool
+runs through its own `execute`; a deferred tool's calls go to the handler
+registered with `agent.onToolCall()`, one per agent, or wait for
+`agent.toolCall(id)` when no branch answers. See [Tools](/concepts/tools) and
+[Skills](/concepts/skills).
 
 ## Picking up where you left off
 
@@ -287,4 +317,5 @@ See [Sessions & persistence](/concepts/sessions).
 
 - [Instruct](/concepts/instruct) — when a string isn't enough
 - [Results & errors](/concepts/results-and-errors) — what `send()` gives you back
+- [Remote agents](/concepts/remote-agents) — driving an agent served elsewhere
 - [Agent reference](/reference/agent) — every option and method

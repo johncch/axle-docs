@@ -73,9 +73,11 @@ differences for hosts that track the queue:
 
 - No `pending:queued` announces an inline turn — it starts at once. A host
   that keys queued rows by id ignores inline turns by construction.
-- `onSettled` fires for each inline turn under that turn's own id, after that
-  turn's `turn:end`. Slow per-cycle work in the callback (a sandbox snapshot,
-  say) runs after every inline turn — move it to the end of the continuation.
+- No hook fires for an inline turn on its own. `onSettled` fires once for the
+  whole operation, after the continuation returns — not per inline turn — and
+  the inline turns arrive listed under `result.after`. Each inline turn's user
+  turn carries `threadId`: the send's id, rooting the thread. A renderer can
+  draw them as replies; the transcript stays a flat list.
 
 ## Next
 

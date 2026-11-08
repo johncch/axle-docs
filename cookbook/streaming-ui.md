@@ -110,6 +110,12 @@ function ActionView({ part }: { part: ActionPart }) {
 streaming in and can't be parsed yet — so you have something to show instead of
 an empty box.
 
+A deferred call never shows `running` — it moves `pending` → `waiting` while it
+needs the caller, with `action:waiting` carrying the call id (`callId`) and the
+validated `input`. Render `waiting` as a prompt, not a spinner: something is
+waiting on the person, not working. `detail.callId` is what `toolCall(id)`
+takes when they answer.
+
 ## Keeping the UI out of provider SDKs
 
 Your render code probably shouldn't drag the Anthropic, OpenAI, and Google SDKs
@@ -143,6 +149,10 @@ not recognize:
 const outcome = transcript.apply(incoming);
 if (!outcome.handled) myReducer(outcome.event);
 ```
+
+For more than a one-way pipe — reconnection with cursors, commands back to
+the server, driving a deferred tool's answer from the client — reach for
+[Remote agents](/concepts/remote-agents) instead of hand-rolling the socket.
 
 ## Persisting and restoring
 

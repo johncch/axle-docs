@@ -96,11 +96,11 @@ Supply tools inline:
 stream({ provider, model, messages, tools: [a], providerTools: [b] });
 ```
 
-The loop builds every request from the values it was given. (`registry` was
-removed in 0.34.0 — the loop never reads one, so a tool added to a
-`ToolRegistry` after the call no longer appears mid-loop. To change tools or
-the prompt mid-loop, return them from `onToolBatchComplete`, below. See
-[Upgrading](/upgrading).)
+`tools` takes executable and deferred tools side by side (`AnyTool`). The loop
+builds every request from the values it was given. (`registry` was removed in
+0.34.0 — the loop never reads one, so a tool added to a `ToolRegistry` after
+the call no longer appears mid-loop. To change tools or the prompt mid-loop,
+return them from `onToolBatchComplete`, below. See [Upgrading](/upgrading).)
 
 When the model requests several tool calls in one message, they all start at
 once — the step's tool phase takes as long as its longest call, and results
@@ -108,23 +108,40 @@ answer in request order. `tool:exec-start` fires for every call up front and
 completions interleave in finish order, so key on `id`. A fatal tool error or a
 cancelled run aborts the batch's other calls through `ctx.signal`.
 
-There's also `onToolCall`, which intercepts tool calls without registering
-`ExecutableTool` objects at all:
+There's also `onToolCall`, which answers the deferred tools in `tools` —
+definitions with no `execute` that the caller resolves:
 
 ```typescript
 stream({
   provider,
   model,
   messages,
-  onToolCall: async (name, params, ctx) => {
-    if (name !== "lookup") return null; // fall through to the registry
-    return { type: "success", content: JSON.stringify(await lookup(params)) };
+  tools: [a, askUser],
+  onToolCall: (call) => {
+    if (!isCall(askUser, call)) return; // this branch answers nothing: the call waits
+    return prompt(call.input.question);
   },
 });
 ```
 
-Return `null` or `undefined` and it defers to the registry, so you can intercept
-selectively.
+The handler receives one call (`{ id, name, input }`, input already validated)
+plus the tool context, and returns what an `execute` would — or throws to hand
+the model an error. It never sees executable tools; those always run through
+their own `execute`. A call the handler doesn't answer waits instead of
+failing: answer it from outside through the handle while it waits, or bound
+the wait with the tool's `timeout`:
+
+```typescript
+const handle = stream({ provider, model, messages, tools: [askUser] });
+handle.on((event) => {
+  if (event.type === "tool:waiting") showPrompt(event.id, event.input);
+});
+handle.toolCall(id)?.answer("teal");
+```
+
+`generate()` has no handle, so nothing outside its handler can answer. It keeps
+failing fast: a call the handler doesn't answer, or any call when there's no
+handler, is an `execution` error result at once. See [Tools](/concepts/tools#deferred-tools).
 
 ## Bounding the loop
 
@@ -140,6 +157,12 @@ Crossing either one is a **stop, not an error** — you get `ok: true` with
 `stopped: "max-steps" | "token-limit"` and everything accumulated so far. The
 conversation is well-formed and continuable, and it's your call whether to
 compact and carry on. Non-positive limits throw at call time.
+
+`streamStallMs` is the other bound: the longest gap in milliseconds between two
+chunks from the provider on one step's stream, the wait for the first included.
+When it passes, the request aborts and the run ends `ok: false` with an `api` /
+`StreamStall` failure. It is not retried, and it is unset by default — reach
+for it when a hung socket is worse than a failed run.
 
 See [Results & errors](/concepts/results-and-errors#stops-arent-errors).
 

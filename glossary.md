@@ -45,29 +45,41 @@ flattened into messages and into the agent turn's parts. Spans are named
 `step-N`; stream events are `step:start` / `step:complete`.
 
 **Turn** — the render-layer unit only: one conversation entry in a transcript, a
-user turn or an agent turn. One send produces one of each; the agent turn
-accumulates parts from every step. Turns can also be opened and closed by
-compaction. A turn's `status` runs `pending` → `streaming` → `complete` |
-`cancelled` | `error`; a user turn skips `streaming`, and a `pending` turn lives
-only in `Transcript.pending`. Never a single assistant message; never a
-provider request.
+user turn or an agent turn. A send's own exchange is one user turn and one
+agent turn; the agent turn accumulates parts from every step of that send, and
+a continuation adds further pairs, threaded under the first. Turns can also be
+opened and closed by compaction. A turn's `status` runs `pending` →
+`streaming` → `complete` | `cancelled` | `error`; a user turn skips
+`streaming`, and a `pending` turn lives only in `Transcript.pending`. Turns are
+what people see; the _operation_ that produced them is not a turn. Never a
+single assistant message; never a provider request.
 
 **Send** — the Agent API verb: one scheduled conversation exchange
 (`agent.send(...)`), executed as a FIFO queue item. The host-facing unit of "the
 agent took its turn."
 
-**Operation** — a queued unit of agent work that opens a turn: a send or a
-manual compaction. Operations run one at a time in FIFO order. An operation is
-_pending_ from the call until its turn opens, and _settles_ when it ends,
-however it ends; `agent.onSettled(...)` then hands the host the session and the
-outcome, and waits for the host before the next operation starts. An operation
-cancelled while still queued never ran and does not settle. `agent.snapshot()`
-opens no turn, is not queued, and is not an operation.
+**Operation** — a queued unit of agent work: a send or a manual compaction.
+Operations run one at a time in FIFO order. An operation is _pending_ from the
+call until its turn opens; it runs from `operation:start` to `operation:end`,
+and `onStart` and `onSettled` fire once each. An operation produces turns, and
+the two are not one-to-one: a send produces its own user and agent turn and,
+with a continuation, the inline turns it sends; a manual compaction produces
+one agent turn; one dropped before its turn opened produces none. The lifecycle
+belongs to the operation, and the turns it produces are its output. An
+operation cancelled while still queued never ran and does not settle.
+`agent.snapshot()` opens no turn, is not queued, and is not an operation.
 
 **Idle** — the Agent has no operation running and none queued. It is _busy_
 from the first call that schedules an operation until the last queued one has
 settled; `agent.onIdle(...)` fires at each change from busy to idle, and
 `agent.snapshot()` resolves there.
+
+**Agent status** — `agent.status`: `{ phase: "idle" }`, or `{ phase: "busy", id }`
+with the id of the operation holding the queue (the send's user turn id, or the
+compaction's id). Busy covers the operation's `onStart` callbacks, its
+continuation, and its `onSettled` callbacks. It changes only at
+`operation:start` and `agent:idle`. Not to be confused with `Turn.status`,
+which describes one turn.
 
 **Pending turn** — a preview of a turn the Agent has accepted but not yet
 opened: the user turn a queued `send()` will commit, or an agent turn with one
@@ -159,9 +171,9 @@ by span writers. Never the conversation transcript.
 **Annotation** — host-owned render state attached to a turn or a part. Never
 model state, never sent to a provider.
 
-**Tool** — an executable capability. Four sources: local `ExecutableTool`s,
-provider-managed tools, MCP tools, and subagents. All share one `ToolRegistry`
-and one flat namespace.
+**Tool** — an executable capability. Five sources: local `ExecutableTool`s,
+deferred tools, provider-managed tools, MCP tools, and subagents. All share one
+`ToolRegistry` and one flat namespace.
 
 **Tool batch** — the set of separate tool calls one assistant message
 requests. Each call in a tool batch is validated, executed, and answered with
@@ -173,9 +185,34 @@ tool's `execute` concurrently, with one ordered result. It is one tool call,
 not a tool batch: its arguments are validated as a whole, so one invalid item
 rejects the call. Not "batch tool".
 
+**Deferred tool** — a tool definition with no `execute` (`type: "deferred"`,
+name, description, schema, optional `timeout`). The model calls it like any
+other tool; the loop validates the arguments and hands the call to the
+consumer's `onToolCall` handler, which returns what an `execute` would.
+
+**Deferred call** — one call to a deferred tool as the handler receives it:
+`{ id, name, input }`, with `input` already validated. `id` is the tool call
+id, carried on the `DeferredAction` part as `detail.callId`.
+
+**Waiting** — the status of a `DeferredAction` from the moment its validated
+call is handed to `onToolCall` (`tool:waiting`, `action:waiting`) until
+something settles it: the handler's return or throw, `toolCall(id)`, the
+tool's `timeout`, or a cancellation. A deferred action is never `running`: it
+is `pending` while its arguments stream, then `waiting`.
+
+**Waiting tool call** — the handle `toolCall(id)` returns on a stream handle or
+an `Agent` while the call with that tool call id is waiting: `{ answer, fail }`.
+The first settle wins; the lookup returns `undefined` once the call has
+settled.
+
 **Continuation** — a program a send carries under `after`: runs once the turn
 settles, holds the queue, and runs inline turns via `ctx.send()`. See
 [Continuations](/concepts/continuations).
+
+**Thread** — the turns an operation produced: its own user turn, which roots
+the thread, and the inline turns its continuation sent, whose user turns carry
+the root's id as `threadId`. A renderer draws an inline turn as a reply; the
+transcript stays a flat list.
 
 **Protocol** — the wire format a provider speaks (`messages`, `responses`,
 `generateContent`, `chatCompletions`). A provider is a `protocol` plus an `id`
@@ -225,5 +262,10 @@ models](/concepts/providers).
 | `error.type === "aborted"` tool result | `action:cancelled`, `status: "cancelled"` | 0.35.0 |
 | `AgentDefinition` / `createAgentConfig()` / `SavedAgent` | removed — rebuild `AgentConfig` from your own recipe shape + `AgentSession` | 0.35.0 |
 | `FileProviderId` / `provider` in file + `PROVIDER_UNSUPPORTED` details | `Protocol` / `protocol` | 0.35.0 |
+| `TurnEventCallback` | `AgentEventCallback` — `agent.on` delivers the operation lifecycle beside turn events | 0.36.0 |
+| `onToolCall(name, parameters, ctx)` intercepting any tool, returning `null` to fall through | `onToolCall(call, ctx)` answering deferred tools only — executable tools always run their own `execute` | 0.36.0 |
+| `unanswered` tool error result | removed — an unanswered deferred call waits for `toolCall(id)`, the tool's `timeout`, or cancellation (`generate()` fails fast instead) | 0.36.0 |
+| `onSettled` per turn, including inline turns | `onSettled` once per operation, after the continuation | 0.36.0 |
+| `InlineSendOptions` with `signal` | `signal` removed — it was ignored; cancel the operation to abort an inline turn | 0.36.0 |
 
 See [Upgrading](/upgrading).

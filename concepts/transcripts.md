@@ -18,6 +18,8 @@ interface Turn {
   status: "pending" | "streaming" | "complete" | "cancelled" | "error";
   annotations?: Annotation[];
   metadata?: Record<string, unknown>;
+  threadId?: string; // on inline turns — the send's id, rooting the thread
+  cursor?: string; // where this turn closed on a served event stream
   timing?: { start: string; end?: string };
   usage?: Stats;
   failure?: TurnFailure; // when the send resolved ok: false
@@ -112,6 +114,7 @@ Action parts discriminate further on `kind`:
 - `kind: "tool"` — `detail.name`, `detail.parameters`, `detail.pendingArgs`, `detail.result`
 - `kind: "agent"` — a subagent, with `detail.children: Turn[]` for the nested run
 - `kind: "provider-tool"` — `detail.input`, `detail.result`
+- `kind: "deferred"` — `detail.callId`, `detail.input`, `detail.pendingArgs`, `detail.result`; never `running`, waiting on your answer instead (see [Tools](/concepts/tools#deferred-tools))
 
 Which means rendering a subagent is recursive: the same component that renders
 `transcript.turns` renders `part.detail.children`. That falls out nicely.
