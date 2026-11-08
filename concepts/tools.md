@@ -98,8 +98,8 @@ call, whatever order the calls actually finished in.
 Three consequences are worth knowing before you write a tool:
 
 - **State shared between calls is yours to guard.** Two calls to the same tool
-  can sit inside `execute` at the same time, and an `onToolCall` handler fires
-  once per call with no ordering between them.
+  can sit inside `execute` at the same time, and `onToolCall` is called once per
+  deferred call with no ordering between calls — executable calls run beside it.
 - **An ordinary failure touches no sibling.** Arguments that fail the schema, a
   tool that isn't found, a plain `throw` — each becomes that call's error
   result, the other calls run to completion, and the model sees every result.
@@ -113,9 +113,14 @@ them completes, and the phases interleave from there, so a renderer keys on the
 part's `id` rather than on "the running tool". See [A tool call, in
 phases](/concepts/turn-events#a-tool-call-in-phases).
 
-`parallelize` is a different thing and is unchanged — one call, many items,
-under a cap you set. See [Running a tool over many
-inputs](#running-a-tool-over-many-inputs).
+A [deferred call](#deferred-tools) is a call in the batch like any other: the
+batch waits for its answer exactly as it waits for a running tool, so everything
+above holds for it too. One consequence is easy to miss — a deferred call that
+nobody has answered yet keeps waiting while its siblings finish, and the run's
+abort settles it like any other call.
+
+`parallelize` is a different thing — one call, many items, under a cap you set.
+See [Running a tool over many inputs](#running-a-tool-over-many-inputs).
 
 ## The tool context
 

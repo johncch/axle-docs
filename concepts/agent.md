@@ -120,6 +120,10 @@ similar and do quite different jobs. Here's the short version:
 | Throw away what's queued up behind it | `agent.clear()` |
 | Stop one specific send right now, mid-request | `handle.cancel()` |
 
+These are the four calls. A turn can also stop without you asking: a
+`turnTimeoutMs` cancels it from the inside, with a timeout as the abort reason
+(see [Listening in](#listening-in)).
+
 ### stop() — wind down gracefully
 
 ```typescript

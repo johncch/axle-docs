@@ -7,9 +7,9 @@ description: The Transcript class, the Turn/TurnPart shapes, and the full TurnEv
 
 Conceptual guide: [Turns & Transcripts](/concepts/transcripts).
 
-Everything on this page is also available type-only from
-`@fifthrevision/axle/ui`, which doesn't pull in the provider SDKs — use that
-import in UI code.
+Everything on this page is also exported from `@fifthrevision/axle/ui` — the
+types, and `Transcript` itself — which doesn't pull in the provider SDKs. Use
+that import in UI code.
 
 ## Transcript
 

@@ -185,7 +185,9 @@ Your tools have to cooperate here. Without forwarding the signal, cancelling
 stops the agent while your work keeps running in the background. `ctx.signal`
 also aborts when a sibling call in the same batch throws `AxleToolFatalError`,
 so forwarding it is what keeps a doomed batch from being held open by the calls
-that were still working:
+that were still working. (In a deferred handler the same signal also aborts when
+anything else settles that call — see [Deferred
+tools](/concepts/tools#deferred-tools).)
 
 ```typescript
 async execute({ url }, ctx) {

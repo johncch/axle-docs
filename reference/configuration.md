@@ -126,4 +126,4 @@ or `appendixTokens` is negative.
 | Import | Contains |
 | --- | --- |
 | `@fifthrevision/axle` | The full runtime surface. |
-| `@fifthrevision/axle/ui` | The render surface: the render-layer types plus `Transcript`, `computeCost` and `renderTerminalMarkdown` — no provider SDKs. |
+| `@fifthrevision/axle/ui` | The render and client surface: the render-layer types plus `Transcript`, `Instruct`, `computeCost`, `isCall` / `isActionOf` / `isTimeoutReason`, `renderTerminalMarkdown`, `RemoteAgent`, `httpTransport` and `HttpTransportError` — no provider SDKs. |
