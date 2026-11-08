@@ -193,4 +193,6 @@ interface AgentTransport<THostEvent extends { type: string } = never> {
 ```
 
 The cursor's format is the store's — transports and `Turn.cursor` treat it as
-an opaque string. `isWelcome(item)` narrows a `StreamItem` to its welcome.
+an opaque string. A `StreamItem` narrows to its welcome on
+`item.type === "welcome"`; the shipped transports do that for you, so only a
+transport of your own needs it.
