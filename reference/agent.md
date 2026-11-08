@@ -111,6 +111,9 @@ interface AgentHandle<T> {
 }
 ```
 
+`AgentHandle` and `StreamHandle` both satisfy the exported `Handle<T>`
+(`{ cancel, final }`), so code that only cancels and awaits can take either.
+
 ### AgentResult
 
 ```typescript
@@ -367,7 +370,10 @@ interface ContextUsage {
 }
 ```
 
-Locally estimated, not provider-reported.
+Locally estimated, not provider-reported. `context()` supplies no `limit`, so
+`limit` and `free` are always absent from its result; to fill them, call
+[`estimateContextUsage`](/reference/providers#context-estimation) yourself with
+a limit from the [model catalog](/concepts/model-catalog#budgeting-the-window).
 
 ## snapshot()
 

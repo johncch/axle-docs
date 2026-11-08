@@ -84,6 +84,44 @@ in the same turn. Deferred tools validate the same way before the call reaches
 your handler; executable tools always run through their own `execute` and never
 consult `onToolCall` (see [Deferred tools](#deferred-tools) below).
 
+## One batch, all at once
+
+When the model requests several calls in one message, they all start before the
+loop waits on any of them: the step's tool phase takes as long as its longest
+call, not the sum of them. There's no concurrency cap — the model bounds the
+batch by how many calls it makes, and a tool that has to throttle itself (a
+subagent, a rate-limited client) does that inside its own `execute`.
+
+What the model sees doesn't change. Results answer **in request order**, one per
+call, whatever order the calls actually finished in.
+
+Three consequences are worth knowing before you write a tool:
+
+- **State shared between calls is yours to guard.** Two calls to the same tool
+  can sit inside `execute` at the same time, and `onToolCall` is called once per
+  deferred call with no ordering between calls — executable calls run beside it.
+- **An ordinary failure touches no sibling.** Arguments that fail the schema, a
+  tool that isn't found, a plain `throw` — each becomes that call's error
+  result, the other calls run to completion, and the model sees every result.
+- **A fatal failure ends the batch.** `AxleToolFatalError` aborts the other
+  calls through their `ctx.signal`, the loop waits for every one to settle, and
+  no tool results message is appended at all — results the siblings had already
+  produced are discarded.
+
+Events follow the same shape: every call's `action` part opens before any of
+them completes, and the phases interleave from there, so a renderer keys on the
+part's `id` rather than on "the running tool". See [A tool call, in
+phases](/concepts/turn-events#a-tool-call-in-phases).
+
+A [deferred call](#deferred-tools) is a call in the batch like any other: the
+batch waits for its answer exactly as it waits for a running tool, so everything
+above holds for it too. One consequence is easy to miss — a deferred call that
+nobody has answered yet keeps waiting while its siblings finish, and the run's
+abort settles it like any other call.
+
+`parallelize` is a different thing — one call, many items, under a cap you set.
+See [Running a tool over many inputs](#running-a-tool-over-many-inputs).
+
 ## The tool context
 
 `execute` gets a `ToolContext` as its second argument:
@@ -100,6 +138,12 @@ async execute(input, ctx) {
 `ctx.emit` is what makes a slow tool feel alive — whatever you pass shows up as
 `action:progress` events while `execute` is still running. Without it, a
 ten-second tool just looks frozen to your user.
+
+`ctx.signal` is the **batch's** signal, not the run's. It aborts when the run is
+cancelled, with the run's reason, and also when a sibling call in the same batch
+fails fatally, with that sibling's error as the reason. So forwarding it to your
+I/O buys you two things: cancellation, and not holding a batch open after
+another call has already doomed it.
 
 (`ctx.registry` was removed in 0.34.0. A tool that changes the agent it runs
 under uses that agent in closure scope — `agent.registry.add(...)`,
@@ -134,9 +178,10 @@ the model, which usually retries or works around it. The run keeps going in
 both cases. That's almost always what you want.
 
 If you need to kill the run instead, throw `AxleToolFatalError` — that propagates
-out of `send()` rather than resolving as a result. Save it for cases where
-carrying on would be incoherent, like the sandbox your tool operates on no longer
-existing. See [Results & errors](/concepts/results-and-errors).
+out of `send()` rather than resolving as a result, and it takes the rest of the
+batch with it (above). Save it for cases where carrying on would be incoherent,
+like the sandbox your tool operates on no longer existing. See [Results &
+errors](/concepts/results-and-errors).
 
 ## Deferred tools
 

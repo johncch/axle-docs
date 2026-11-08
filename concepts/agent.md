@@ -110,8 +110,8 @@ waiting on. Call them from outside a send instead.
 
 ## Interrupting: four different things
 
-`stop()`, `clear()`, `cancel()`, and handle-level `cancel()` sound similar and
-do quite different jobs. Here's the short version:
+`agent.stop()`, `agent.cancel()`, `agent.clear()` and `handle.cancel()` sound
+similar and do quite different jobs. Here's the short version:
 
 | You want to | Use |
 | --- | --- |
@@ -120,6 +120,10 @@ do quite different jobs. Here's the short version:
 | Throw away what's queued up behind it | `agent.clear()` |
 | Stop one specific send right now, mid-request | `handle.cancel()` |
 
+These are the four calls. A turn can also stop without you asking: a
+`turnTimeoutMs` cancels it from the inside, with a timeout as the abort reason
+(see [Listening in](#listening-in)).
+
 ### stop() — wind down gracefully
 
 ```typescript
@@ -127,8 +131,8 @@ agent.stop(); // false if nothing was running
 ```
 
 This asks the active turn to finish at its **next tool-batch boundary**. Every
-tool in the batch that's currently running — including parallel ones — completes
-and commits. Then the handle settles without another provider request. Nothing
+call in the in-flight batch runs to completion and commits — they're [already
+running at once](/concepts/tools#one-batch-all-at-once). Then the handle settles without another provider request. Nothing
 gets wasted, and the history stays coherent.
 
 `stop()` won't interrupt a request or a tool that's already in flight, and it
@@ -138,16 +142,6 @@ One consequence to expect: since a stopped turn ends on its tool-call exchange,
 a plain send resolves with whatever text that step produced — often nothing. An
 `Instruct` send may come back `ok: false` with a parse error. That's not a bug;
 there genuinely isn't a final answer yet.
-
-### clear() — empty the queue
-
-```typescript
-const dropped = agent.clear(); // how many you cancelled
-```
-
-Cancels everything queued, leaves the active turn alone. Each cleared handle
-rejects with `AxleAgentAbortError`, having committed nothing. A waiting
-`snapshot()` is not queued work, so `clear()` doesn't touch it.
 
 ### agent.cancel() — stop the active operation now
 
@@ -162,33 +156,17 @@ unaffected — the next one starts. `stop()` remains the gentle form. Graceful
 shutdown is `clear()`, then `stop()` or `cancel()`, then `snapshot()` (or the
 last `onSettled`).
 
-### The steer playbook
-
-This is the one to memorize. When your user types something while the agent is
-mid-task, you want to redirect it without losing the work it already did:
+### clear() — empty the queue
 
 ```typescript
-agent.stop(); // finish the current tool batch, then settle
-agent.clear(); // drop anything queued behind it
-agent.send("Actually, make the button blue."); // becomes the very next turn
+const dropped = agent.clear(); // how many you cancelled
 ```
 
-Stop, clear, send. That's steering.
+Cancels everything queued, leaves the active turn alone. Each cleared handle
+rejects with `AxleAgentAbortError`, having committed nothing. A waiting
+`snapshot()` is not queued work, so `clear()` doesn't touch it.
 
-Each call does one part of it. `stop()` lets the active turn wind down
-gracefully — in-flight tools finish and commit, so nothing is wasted or
-half-written. `clear()` throws away work that was queued behind it, which the
-user has now implicitly superseded. And the `send()` lands on a clean, linear
-history that includes everything the agent actually did.
-
-The order matters. Call `clear()` before `stop()` and you leave a window where
-the active turn can finish and pull in the queued work you were about to drop.
-
-Reach for `handle.cancel()` instead only when you need the agent to stop *now*
-and don't care about the in-flight tool call — closing a tab, say, rather than
-redirecting.
-
-### cancel() — stop now
+### handle.cancel() — stop one send now
 
 ```typescript
 const handle = agent.send("Long task...");
@@ -217,6 +195,14 @@ the moment it committed.
 
 Either way, the rejected error hangs on to `reason`, `usage`, `turn`, and
 whatever partial output existed. You paid for that; you may as well show it.
+
+### Steering: stop, clear, send
+
+The pattern you'll reach for most combines three of them — `stop()` so the
+active turn commits what it has, `clear()` so queued work the user has just
+superseded is dropped, then `send()` to land the new instruction on a clean
+history. The order matters, and the full recipe with the chat-box wiring is
+[Interrupting & cancelling](/cookbook/cancellation#the-steer-playbook).
 
 ## Listening in
 

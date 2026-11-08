@@ -263,7 +263,10 @@ host event type, so one dispatcher stays fully typed end to end — including th
 ## Keeping provider SDKs out of your bundle
 
 Your UI code probably shouldn't transitively import the Anthropic, OpenAI, and
-Google SDKs. The `/ui` subpath is the type-only surface for renderers:
+Google SDKs. The `/ui` subpath is the renderer's surface — the render-layer
+types plus the runtime pieces a UI actually runs (`Transcript`, `computeCost`,
+the `isCall` / `isActionOf` narrowing helpers, `Instruct`, the `RemoteAgent`
+client), and nothing that reaches a provider SDK:
 
 ```typescript
 import type { Turn, TurnEvent, TurnPart } from "@fifthrevision/axle/ui";

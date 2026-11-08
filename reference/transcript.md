@@ -7,9 +7,9 @@ description: The Transcript class, the Turn/TurnPart shapes, and the full TurnEv
 
 Conceptual guide: [Turns & Transcripts](/concepts/transcripts).
 
-Everything on this page is also available type-only from
-`@fifthrevision/axle/ui`, which doesn't pull in the provider SDKs — use that
-import in UI code.
+Everything on this page is also exported from `@fifthrevision/axle/ui` — the
+types, and `Transcript` itself — which doesn't pull in the provider SDKs. Use
+that import in UI code.
 
 ## Transcript
 
@@ -310,3 +310,15 @@ import { TurnEventBuilder } from "@fifthrevision/axle";
 Converts `StreamEvent`s into `TurnEvent`s — the same translation `Agent` does
 internally. You'd only need this if you're driving `stream()` directly but still
 want render-layer events.
+
+## renderTerminalMarkdown
+
+```typescript
+renderTerminalMarkdown(text: string): string;
+```
+
+Markdown in, ANSI-styled terminal text out. Exported from
+`@fifthrevision/axle/ui` only — it's what a terminal renderer needs for a
+turn's text parts, and it's the same rendering `SimpleWriter`'s
+[`markdown` option](/reference/observability#simplewriter) applies to event
+messages.

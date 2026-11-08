@@ -170,6 +170,11 @@ const cost = computeCost(usage, catalog);
 // { usd, priced, unpriced, pricedWith? }
 ```
 
+It prices each row at its own provider, model and tier, and reports the rows it
+couldn't price rather than guessing. [Model catalog &
+cost](/concepts/model-catalog#what-a-run-cost) covers where `catalog` comes from
+and what an unpriced row means.
+
 If you write a tool that calls a model, report its usage so it rolls up.
 `breakdown` is required — a hand-built `Stats` needs rows, so build it with
 `attributeStats`:
@@ -197,4 +202,5 @@ ctx.reportUsage(
 ## Next
 
 - [Observability reference](/reference/observability)
+- [Model catalog & cost](/concepts/model-catalog) — turning a `Stats` into dollars
 - [Results & errors](/concepts/results-and-errors)

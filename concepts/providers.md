@@ -1,34 +1,125 @@
 ---
 title: Providers & models
-description: Picking an inference backend, naming models, and controlling requests portably.
+description: Protocols, providers and presets; naming models; controlling requests portably.
 ---
 
 # Providers & models
 
-A provider is an adapter that turns Axle's normalized request into one vendor's
-API call. You make one, hand it to an `Agent` (or to `stream()` / `generate()`),
-and then mostly forget about it.
+A provider answers two questions, and since 0.35.0 it answers them in two
+separate fields: **which wire format** to speak, and **which service** to speak
+it to.
 
 ```typescript
-import { anthropic, openai, gemini, chatCompletions, openrouter, togetherai } from "@fifthrevision/axle";
+import { anthropic } from "@fifthrevision/axle";
 
 const a = anthropic(process.env.ANTHROPIC_API_KEY!);
-const o = openai(process.env.OPENAI_API_KEY!);
-const g = gemini(process.env.GEMINI_API_KEY!);
-const local = chatCompletions({ baseUrl: "http://localhost:11434/v1" });
+a.protocol; // "messages"  — the wire format it speaks
+a.id;       // "anthropic" — the service it reaches, as models.dev names it
 ```
 
-`chatCompletions` points at any OpenAI-compatible endpoint — Ollama, vLLM,
-OpenRouter, Together, LM Studio. It takes one options object (`{ baseUrl, apiKey,
-id?, dialect? }`). The official hostnames still infer `id` and `dialect`
-automatically — OpenRouter's `https://openrouter.ai/api/v1` gets
-`openrouterDialect`, Together's hosts get `togetheraiDialect` — or pass your own
-for a proxy (`{ baseUrl: "https://gateway.example.com/v1", apiKey, id:
-"openrouter", dialect: openrouterDialect }`). Prefer the `openrouter(apiKey)` and
-`togetherai(apiKey)` presets when you're talking to those services directly, and
-`bedrock(apiKey, { protocol, region })` for Amazon Bedrock (protocol follows the
-model: `messages` for Claude, `responses` or `chatCompletions` for what Mantle
-serves).
+You hand one to an `Agent` (or to `stream()` / `generate()`) and then mostly
+forget about it. The split is still worth understanding once, because it is what
+makes "same model, different route" a one-line change.
+
+## The four protocols
+
+Four wire formats cover the field. Each has a constructor of the same name that
+returns a provider speaking it at any base URL.
+
+| Protocol | The API it speaks | Who serves it |
+| --- | --- | --- |
+| `messages` | Anthropic Messages | Anthropic; Claude on Bedrock |
+| `responses` | OpenAI Responses | OpenAI; what Mantle serves on Bedrock |
+| `generateContent` | Google Gemini | Gemini |
+| `chatCompletions` | OpenAI Chat Completions | everyone else: OpenRouter, Together, Ollama, vLLM, LM Studio, most gateways |
+
+A protocol is not a vendor — that's the point of keeping the two apart.
+`messages` serves Anthropic, Claude on Bedrock, and any proxy in front of
+either; `chatCompletions` serves a dozen services that implement one API. One
+string could never say both things, which is why `AIProvider.name` became
+`protocol` + `id` in 0.35.0.
+
+## Presets
+
+The named factories are presets: a protocol constructor with one service's base
+URL, `id` and quirks filled in. There is nothing else in them.
+
+```typescript
+import { anthropic, messages, openrouter, chatCompletions, openrouterDialect } from "@fifthrevision/axle";
+
+anthropic(apiKey);
+// is messages({ baseUrl: "https://api.anthropic.com", apiKey, id: "anthropic", resolveModel: … })
+
+openrouter(apiKey);
+// is chatCompletions({ baseUrl: "https://openrouter.ai/api/v1", apiKey, id: "openrouter", dialect: openrouterDialect })
+```
+
+| Preset | Protocol | `id` |
+| --- | --- | --- |
+| `anthropic(apiKey)` | `messages` | `anthropic` |
+| `openai(apiKey)` | `responses` | `openai` |
+| `gemini(apiKey)` | `generateContent` | `google` |
+| `openrouter(apiKey)` | `chatCompletions` | `openrouter` |
+| `togetherai(apiKey)` | `chatCompletions` | `togetherai` |
+| `bedrock(apiKey, { protocol, region })` | the one you name | `amazon-bedrock` |
+
+`bedrock()`'s protocol follows the model: `messages` for Claude, `responses` or
+`chatCompletions` for what Mantle serves.
+
+Call a constructor yourself when no preset fits — a gateway, a logging proxy, a
+local runtime, a test double:
+
+```typescript
+import { chatCompletions, messages } from "@fifthrevision/axle";
+
+const local = chatCompletions({ baseUrl: "http://localhost:11434/v1" });
+const viaProxy = messages({ baseUrl: "https://proxy.example.com", apiKey });
+```
+
+Presets take no `baseUrl` of their own; redirecting one is what the constructor
+is for. (`openrouter()` is the exception, for OpenRouter's regional hosts, and
+`typesafe()` — a [decision provider](/concepts/decisions), not an `AIProvider` —
+keeps its own.) A preset also passes its base URL explicitly, so the vendor
+SDKs' environment variables no longer redirect it.
+
+## What each field is for
+
+**`protocol`** builds the request and parses the stream. It is the only field
+that decides what goes over the wire.
+
+**`id`** is the models.dev provider id, stamped on every usage row — which is
+how a run gets priced, since a price belongs to a service and model together,
+not to a model alone. Each constructor infers it from the base URL's hostname
+when it recognizes one (`api.anthropic.com`, `api.openai.com`,
+`generativelanguage.googleapis.com`, `openrouter.ai`, `api.together.ai`,
+`api.together.xyz`, subdomains included) and leaves it `undefined` otherwise, so
+a provider at `localhost` produces rows that can't be priced. Point a known
+service's protocol at your own hostname and you should pass `id` yourself. See
+[Model catalog & cost](/concepts/model-catalog).
+
+**`dialect`** exists on `chatCompletions` alone, and carries one service's
+deltas from the shared API: the fields that express a reasoning setting, what
+keeps a session pinned to the same upstream, which provider tools the service
+hosts itself, how it reports a citation. Axle ships `openrouterDialect` and
+`togetheraiDialect`, and infers the dialect from the same hostnames as the `id`.
+Behind a proxy the hostname says nothing, so pass both:
+
+```typescript
+const viaGateway = chatCompletions({
+  baseUrl: "https://gateway.example.com/v1",
+  apiKey,
+  id: "openrouter",
+  dialect: openrouterDialect,
+});
+```
+
+A `chatCompletions()` provider works without a dialect; it just won't read
+OpenRouter's `reasoning_details` or a citation's quoted text, so thinking
+continuity is lost. Prefer the `openrouter(apiKey)` and `togetherai(apiKey)`
+presets when you talk to those services directly.
+
+Two providers can share an `id` — Bedrock in two regions — and one protocol
+serves many ids. Both are fine: the fields are independent on purpose.
 
 ## Switching providers
 
@@ -38,9 +129,9 @@ name models the [portable way](#one-model-string-any-inference-provider), often
 only the provider changes.
 
 ```typescript
-const agent = new Agent({ provider: a, model: "claude-sonnet-4-5" });
+const agent = new Agent({ provider: anthropic(apiKey), model: "claude-sonnet-4-5" });
 // same tools, same Instructs, same events
-const cheaper = new Agent({ provider: g, model: "gemini-2.5-flash" });
+const cheaper = new Agent({ provider: gemini(apiKey), model: "gemini-2.5-flash" });
 ```
 
 A fair warning about what *isn't* portable: `providerOptions` (it's raw
@@ -107,13 +198,17 @@ rejects `"openai/gpt-5.1"` before it costs you a round trip.
 Accepted prefixes are what you'd guess, with one convenience: `gemini()` takes
 both `google/` and `gemini/`.
 
-### No model registry — but there is a ModelCatalog
+Stripping is the preset's doing, not the protocol's: a constructor you call
+yourself sends the model id exactly as given. Pass `resolveModel` if you want
+the same behaviour behind your own base URL. Full signatures are in the
+[Providers reference](/reference/providers#protocol-constructors).
+
+### No model registry
 
 There is no model registry. Axle ships no list of models, no context windows, no
-output ceilings — model IDs are plain strings your application owns. If you need
-a ceiling or a capability flag, keep your own table or ask the provider's models
-API. A model hosted by several vendors has a different ID on each, so a shared
-constant could never be portable with `chatCompletions()` anyway.
+output ceilings — model IDs are plain strings your application owns. A model
+hosted by several vendors has a different ID on each, so a shared constant could
+never be portable with `chatCompletions()` anyway.
 
 ```typescript
 const model = "openai/gpt-5.5";
@@ -123,31 +218,11 @@ const model = "openai/gpt-5.5";
 and `ModelMetadata` exports were removed in 0.33.0 — see
 [Upgrading](/upgrading).)
 
-What 0.35.0 keeps is narrower: `ModelCatalog`, a synchronous, immutable index
-over the models.dev catalog for answering "how big is this model's window?"
-without keeping your own table — and `computeCost(usage, catalog)` for pricing
-a `Stats` at each request's own tier. Load saved JSON, refresh when it's stale,
-and ask:
-
-```typescript
-import { ModelCatalogStore, catalogFile, computeCost } from "@fifthrevision/axle";
-
-const file = catalogFile("./.cache/axle-models.json");
-const catalogs = new ModelCatalogStore({ providers: ["anthropic"] });
-catalogs.load(await file.read());
-const snapshot = await catalogs.refreshIfStale();
-if (snapshot) await file.write(snapshot);
-const catalog = catalogs.current;
-const hit = catalog?.contextWindow("openai/gpt-5.5");
-// { window, id, match } | undefined
-```
-
-`new ModelCatalog(data)` takes its data as given; `fetchModelsDev()` fetches
-`CatalogData` (version 4) and `parseCatalogData()` reads saved JSON. `lookup`
-and `contextWindow` take `{ provider }`, not `{ host }`. When to refresh is
-your call — drive a compaction threshold or a progress meter with it; price
-with `computeCost`. Full signatures are in the [Providers
-reference](/reference/providers#model-catalog-and-cost).
+When you do need a ceiling, a capability flag or a price, there is an opt-in
+data layer for it: `ModelCatalog` indexes the models.dev catalog, and
+`computeCost(usage, catalog)` prices a `Stats` with it. Neither is a registry —
+you load and store the data, and the runtime never consults it. See [Model
+catalog & cost](/concepts/model-catalog).
 
 ## Request options
 
@@ -259,31 +334,6 @@ declare const loggingFetch: typeof fetch;
 const provider = chatCompletions({ baseUrl: "http://localhost:11434/v1", fetch: loggingFetch });
 ```
 
-### Reaching a proxy instead of the vendor
-
-Sometimes the request shouldn't go to the vendor at all — a gateway that
-speaks the vendor's API, a logging proxy in front of it, a test double. That's
-what the protocol constructors are for: `messages()`, `responses()`,
-`generateContent()`, and `chatCompletions()` each take `{ baseUrl, apiKey, …
-}` and speak one wire format at any base URL.
-
-```typescript
-import { messages, responses, generateContent } from "@fifthrevision/axle";
-
-const viaProxy = messages({ baseUrl: "https://proxy.example.com", apiKey });
-const viaOpenAIProxy = responses({ baseUrl: "https://proxy.example.com/v1", apiKey });
-const viaGeminiProxy = generateContent({ baseUrl: "https://proxy.example.com", apiKey });
-```
-
-`anthropic()`, `openai()`, and `gemini()` are now presets — the protocol
-constructor at the service's own base URL — so they no longer take `baseUrl`.
-(`typesafe()` keeps its `baseUrl`, and `openrouter()` takes one for OpenRouter's
-regional hosts.) A preset passes its base URL explicitly, so the SDKs' own
-environment variables no longer redirect it. Each preset accepts a namespaced
-model id and strips the prefix; a raw constructor sends the id as given — pass
-`resolveModel` if you relied on the preset's stripping. Full signatures are in
-the [Providers reference](/reference/providers#providerclientoptions).
-
 ## How full is the context?
 
 ```typescript
@@ -296,8 +346,15 @@ your messages and tool payloads. They're not what the provider will bill you.
 They're good enough to drive a compaction threshold or a progress meter, and not
 good enough for accounting. For real numbers, read `result.usage` after a send.
 
+What `agent.context()` can't tell you is how full "full" is — it reports no
+limit, because the runtime keeps no table of windows. [Model catalog &
+cost](/concepts/model-catalog#budgeting-the-window) is where the limit comes
+from.
+
 ## Next
 
 - [Agent](/concepts/agent) — the thing that uses a provider
+- [Model catalog & cost](/concepts/model-catalog) — windows, prices, and where
+  `provider.id` lands
 - [Tools](/concepts/tools) — including the provider-managed kind
 - [Providers reference](/reference/providers) — every factory signature

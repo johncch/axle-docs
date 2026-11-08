@@ -5,31 +5,6 @@ description: Compaction wiring and entry points.
 
 # Configuration
 
-## Removed in 0.34.0: configureAxle()
-
-```typescript
-// @check-skip — removed in 0.34.0, kept here so the name resolves
-configureAxle(options: AxleConfiguration): void
-```
-
-There is no process-global configuration anymore. Web search on a provider
-without hosted search used to be a process-wide fallback backend; it is now a
-tool attached to the `chatCompletions()` provider that needs it:
-
-```typescript
-import { chatCompletions, braveWebSearch } from "@fifthrevision/axle";
-
-const provider = chatCompletions({ baseUrl: "https://api.together.ai/v1",
-  apiKey,
-  webSearch: braveWebSearch({ apiKey: braveKey }),
-});
-```
-
-`AxleConfiguration`, `WebSearchBackend`, `WebSearchRequest`,
-`WebSearchBackendContext`, and `WebSearchResponse` are removed. A custom search
-is an `ExecutableTool` passed as `webSearch`. See [Web
-search](/cookbook/web-search) and [Upgrading](/upgrading).
-
 ## Compaction
 
 ::: warning Experimental
@@ -151,4 +126,4 @@ or `appendixTokens` is negative.
 | Import | Contains |
 | --- | --- |
 | `@fifthrevision/axle` | The full runtime surface. |
-| `@fifthrevision/axle/ui` | Type-only render surface plus `Transcript` — no provider SDKs. |
+| `@fifthrevision/axle/ui` | The render and client surface: the render-layer types plus `Transcript`, `Instruct`, `computeCost`, `isCall` / `isActionOf` / `isTimeoutReason`, `renderTerminalMarkdown`, `RemoteAgent`, `httpTransport` and `HttpTransportError` — no provider SDKs. |
