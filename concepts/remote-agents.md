@@ -128,8 +128,8 @@ all. The consumer answers `ask_user` from its own `onToolCall`, folds events
 into its own transcript, and reads the result off `final`. The switch in the
 middle is the only new code, and over HTTP it looks the same, with
 `parseAgentCommand` checking the body and `toEventStreamResponse` writing the
-stream. A runnable server and client live in `examples/remote` in the library
-repo.
+stream — [Remote agents over HTTP](/cookbook/remote-over-http) is that version,
+with both routes and the reconnect.
 
 ## What crosses the wire
 

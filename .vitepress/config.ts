@@ -104,6 +104,8 @@ export default defineConfig({
           { text: 'Reasoning models', link: '/cookbook/reasoning' },
           { text: 'Interrupting & cancelling', link: '/cookbook/cancellation' },
           { text: 'Subagents & parallelism', link: '/cookbook/subagents' },
+          { text: 'Judging with a continuation', link: '/cookbook/judge-continuation' },
+          { text: 'Remote agents over HTTP', link: '/cookbook/remote-over-http' },
         ],
       },
       {
