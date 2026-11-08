@@ -52,6 +52,8 @@ interface Turn<TAnnotation extends Annotation = Annotation> {
   status: TurnStatus;
   annotations?: TAnnotation[];
   metadata?: Record<string, unknown>;
+  threadId?: string; // on a user turn sent inline by a continuation — the send's id, rooting the thread
+  cursor?: string; // where this turn closed on a served event stream, when folded from events carrying one
   timing?: TimingInfo;
   usage?: Stats;
   failure?: TurnFailure;
@@ -129,6 +131,7 @@ and discriminate on `kind`.
 | `"tool"` | `{ name, parameters, pendingArgs?, result? }` |
 | `"agent"` | `{ name, config?, children: Turn[], result? }` |
 | `"provider-tool"` | `{ name, input?, result? }` |
+| `"deferred"` | `{ name, callId, input, pendingArgs?, result? }` — a call answered through `onToolCall`; never `running` |
 
 ```typescript
 type ActionResult =
@@ -152,6 +155,28 @@ object case. Local tools still return strings or parts.
 `pendingArgs` holds accumulated argument JSON before it can be parsed into
 `parameters`. Render it during streaming so there's something on screen.
 
+```typescript
+interface DeferredAction<TAnnotation extends Annotation = Annotation> {
+  id: string;
+  type: "action";
+  kind: "deferred";
+  status: "pending" | "waiting" | "complete" | "cancelled" | "error";
+  detail: {
+    name: string;
+    callId: string; // the tool call id — what the handler's DeferredCall carries as id
+    input: Record<string, unknown>; // the validated input once the call is waiting; empty before
+    pendingArgs?: string;
+    result?: ActionResult;
+  };
+}
+```
+
+A deferred call never runs, so it is never `running`: `pending` while its
+arguments stream, `waiting` from `action:waiting` until the answer, timeout, or
+cancellation settles it. `isActionOf(tool, part)` narrows a part to one
+deferred tool's action with its input typed (a `pending` part carries no input
+yet and is excluded).
+
 `SubagentAction.detail.children` is a nested `Turn[]`, so subagent rendering is
 recursive.
 
@@ -173,6 +198,22 @@ Your own UI state, attached to a turn or a part and never sent to a provider.
 Omit `status` for static annotations that have no lifecycle.
 
 ## TurnEvent
+
+`agent.on` delivers `AgentEvent` — every `TurnEvent` below, plus the operation
+lifecycle framing it. `Transcript.apply` reports the lifecycle events handled
+and folds nothing from them, so `agent.on(transcript.apply)` is unchanged.
+Events folded from a served stream may carry a `cursor` beside their fields;
+`apply` records it on the turn that `turn:user` or `turn:end` closes.
+
+### Operation lifecycle
+
+| Event | Fields |
+| --- | --- |
+| `operation:start` | `id`, `kind` (`"send"` \| `"compaction"`) |
+| `after:start` | `id` |
+| `after:end` | `id` |
+| `operation:end` | `id`, `outcome` (`{ type: "complete" }` \| `{ type: "cancelled", reason? }` \| `{ type: "error", error: { message } }`) |
+| `agent:idle` | — |
 
 ### Pending lifecycle
 
@@ -225,7 +266,8 @@ Openings carry the full part; deltas carry only ids and the delta.
 | Event | Fields |
 | --- | --- |
 | `action:args-delta` | `turnId`, `partId`, `delta`, `accumulated` |
-| `action:running` | `turnId`, `partId`, `parameters?` |
+| `action:running` | `turnId`, `partId`, `parameters?` — never fires for deferred calls |
+| `action:waiting` | `turnId`, `partId`, `callId`, `name`, `input` — the validated deferred call, handed to `onToolCall` |
 | `action:input` | `turnId`, `partId`, `input` — what the provider tool was asked to do (added in 0.33.0) |
 | `action:progress` | `turnId`, `partId`, `chunk` |
 | `action:complete` | `turnId`, `partId`, `result`, `timing?` |

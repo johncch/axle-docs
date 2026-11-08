@@ -13,7 +13,7 @@ export default defineConfig({
       { text: 'Reference', link: '/reference/agent', activeMatch: '/reference/' },
       { text: 'Cookbook', link: '/cookbook/tool-using-agent', activeMatch: '/cookbook/' },
       {
-        text: 'v0.35.0',
+        text: 'v0.36.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Upgrading', link: '/upgrading' },
@@ -46,6 +46,7 @@ export default defineConfig({
           { text: 'Turn events', link: '/concepts/turn-events' },
           { text: 'Continuations', link: '/concepts/continuations' },
           { text: 'Sessions & persistence', link: '/concepts/sessions' },
+          { text: 'Remote agents', link: '/concepts/remote-agents' },
           { text: 'Compaction', link: '/concepts/compaction' },
           { text: 'Skills', link: '/concepts/skills' },
         ],
@@ -81,6 +82,7 @@ export default defineConfig({
           { text: 'Skills', link: '/reference/skills' },
           { text: 'MCP', link: '/reference/mcp' },
           { text: 'Transcript & turn events', link: '/reference/transcript' },
+          { text: 'Remote agents', link: '/reference/remote' },
           { text: 'Messages & parts', link: '/reference/messages' },
           { text: 'Errors', link: '/reference/errors' },
           { text: 'Observability', link: '/reference/observability' },

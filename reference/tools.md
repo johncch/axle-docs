@@ -62,6 +62,93 @@ type ToolResultPart =
   | { type: "file"; file: FileInfo };
 ```
 
+## DeferredTool
+
+```typescript
+import type { ZodObject, z } from "zod";
+
+interface DeferredTool<TSchema extends ZodObject<any> = ZodObject<any>> {
+  type: "deferred";
+  name: string;
+  description: string;
+  schema: TSchema;
+  summarize?(input: z.infer<TSchema>): string;
+  timeout?: number; // ms a call may wait for its answer before it fails with `timeout`; unbounded when absent
+}
+```
+
+A tool definition with no `execute`: the model calls it like any other tool,
+and the caller answers. Calls go to the `onToolCall` handler on `stream()`,
+`generate()`, or `agent.onToolCall()`, or are answered from outside with
+`toolCall(id).answer()` / `.fail()`. Conceptual guide: [Deferred
+tools](/concepts/tools#deferred-tools).
+
+| Field | Notes |
+| --- | --- |
+| `name` | Must be unique across local, deferred, MCP, and provider tools. |
+| `description` | Sent to the model. This is prompt text. |
+| `schema` | Must be a Zod **object**. Call arguments are parsed with it before the handler runs — a mismatch returns a `validation` error tool result without calling it. |
+| `summarize` | Optional human-readable one-liner for a UI. |
+| `timeout` | Milliseconds a call may wait for its answer before it fails with a `timeout` error result (`No answer for <name> within <ms>ms`). Unset, a call waits until answered or cancelled. |
+
+## DeferredCall
+
+```typescript
+interface DeferredCall<TInput = Record<string, unknown>> {
+  id: string; // the tool call id — pass it to toolCall(id)
+  name: string;
+  input: TInput; // already validated against the tool's schema
+}
+```
+
+What an `onToolCall` handler receives, with the `ToolContext` an `execute`
+would get. Return the result (`string | ToolResultPart[]`), throw for an
+`execution` error with the message as reason, or return nothing and leave the
+call waiting.
+
+## WaitingToolCall
+
+```typescript
+interface WaitingToolCall {
+  answer(content: string | ToolResultPart[]): void;
+  fail(message: string): void;
+}
+```
+
+The deferred call the loop is waiting on, reached through `toolCall(id)` on a
+stream handle or an `Agent` — `undefined` once it has settled. The first settle
+wins; later ones do nothing.
+
+## isCall / isActionOf
+
+```typescript
+import {
+  isActionOf,
+  isCall,
+  type DeferredCall,
+  type DeferredTool,
+  type TurnPart,
+} from "@fifthrevision/axle";
+
+declare const tool: DeferredTool;
+declare const call: DeferredCall;
+declare const part: TurnPart;
+
+isCall(tool, call); // narrows DeferredCall to DeferredCallOf<typeof tool>, input typed
+isActionOf(tool, part); // narrows a TurnPart to that tool's deferred action (pending parts excluded)
+```
+
+Both are also exported from `@fifthrevision/axle/ui`.
+
+```typescript
+type AnyTool = ExecutableTool | DeferredTool;
+```
+
+`StreamParams.tools`, `AgentConfig.tools`, `ToolRegistry.add()`, and the
+registry constructor take `AnyTool`. Code that passes `ExecutableTool[]` is
+unaffected. `ToolRegistry.get()` still returns executable tools only — use
+`getDeferred()` / `deferred()` for the other kind.
+
 ## ProviderTool
 
 ```typescript
@@ -96,26 +183,28 @@ The schema-only shape sent to providers.
 Conceptual guide: [The tool registry](/concepts/tool-registry).
 
 ```typescript
-new ToolRegistry(init?: { tools?: ExecutableTool[]; providerTools?: ProviderTool[] })
+new ToolRegistry(init?: { tools?: AnyTool[]; providerTools?: ProviderTool[] })
 ```
 
 | Method | Returns | Notes |
 | --- | --- | --- |
-| `add(tool \| tools)` | `void` | Local tools. Throws `TOOL_REGISTRY_DUPLICATE` on a name collision. |
+| `add(tool \| tools)` | `void` | Local or deferred tools — the kind is on the tool. Throws `TOOL_REGISTRY_DUPLICATE` on a name collision. |
 | `addMcp(tool \| tools)` | `void` | MCP tools. Same duplicate check. |
 | `addProvider(tool \| tools)` | `void` | Provider tools. Same duplicate check. |
-| `remove(name)` | `boolean` | Removes from all three maps. |
-| `has(name)` | `boolean` | Across all three. |
-| `get(name)` | `ExecutableTool \| undefined` | Local, then MCP. Not provider tools. |
+| `remove(name)` | `boolean` | Removes from all four maps. |
+| `has(name)` | `boolean` | Across all four. |
+| `get(name)` | `ExecutableTool \| undefined` | Local, then MCP. Not provider or deferred tools. |
+| `getDeferred(name)` | `DeferredTool \| undefined` | |
 | `getProvider(name)` | `ProviderTool \| undefined` | |
 | `executable()` | `ExecutableTool[]` | Local + MCP. |
+| `deferred()` | `DeferredTool[]` | |
 | `local()` | `ExecutableTool[]` | |
 | `mcp()` | `ExecutableTool[]` | |
 | `provider()` | `ProviderTool[]` | |
-| `size` | `number` | Total across all three. |
+| `size` | `number` | Total across all four. |
 
-Names are unique across all three maps — a local tool and a provider tool cannot
-share a name.
+Names are unique across all four maps — a local tool, a deferred tool, an MCP
+tool, and a provider tool cannot share a name.
 
 ## createAgentTool()
 

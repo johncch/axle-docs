@@ -74,8 +74,9 @@ A **step** is one pass of the loop inside a `send()`: one provider request, the
 assistant message it produced, and the tools that message asked for, if any.
 
 A send ends at the first step where the model doesn't ask for tools. It can also
-end early if a budget stops it (`maxSteps`, `maxContextTokens`) or if you call
-`agent.stop()`.
+end early if a budget stops it (`maxSteps`, `maxContextTokens`), if a timeout
+fires (`turnTimeoutMs` cancels the turn, `streamStallMs` fails a silent step),
+or if you call `agent.stop()`.
 
 Steps don't show up in conversation state — each one's output gets flattened into
 messages and into the agent turn's parts. You'll see them in two places:
@@ -95,8 +96,10 @@ if you're coming from an older version.
 ## Turn — the render lens
 
 A **turn** is one conversation entry as a reader sees it — a user turn or an
-agent turn. Each send produces exactly one of each. The agent turn collects parts
-(text, thinking, tool actions, files, citations) from every step of that send.
+agent turn. A send's own exchange is one user turn and one agent turn; a
+continuation adds further pairs, threaded under the first. The agent turn
+collects parts (text, thinking, tool actions, files, citations) from every
+step of that send.
 
 ```typescript
 result.turn.parts; // TurnPart[], in display order

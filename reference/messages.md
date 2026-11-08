@@ -25,6 +25,7 @@ interface AxleUserMessage {
   name?: string;
   content: string | ContentPart[];
   metadata?: MessageMetadata;
+  threadId?: string; // on a message sent inline by a continuation — the send's id, rooting the thread
 }
 
 interface AxleAssistantMessage {

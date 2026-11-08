@@ -220,6 +220,18 @@ cap the number of model requests, use `maxSteps` with
 [`stream()`](/concepts/generate-and-stream) — which is a stop rather than an
 error, so you keep everything produced so far.
 
+Two built-in timeouts cover the cases a signal can't. `turnTimeoutMs` bounds a
+whole turn — every model step, tool call, and deferred wait included — and
+cancels it with `{ type: "timeout", limitMs }` as the abort reason (narrow it
+with `isTimeoutReason`) when it elapses. `streamStallMs` fails a step whose
+provider stream goes silent, without retrying. Both are unset by default, and
+both can be set on the agent or per send:
+
+```typescript
+const agent = new Agent({ provider, model, turnTimeoutMs: 120_000 });
+await agent.send("...", { streamStallMs: 15_000 }).final;
+```
+
 ## See also
 
 - [Agent](/concepts/agent#interrupting-four-different-things)

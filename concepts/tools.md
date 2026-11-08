@@ -1,6 +1,6 @@
 ---
 title: Tools
-description: Four ways to give an agent capabilities — local tools, provider tools, MCP, and subagents.
+description: Five ways to give an agent capabilities — local tools, deferred tools, provider tools, MCP, and subagents.
 ---
 
 # Tools
@@ -10,12 +10,13 @@ Axle has one tool registry and four ways to fill it.
 | Kind | Runs where | What you supply |
 | --- | --- | --- |
 | **Executable tool** | Your process | Name, description, Zod schema, `execute` |
+| **Deferred tool** | Whoever holds the loop | Name, description, Zod schema — no `execute` |
 | **Provider tool** | The provider's infrastructure | A name and optional config |
 | **MCP tool** | An MCP server | A client config — Axle discovers the tools |
 | **Subagent** | Your process, as a nested `Agent` | A child agent factory |
 
 They all land in the same `ToolRegistry`, and the model sees one flat list. Which
-means names have to be unique across all four — duplicates throw as soon as you
+means names have to be unique across all five — duplicates throw as soon as you
 register them, rather than confusing the model later.
 
 ## Executable tools
@@ -79,9 +80,9 @@ The message names each issue with its path (`steps.0.label` for a bad nested
 field, `items.1.description` inside a parallelized call), joined with `;`
 when there are several. Because this is an ordinary tool result — not a thrown
 error — the loop continues and the model usually retries with fixed arguments
-in the same turn. An `onToolCall` handler that returns a result for the call
-bypasses this entirely; validation only applies on the fall-through path to a
-registered tool.
+in the same turn. Deferred tools validate the same way before the call reaches
+your handler; executable tools always run through their own `execute` and never
+consult `onToolCall` (see [Deferred tools](#deferred-tools) below).
 
 ## The tool context
 
@@ -136,6 +137,80 @@ If you need to kill the run instead, throw `AxleToolFatalError` — that propaga
 out of `send()` rather than resolving as a result. Save it for cases where
 carrying on would be incoherent, like the sandbox your tool operates on no longer
 existing. See [Results & errors](/concepts/results-and-errors).
+
+## Deferred tools
+
+Some calls can't be answered by code — they need a person. A deferred tool is
+a tool definition with no `execute`: the model calls it like any other tool,
+and whoever holds the loop answers each call.
+
+```typescript
+import type { DeferredTool } from "@fifthrevision/axle";
+
+const askUser = {
+  type: "deferred",
+  name: "ask_user",
+  description: "Ask the person a question and wait for their answer",
+  schema: z.object({ question: z.string() }),
+} satisfies DeferredTool;
+```
+
+Register it like anything else — `tools` takes executable and deferred side by
+side — and answer its calls with `onToolCall`:
+
+```typescript
+const agent = new Agent({ provider, model, tools: [getWeather, askUser] });
+
+agent.onToolCall((call) => {
+  if (!isCall(askUser, call)) return;
+  return prompt(call.input.question);
+});
+```
+
+The handler receives one call — `{ id, name, input }`, with `input` already
+validated against the schema — and the same `ToolContext` an `execute` gets.
+The contract is `execute`'s: return the result, throw to hand the model an
+error result with the message as the reason, and return nothing when this
+branch doesn't answer. A call nobody answers doesn't fail. It waits — for
+`toolCall(id)`, for the tool's `timeout`, or for cancellation:
+
+```typescript
+agent.on((event) => {
+  if (event.type === "action:waiting") showPrompt(event.callId, event.input);
+});
+
+// when the person answers, from anywhere that holds the agent:
+agent.toolCall(id)?.answer("teal");
+```
+
+A few things worth knowing about the wait:
+
+- **Outside the handler, use `toolCall(id)`.** It returns `{ answer, fail }`
+  while that call is waiting and `undefined` once it has settled. `fail`
+  hands the model an `execution` error, the same as throwing inside the
+  handler. The first settle wins; later ones do nothing.
+- **`generate()` has no handle, so it fails fast.** A call the handler doesn't
+  answer — or any call when there's no handler — becomes an `execution` error
+  result at once, instead of waiting. On `stream()` and `Agent`, the same call
+  waits.
+- **`timeout` bounds the wait.** A deferred tool may set one in milliseconds;
+  when it elapses, the call settles as a `timeout` error result the model reads.
+  Unset, a call waits until it is answered or the run is cancelled.
+- **Cancelling aborts the wait.** The handler's `signal` aborts when anything
+  else settles the call, so stop prompting and drop whatever the handler later
+  resolves to — it's discarded.
+
+On the event stream, a deferred call never runs — there is no `action:running`.
+The part opens `pending`, moves to `waiting` when the validated call reaches
+your handler (`tool:waiting` on the stream layer, `action:waiting` on turns),
+and closes with the answer. `isCall(tool, call)` narrows a handler call to one
+tool with its input typed; `isActionOf(tool, part)` does the same for a
+rendered part, so a UI can find the handler's promise from the part. Both live
+on the main entry point and on `@fifthrevision/axle/ui`.
+
+Reach for a deferred tool for approvals, human-in-the-loop answers, and
+anything else the caller decides at runtime. If the answer is computable where
+the agent runs, write an `execute` instead.
 
 ## Provider tools
 

@@ -20,7 +20,7 @@ const WORK = join(ROOT, ".snippet-check");
 const EXCLUDED_DOCS = new Set(["LLM-CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md"]);
 
 // Identifiers the docs deliberately leave undefined.
-const PLACEHOLDER = /^(provider|model|apiKey|agent|instruct|schema|messages|previousMessages|newMessages|tools|myTool|getWeather|searchTool|webSearchTool|myLocalTool|myDatabaseTool|readFile|showChart|research|researcher|compactor|transcript|handle|result|session|definition|config|db|sessionId|id|turnId|url|token|input|ctx|state|context|event|socket|logger|exporter|sandbox|authorize|searchIndex|summarize|lookup|persist|render|myReducer|applyHostEvent|myProviderFor|myToolFor|myOtelWriter|myBackend|fs|github|docs|remote|servers|items|documents|doc|hits|shouldStop|shouldHandoff|done|sandboxAlive|userInput|saved|TurnView|ActionView|Markdown|Thinking|FileChip|SourceList|Divider|Spinner|Note|DocRef|Generic|Error|useState|useEffect|outcome|incoming|next|running|lead|researchBatch|batchResearch|webSearch|setName|custom|base|template|variant|usage|summary|fileResolver|myRegistry|controller|text|args|part|turn|turns|citation|annotation|applied|recent|newServer|other|mcpClient|tool|error|message|item|msg|entry|value|key|q|name|status|reason|delta|chunk|progress|index|file|image|city|topic|query|prompt|body|res|opts|params|payload|a|b|g|o|handleItem|incoming|session|skill|skills|catalog|decisionProvider|braveKey|operation|answers|unsubscribe)$/;
+const PLACEHOLDER = /^(provider|model|apiKey|agent|instruct|schema|messages|previousMessages|newMessages|tools|myTool|getWeather|searchTool|webSearchTool|myLocalTool|myDatabaseTool|readFile|showChart|research|researcher|compactor|transcript|handle|result|session|definition|config|db|sessionId|id|turnId|url|token|input|ctx|state|context|event|socket|logger|exporter|sandbox|authorize|searchIndex|summarize|lookup|persist|render|myReducer|applyHostEvent|myProviderFor|myToolFor|myOtelWriter|myBackend|fs|github|docs|remote|servers|items|documents|doc|hits|shouldStop|shouldHandoff|done|sandboxAlive|userInput|saved|TurnView|ActionView|Markdown|Thinking|FileChip|SourceList|Divider|Spinner|Note|DocRef|Generic|Error|useState|useEffect|outcome|incoming|next|running|lead|researchBatch|batchResearch|webSearch|setName|custom|base|template|variant|usage|summary|fileResolver|myRegistry|controller|text|args|part|turn|turns|citation|annotation|applied|recent|newServer|other|mcpClient|tool|error|message|item|msg|entry|value|key|q|name|status|reason|delta|chunk|progress|index|file|image|city|topic|query|prompt|body|res|opts|params|payload|a|b|g|o|handleItem|incoming|session|skill|skills|catalog|decisionProvider|braveKey|operation|answers|unsubscribe|askUser|remoteAgent|showPrompt|shuttingDown)$/;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -70,8 +70,8 @@ mkdirSync(WORK, { recursive: true });
 // Docs show imports once per page and omit them in later blocks, so a block
 // without its own axle import gets one injected. A block that *does* import is
 // left alone — that way a wrong import name is caught rather than papered over.
-const AXLE_IMPORT = `import { Agent, Instruct, MCP, Transcript, ToolRegistry, SkillRegistry, PromptCompactor, Tracer, LogWriter, SimpleWriter, anthropic, openai, gemini, chatCompletions, openrouter, togetherai, bedrock, openrouterDialect, togetheraiDialect, generate, stream, decide, typesafe, choice, noul, score, createAgentTool, parallelize, braveWebSearch, loadSkill, renderSkillsCatalog, createViewSkillTool, ModelCatalog, ModelCatalogStore, catalogFile, fetchModelsDev, parseCatalogData, computeCost, loadFileContent, estimateContextUsage, parseResponse, getCompactionStamp, validateCompactedMessages, createStats, addStats, mergeStats, attributeStats, AxleError, AxleErrorCode, isAxleError, AxleAbortError, AxleAgentAbortError, AxleToolFatalError, AxleInstructVariableError, AxleStopReason } from "@fifthrevision/axle";\n` +
-  `import type { AIProvider, AgentConfig, AgentHandle, AgentSession, AgentResult, AxleMessage, AxleAssistantMessage, AxleUserMessage, AxleProviderFailure, Citation, CompactionCallback, CompactionConfig, ContentPart, ContextUsage, ExecutableTool, FileInfo, FileResolver, GenerateResult, MessageMetadata, ProviderTool, Span, SpanData, Stats, StreamEvent, StreamResult, ToolContext, ToolDefinition, ToolResultPart, TraceWriter, Turn, TurnEvent, TurnPart, ActionPart, TextPart, ThinkingPart, Annotation, Skill, DecisionProvider, DecideParams, DecideResult, DecisionQuestion, DecisionQuestions, DecisionAnswer, DecisionAnswers, DecisionInput, DecisionJson, DecisionRefusal, NoulQuestion, NoulAnswer, ChoiceQuestion, ChoiceAnswer, ScoreQuestion, ScoreAnswer, AnswerFor, DecisionRequestParams, DecisionResponse, TypesafeOptions, CatalogMatch, CatalogModel, ContextWindowMatch, ModelCost, SettledCallback, SettledOperation, IdleCallback, PendingDropReason, Continuation, ContinuationContext, InlineTurn, InlineSendOptions, Cost, UsageEntry, TokenStats } from "@fifthrevision/axle";\n`;
+const AXLE_IMPORT = `import { Agent, Instruct, MCP, Transcript, ToolRegistry, SkillRegistry, PromptCompactor, Tracer, LogWriter, SimpleWriter, anthropic, openai, gemini, chatCompletions, openrouter, togetherai, bedrock, openrouterDialect, togetheraiDialect, generate, stream, decide, typesafe, choice, noul, score, createAgentTool, parallelize, braveWebSearch, loadSkill, renderSkillsCatalog, createViewSkillTool, ModelCatalog, ModelCatalogStore, catalogFile, fetchModelsDev, parseCatalogData, computeCost, loadFileContent, estimateContextUsage, parseResponse, getCompactionStamp, validateCompactedMessages, createStats, addStats, mergeStats, attributeStats, AxleError, AxleErrorCode, isAxleError, AxleAbortError, AxleAgentAbortError, AxleToolFatalError, AxleInstructVariableError, AxleStopReason, isTimeoutReason, isCall, isActionOf, RemoteAgent, httpTransport, loopbackTransport, InMemoryEventStore, toEventStreamResponse, parseAgentCommand } from "@fifthrevision/axle";\n` +
+  `import type { AIProvider, AgentConfig, AgentHandle, AgentSession, AgentResult, AgentErrorResult, AxleMessage, AxleAssistantMessage, AxleUserMessage, AxleProviderFailure, Citation, CompactionCallback, CompactionConfig, ContentPart, ContextUsage, ExecutableTool, DeferredTool, DeferredCall, WaitingToolCall, AnyTool, FileInfo, FileResolver, GenerateResult, MessageMetadata, ProviderTool, Span, SpanData, Stats, StreamEvent, StreamResult, ToolContext, ToolDefinition, ToolResultPart, TraceWriter, Turn, TurnEvent, TurnPart, ActionPart, DeferredAction, TextPart, ThinkingPart, Annotation, Skill, DecisionProvider, DecideParams, DecideResult, DecisionQuestion, DecisionQuestions, DecisionAnswer, DecisionAnswers, DecisionInput, DecisionJson, DecisionRefusal, NoulQuestion, NoulAnswer, ChoiceQuestion, ChoiceAnswer, ScoreQuestion, ScoreAnswer, AnswerFor, DecisionRequestParams, DecisionResponse, TypesafeOptions, CatalogMatch, CatalogModel, ContextWindowMatch, ModelCost, SettledCallback, SettledOperation, IdleCallback, PendingDropReason, Continuation, ContinuationContext, InlineTurn, InlineSendOptions, Cost, UsageEntry, TokenStats, AgentEventCallback, AgentStatus, StartCallback, StartedOperation, OperationOutcome, TimeoutReason, AgentCommand, AgentSubscription, AgentTransport, AgentWelcome, StreamItem, StoredEvent, CommandOutcome, HttpTransportOptions, RemoteConnection, RemoteHandle, RemoteSendOptions, RemoteWaitingToolCall } from "@fifthrevision/axle";\n`;
 
 const ZOD_IMPORT = `import * as z from "zod";\n`;
 
@@ -79,11 +79,12 @@ const ZOD_IMPORT = `import * as z from "zod";\n`;
 // still gets checked properly.
 const AMBIENT = `
 import type {
-  Agent as A, AIProvider, Instruct as I, ExecutableTool, ProviderTool, MCP as M,
+  Agent as A, AIProvider, Instruct as I, ExecutableTool, DeferredTool, ProviderTool, MCP as M,
   Transcript as T, AxleMessage, AgentSession, Turn, TurnPart,
   TurnEvent, FileResolver, ToolRegistry as R, ToolContext,
-  PromptCompactor as P, TraceWriter,
+  PromptCompactor as P, TraceWriter, RemoteAgent as Remote,
 } from "@fifthrevision/axle";
+import type * as z from "zod";
 
 declare global {
   const provider: AIProvider;
@@ -141,6 +142,11 @@ declare global {
   const sandboxAlive: boolean;
   const events: TurnEvent[];\n  const id: string;\n  const event: TurnEvent;\n  const handle: import("@fifthrevision/axle").StreamHandle;
   const myOtel: TraceWriter;
+  const remoteAgent: Remote;
+  const askUser: DeferredTool<z.ZodObject<{ question: z.ZodString }>>;
+  const shuttingDown: boolean;
+  function prompt(question: string): Promise<string>;
+  function showPrompt(callId: string, input: Record<string, unknown>): void;
   function authorize(id: string): Promise<void>;
   function searchIndex(q: string, o?: any): Promise<any[]>;
   function summarize(m: AxleMessage[]): Promise<string>;

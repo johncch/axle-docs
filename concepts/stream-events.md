@@ -66,7 +66,7 @@ If you've come from `agent.on()`, four things change:
 - **Thinking** — `thinking:start`, `thinking:raw-delta`,
   `thinking:summary-delta`, `thinking:update`, `thinking:end`
 - **Tools** — `tool:request`, `tool:args-delta`, `tool:exec-start`,
-  `tool:exec-delta`, `tool:exec-complete`, `tool:exec-error`
+  `tool:waiting`, `tool:exec-delta`, `tool:exec-complete`, `tool:exec-error`
 - **Provider tools** — `provider-tool:start`, `provider-tool:input`, `provider-tool:complete`, `provider-tool:error`
 - **Error** — `error`
 
@@ -88,6 +88,16 @@ handle.onToolBatchComplete((message) => {
 batch has already completed and committed, so nothing is lost. This is the
 primitive [`agent.stop()`](/concepts/agent#the-steer-playbook) is built on, if
 you want that behaviour in your own loop.
+
+## Waiting on a deferred call
+
+A call to a deferred tool never executes — there is no `tool:exec-start` for
+it. Instead, `tool:request` carries `kind: "deferred"`, and once the arguments
+validate, `tool:waiting` fires with the call's `id`, `name`, and `input`. That
+event is your cue to prompt whoever answers: the `id` is what `handle.toolCall(id)`
+takes. The call closes with `tool:exec-complete` (answered) or
+`tool:exec-error` (failed, timed out, or aborted) like any other call. See
+[Tools](/concepts/tools#deferred-tools).
 
 ## What about generate()?
 

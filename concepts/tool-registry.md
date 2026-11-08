@@ -125,31 +125,36 @@ wasn't told its capabilities changed will carry on as if they hadn't.
 
 ## What's actually in it
 
-Three collections, one namespace.
+Four collections, one namespace.
 
-| Collection | Filled by | Executed by |
+| Collection | Filled by | Answered by |
 | --- | --- | --- |
 | **Local** | `tools:`, `registry.add()` | Your `execute` function |
+| **Deferred** | `tools:`, `registry.add()` | Your `onToolCall` handler, or `toolCall(id)` |
 | **MCP** | Resolved from `mcps:` on first send | The MCP server |
 | **Provider** | `providerTools:`, `registry.addProvider()` | The provider's infrastructure |
 
 They're stored separately because Axle handles them differently — local tools are
-functions it calls, MCP tools are proxied over a transport, provider tools are
-names passed to the vendor. But **names are unique across all three**, because
-the model sees one flat list. A duplicate throws `TOOL_REGISTRY_DUPLICATE` at
-registration rather than silently shadowing.
+functions it calls, deferred tools are calls it hands back to you, MCP tools are
+proxied over a transport, provider tools are names passed to the vendor. But
+**names are unique across all four**, because the model sees one flat list. A
+duplicate throws `TOOL_REGISTRY_DUPLICATE` at registration rather than silently
+shadowing.
 
 ```typescript
-agent.registry.has("get_weather"); // across all three
-agent.registry.size; // total across all three
+agent.registry.has("get_weather"); // across all four
+agent.registry.size; // total across all four
 agent.registry.local(); // just yours
+agent.registry.deferred(); // just the deferred ones, for your handler
 agent.registry.mcp(); // just MCP's
 agent.registry.provider(); // just provider tools
 agent.registry.executable(); // local + MCP — everything Axle actually runs
 ```
 
 The `executable()` / `provider()` split is the one that matters: executables have
-an `execute` function, provider tools are just names and config.
+an `execute` function, deferred tools have a handler instead, and provider tools
+are just names and config. `get()` returns executable tools only — reach
+deferred ones through `getDeferred(name)`.
 
 ## Where your registry comes from
 
@@ -227,8 +232,10 @@ const registry = new ToolRegistry({
 });
 
 registry.add(anotherTool);
+registry.add(askUser); // deferred tools go through the same add — the kind is on the tool
 registry.addProvider({ type: "provider", name: "code_execution" });
 registry.addMcp(await mcpClient.listTools({ prefix: "fs" }));
+registry.getDeferred("ask_user"); // deferred only — get() returns executables
 registry.remove("get_weather"); // removes from whichever collection holds it
 ```
 

@@ -7,10 +7,100 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.35.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.36.0-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.35.0**.
+Current release: **0.36.0**.
+
+## 0.36.0 — deferred tools, the operation lifecycle, remote agents
+
+The full guide is
+[`docs/0.36.0-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.36.0-migration.md)
+in the library repo. Read it end to end if you use `onToolCall`, switch
+exhaustively on turn events, or save in `onSettled` — all three change shape.
+
+**`onToolCall` answers deferred tools, and takes a call.** The old
+`onToolCall(name, parameters, ctx)` ran before every tool's `execute` and
+could replace any result. It now receives one `DeferredCall`
+(`{ id, name, input }`, with `input` already validated) plus the `ToolContext`,
+returns what an `execute` returns, and is consulted only for tools with
+`type: "deferred"`. Executable tools run through their own `execute`
+unconditionally. A callback that answered calls to names with no registered
+tool now has no effect on them — register a `DeferredTool` under that name to
+keep answering it. To return an error result, throw; a branch that returns
+nothing leaves the call waiting for `toolCall(id)`, the tool's `timeout`, or
+cancellation. There is no `unanswered` error result anymore (`generate()`
+still fails fast, with an `execution` error naming the tool).
+
+```typescript
+// @check-skip — shows the pre-0.36 API
+stream({
+  tools: [search],
+  onToolCall: async (name, params) =>
+    name === "search" ? { type: "success", content: await lookup(params) } : null,
+});
+```
+
+becomes a deferred tool answered by the new shape:
+
+```typescript
+import type { DeferredTool, ExecutableTool } from "@fifthrevision/axle";
+import { isCall } from "@fifthrevision/axle";
+
+declare const search: ExecutableTool;
+
+const askUser = {
+  type: "deferred",
+  name: "ask-user",
+  description: "Ask the person a question",
+  schema: z.object({ question: z.string() }),
+} satisfies DeferredTool;
+
+stream({
+  tools: [search, askUser],
+  onToolCall: (call) => {
+    if (!isCall(askUser, call)) return;
+    return prompt(call.input.question);
+  },
+});
+```
+
+**`onSettled` fires once per operation, after the continuation.** It used to
+fire after every turn — the send's turn, then each inline turn under its own
+id. Now it fires once per send or manual compaction, after the continuation
+returns and before the handle settles, with what the handle settles with. A
+callback that filtered out inline ids drops the filter; one that saved after
+each inline turn moves that work into the continuation. Inline turns fire no
+hook of their own, and carry the send's id as `threadId` on their user turn
+and `Turn`.
+
+**`agent.on` delivers the operation lifecycle; `TurnEventCallback` is gone.**
+Beside the turn events, `on` now emits `operation:start { id, kind }`,
+`after:start { id }` / `after:end { id }` around a continuation,
+`operation:end { id, outcome }`, and `agent:idle`. The callback type is
+`AgentEventCallback`; `TurnEventCallback` is removed — rename the annotation.
+Exhaustive switches gain cases, and so do switches on `StreamEvent.type`
+(`tool:waiting`), `TurnEvent["type"]` (`action:waiting`), and part `kind`
+(`deferred`). `agent.status` (`{ phase: "idle" }` or `{ phase: "busy", id }`)
+reports what the agent is doing, and already reads the new value when the
+event that moved it is delivered. New `agent.onStart()` runs before an
+operation's turn opens and can refuse it by throwing.
+
+**`ctx.send()` no longer accepts `signal`.** In 0.35.0 the type accepted it
+and the agent ignored it. Remove the option and cancel the operation (the
+handle's `cancel()` or `agent.cancel()`) to abort an inline turn. `send()`
+accepts an `id` for its user turn, and `AgentConfig` / `SendMessageOptions`
+gain `turnTimeoutMs` (bound a whole turn, deferred waits included) and
+`streamStallMs` (fail a step on a silent provider stream) — both unset by
+default.
+
+Additions with no migration cost: deferred tools and `toolCall(id)` on
+`stream()` handles and `Agent` (`generate()` has no handle, so nothing
+outside its handler can answer); experimental remote agents (`RemoteAgent`
+over `httpTransport` or `loopbackTransport`, `InMemoryEventStore` and
+`toEventStreamResponse` on the served side — see [Remote
+agents](/concepts/remote-agents)); `turn` gains `threadId` and `cursor`;
+`send()` gains `id`.
 
 ## 0.35.0 — errors that throw, providers as protocol + id, per-request usage, continuations
 
