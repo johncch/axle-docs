@@ -11,13 +11,22 @@ directness.
 # Commands
 
 - Dev server: `pnpm dev`
-- Build (gated): `pnpm build` — runs both checks, then VitePress
+- Build (gated): `pnpm build` — runs both checks, regenerates the llms files, then VitePress
 - Build (skip checks): `pnpm build:fast`
+- Regenerate the llms files only: `pnpm build:llms`
 - Check everything: `pnpm check`
 - Check snippets only: `pnpm check:snippets`
 - Check links only: `pnpm check:links`
 
 `pnpm build` fails if either check fails. That is deliberate — see Verification.
+
+`pnpm build` also runs `scripts/build-llms.mjs`, which regenerates
+`public/llms.txt` and `public/llms-full.txt` from the sidebar in
+`.vitepress/config.ts`. Both are generated — edit the pages, not those files.
+`public/AGENTS.md` is hand-written and is the contract for agents writing code
+against Axle; the `AGENTS.md` at the repo root is for agents editing this site.
+The two generated files are gitignored — Amplify runs `pnpm build`, so the
+deployed site always has fresh ones. `build:fast` skips them.
 
 # What This Site Is
 
