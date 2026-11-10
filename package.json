@@ -5,8 +5,9 @@
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "dev": "vitepress dev",
-    "build": "node scripts/check-snippets.mjs && node scripts/check-links.mjs && vitepress build",
+    "build": "node scripts/check-snippets.mjs && node scripts/check-links.mjs && node scripts/build-llms.mjs && vitepress build",
     "build:fast": "vitepress build",
+    "build:llms": "node scripts/build-llms.mjs",
     "check:snippets": "node scripts/check-snippets.mjs",
     "check:links": "node scripts/check-links.mjs",
     "check": "node scripts/check-snippets.mjs && node scripts/check-links.mjs",

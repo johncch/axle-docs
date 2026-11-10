@@ -31,16 +31,39 @@ That's a complete program. Everything else in these docs builds on it.
 
 Probably, if you want:
 
-- A TypeScript-native library rather than a Python port.
-- Multi-turn agents without wiring up a framework first.
-- The freedom to switch providers without rewriting your agents.
-- To own your own UI — Axle emits events and hands you the state to render.
+- **TypeScript, end to end.** Zod-typed tools, typed structured output, typed
+  events. No `any` at the seams, no Python port.
+- **Any provider, one agent.** Anthropic, OpenAI, Gemini, Bedrock, OpenRouter,
+  Ollama. Change two constructor fields — your tools, `Instruct`s and event
+  handling don't move.
+- **A library, not a framework.** No graph to declare, no runtime to host, no
+  conventions to learn. You make an object and call `send()`. `Agent`,
+  `Instruct`, `stream()` and `generate()` is most of the library.
+- **State that's ready to render.** `Transcript` folds the event stream into
+  turns and parts shaped the way UIs actually are — streaming text, tool calls
+  with their arguments and results, thinking, citations, files. Hand it to your
+  components.
+- **To cross a network cleanly.** Events are JSON and sessions are
+  serializable, so you can stream a run to the browser and fold it there. The
+  `/ui` import keeps three provider SDKs out of your bundle, and `RemoteAgent`
+  drives a server-side agent from the client, picking up where a dropped
+  connection left off.
+- **The hard parts already solved.** A programmable queue you can interrupt and
+  steer, concurrent tool batches, compaction, thinking continuity across turns,
+  token usage and cost per request — the things you find out about three weeks
+  into a hand-rolled loop.
+
+Probably not, if you want:
+
+- A graph to declare, or a platform to deploy onto.
+- Durable, checkpointed workflows. Axle runs *inside* the engine you already
+  trust, rather than replacing it.
+- Memory, RAG and evals in one box.
 
 ## What we're going for
 
-A small, ergonomic surface for building agents. `Agent`, `Instruct`, `stream()`,
-and `generate()` are most of the library. Each has one job, and they're designed
-to compose.
+A small, ergonomic surface for building agents. Each piece has one job, and
+they're designed to compose rather than to be configured.
 
 Axle started life as a DSPy-inspired workflow tool. As models got better at
 reasoning and tool use, rigid workflow graphs stopped earning their keep — but
@@ -87,3 +110,7 @@ A few honest gaps, so you don't go looking:
 - [Installation](/getting-started/installation) and [Quick Start](/getting-started/quick-start)
 - [Anatomy of a send](/concepts/anatomy-of-a-send) — the mental model
 - [Agent](/concepts/agent) — the interface you'll use most
+- [AGENTS.md](https://axle.fifthrevision.com/AGENTS.md) — the one-page contract
+  for coding agents, alongside
+  [llms.txt](https://axle.fifthrevision.com/llms.txt) and
+  [llms-full.txt](https://axle.fifthrevision.com/llms-full.txt)

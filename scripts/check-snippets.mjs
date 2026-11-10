@@ -16,7 +16,8 @@ import { spawnSync } from "node:child_process";
 const ROOT = process.cwd();
 const WORK = join(ROOT, ".snippet-check");
 
-// Contributor guidance, not site content.
+// Contributor guidance, not site content. Matched by path, not basename:
+// public/AGENTS.md is published content and its snippets must compile.
 const EXCLUDED_DOCS = new Set(["LLM-CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md"]);
 
 // Identifiers the docs deliberately leave undefined.
@@ -27,7 +28,7 @@ function walk(dir, out = []) {
     if (name === "node_modules" || name === ".vitepress" || name === ".snippet-check" || name === ".git" || name === "scripts") continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
-    else if (name.endsWith(".md") && !EXCLUDED_DOCS.has(name)) out.push(full);
+    else if (name.endsWith(".md") && !EXCLUDED_DOCS.has(relative(ROOT, full))) out.push(full);
   }
   return out;
 }
