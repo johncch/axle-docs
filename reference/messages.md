@@ -244,6 +244,13 @@ the cited span in a UI. Text-anchored citations live on
 `ContentPartText.citations`; provider-emitted source lists arrive as their own
 `ContentPartCitation`.
 
+Anthropic document citations are the exception since 0.36.1: Axle sends
+`document` blocks without `citations`, so new answers about a PDF or text file
+arrive as plain text with no `document` sources. The `document` source shape
+above still exists because stored conversations can hold it — Axle keeps those
+on the message but leaves them out of Anthropic requests, which would otherwise
+reject them. Search citations (`web`, `search-result`) are unaffected.
+
 ## Usage
 
 ```typescript
