@@ -103,10 +103,13 @@ Three consequences are worth knowing before you write a tool:
 - **An ordinary failure touches no sibling.** Arguments that fail the schema, a
   tool that isn't found, a plain `throw` — each becomes that call's error
   result, the other calls run to completion, and the model sees every result.
-- **A fatal failure ends the batch.** `AxleToolFatalError` aborts the other
-  calls through their `ctx.signal`, the loop waits for every one to settle, and
-  no tool results message is appended at all — results the siblings had already
-  produced are discarded.
+- **A fatal failure ends the batch, but every call is still answered.** `AxleToolFatalError` aborts the other
+  calls through their `ctx.signal`, the loop waits for every one to settle, and then it commits the tool
+  results message before rethrowing: a call that returned keeps its real result, the fatal call gets an
+  `isError` result with `{"error":{"type":"fatal","message":…}}`, and each call cut short by the abort gets an
+  `isError` result with `{"error":{"type":"cancelled","message":…}}`. Results answer in request order, so the
+  history stays valid and a follow-up send is accepted. A cancelled run settles the same way — the only
+  difference is every unfinished call reads `cancelled`.
 
 Events follow the same shape: every call's `action` part opens before any of
 them completes, and the phases interleave from there, so a renderer keys on the

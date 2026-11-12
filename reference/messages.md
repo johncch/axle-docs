@@ -244,6 +244,14 @@ the cited span in a UI. Text-anchored citations live on
 `ContentPartText.citations`; provider-emitted source lists arrive as their own
 `ContentPartCitation`.
 
+Axle doesn't ask providers for document citations: since 0.36.1, documents sent
+to Anthropic carry no `citations` request field, so answers about PDFs and text
+files arrive as plain text parts. The `document` source shape below still
+matters — conversations stored by earlier versions can hold answers with
+document citations, which stay on the stored messages but are left out of
+Anthropic requests (replaying them would be a 400). Citations from hosted web
+search are unaffected.
+
 ## Usage
 
 ```typescript

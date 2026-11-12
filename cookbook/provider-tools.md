@@ -147,6 +147,8 @@ switch (citation.source.type) {
   case "web":
     return <a href={citation.source.url}>{citation.source.title ?? citation.source.url}</a>;
   case "document":
+    // Stored history from before 0.36.1 can still carry these; fresh
+    // Anthropic answers no longer request document citations.
     return <DocRef title={citation.source.title} locator={citation.source.locator} />;
   case "search-result":
   case "retrieved-context":

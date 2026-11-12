@@ -155,7 +155,9 @@ conventional `error.name === "AbortError"` check works as you'd expect. Carries
 `reason`, `usage`, and partial output — `code` is `"ABORTED"`.
 
 Thrown by a cancelled `stream()` handle. It holds on to whatever was produced
-before the abort.
+before the abort — including the tool results message when the abort landed
+mid-tool-batch (each unfinished call reads `cancelled`), so `messages` ends
+in the `tool` message and the history stays sendable.
 
 ## AxleAgentAbortError
 
@@ -166,7 +168,10 @@ class AxleAgentAbortError extends AxleAbortError {
 ```
 
 Thrown by a cancelled `Agent` handle and by every handle dropped by
-`agent.clear()`. Adds the cancelled turn. Also `name === "AbortError"`.
+`agent.clear()`. Adds the cancelled turn. Also `name === "AbortError"`. When
+the cancel landed mid-tool-batch, `messages` (and `agent.messages`) end in the
+committed tool results message rather than in unanswered calls, so a follow-up
+send is accepted.
 
 ## AxleToolFatalError
 
@@ -189,7 +194,10 @@ new AxleToolFatalError(message?: string, options?: {
 
 Throw this from `execute` when you want to terminate the run. An ordinary
 `Error` becomes a tool error result handed back to the model instead, which is
-usually what you want. `code` is `"TOOL_FATAL_ERROR"`.
+usually what you want. `code` is `"TOOL_FATAL_ERROR"`. The batch's other calls
+are aborted and answered as `cancelled`, the fatal call itself is answered as
+`fatal`, and the tool results message commits before the error is thrown — so
+`messages` ends in the `tool` message and the conversation stays sendable.
 
 Subagent fatal errors are rebuilt without the child's `messages`/`partial` before
 reaching the parent, with the original as `cause`.
