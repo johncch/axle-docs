@@ -121,7 +121,9 @@ into, so `config` is ignored without a warning.
 
 ## Rendering citations
 
-Search results usually arrive as citations, in two forms:
+Search results usually arrive as citations, in two forms (hosted web-search
+citations are unchanged in 0.36.1 — only Anthropic *document* citations went
+away; keep the `document` case below for conversations stored before then):
 
 **Anchored** to a span of generated text, on the text part:
 

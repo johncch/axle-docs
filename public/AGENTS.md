@@ -6,7 +6,7 @@ docs: https://axle.fifthrevision.com/llms-full.txt
 
 ## 1. Check the installed version before you write anything
 
-The public surface moved at 0.33, 0.35 and 0.36. Read the version from the
+The public surface moved at 0.33, 0.35, 0.36 and 0.36.1. Read the version from the
 project's `package.json`, and treat anything you remember as suspect.
 
 | If you were about to write | Since |
@@ -18,6 +18,7 @@ project's `package.json`, and treat anything you remember as suspect.
 | `onToolCall` to intercept a normal tool | 0.36 — it answers **deferred** tools only |
 | `TurnEventCallback` | `AgentEventCallback` in 0.36 |
 | `onSettled` firing per turn | 0.36 — once per operation, after its continuation |
+| document citations on Anthropic PDF answers | 0.36.1 — gone, with no opt-in; answers arrive as plain text (search citations unchanged) |
 
 Every rename: https://axle.fifthrevision.com/upgrading
 

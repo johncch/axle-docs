@@ -8,6 +8,10 @@ description: Notable changes by release.
 Mirrored from [`CHANGELOG.md`](https://github.com/johncch/axle/blob/main/CHANGELOG.md)
 in the library repository. For upgrade instructions, see [Upgrading](/upgrading).
 
+## [0.36.1] - 2026-11-12
+
+- **Breaking:** Axle no longer requests citations for documents sent to Anthropic, and there is no option to re-enable them. Answers about PDF or text documents now arrive as plain text parts. Document citations already stored in a conversation are kept on the messages but left out of requests to Anthropic, which would otherwise reject them. Citations from hosted web search are unchanged. See `docs/0.36.1-migration.md`.
+
 ## [0.36.0] - 2026-11-08
 
 - Added deferred tools: a tool definition with no `execute` that the caller answers. Calls go to `onToolCall` on `stream()`, `generate()` and `agent.onToolCall()`, or are answered from outside with `toolCall(id).answer()` / `.fail()`. A call with no answer keeps waiting instead of failing (`generate()` still fails fast). Added the `tool:waiting` and `action:waiting` events, the `deferred` action part, and the `isCall` / `isActionOf` helpers.

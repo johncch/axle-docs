@@ -39,6 +39,11 @@ instruct.prompt = "Summarize the key findings in this report.";
 Not every model accepts PDFs, though. Check the provider's model docs for
 document support, and prefer a model that mentions it specifically.
 
+On Anthropic, answers about the document arrive as plain text — since 0.36.1
+Axle doesn't ask for document citations, and there is no option to turn them
+back on. (Citations from a hosted web search are a different thing, and are
+unchanged. See [Messages & parts reference](/reference/messages#citations).)
+
 ## An image by URL
 
 You can skip the download entirely and hand the provider a URL:

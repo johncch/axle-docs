@@ -7,10 +7,29 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.36.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.36.1-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.36.0**.
+Current release: **0.36.1**.
+
+## 0.36.1 — Anthropic document citations removed
+
+The full guide is
+[`docs/0.36.1-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.36.1-migration.md)
+in the library repo. Short version: there is nothing to opt into.
+
+**Axle no longer asks Anthropic for document citations, and there is no option
+to turn them back on.** A `document` block goes out without `citations`, so an
+answer about a PDF or text file arrives as plain text parts. Citations from a
+hosted web search are unchanged on every provider.
+
+**Stored document citations stay stored, and stay out of Anthropic requests.**
+A conversation saved before 0.36.1 can hold answers with document citations.
+Those remain on the stored messages, but Axle leaves them out of the requests
+it sends to Anthropic, which would otherwise reject them with a 400. No
+migration of saved sessions is needed — and keep rendering the stored
+`document` sources if your UI switches on them; new Anthropic answers just
+stop producing them.
 
 ## 0.36.0 — deferred tools, the operation lifecycle, remote agents
 
