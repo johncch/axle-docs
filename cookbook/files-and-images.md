@@ -39,6 +39,11 @@ instruct.prompt = "Summarize the key findings in this report.";
 Not every model accepts PDFs, though. Check the provider's model docs for
 document support, and prefer a model that mentions it specifically.
 
+An answer about a document arrives as plain text — Axle doesn't ask providers
+for document citations, so don't expect `citations` with a `document` source on
+fresh answers. Stored conversations from before 0.36.1 can still carry them;
+Axle keeps them on the message but leaves them out of Anthropic requests.
+
 ## An image by URL
 
 You can skip the download entirely and hand the provider a URL:

@@ -121,6 +121,14 @@ whether the turn opened:
   that doesn't look like an abort. This includes cancelling during `beforeTurn`
   compaction: compaction is work inside an already-open turn, and cancelling does
   not unwind the transcript.
+- **Cancelling mid-tool-batch still commits the tool results.** When the abort
+  lands while tool calls are running, the batch answers every call before the
+  handle rejects — finished calls keep their real results, the rest read
+  `cancelled` (`fatal` for the call that threw `AxleToolFatalError`). So the
+  history ends in the `tool` message rather than in unanswered calls, and the
+  next send is accepted. The same holds for a `turnTimeoutMs` elapsing
+  mid-batch, and for `stream()` / `generate()` (where the error's `messages`
+  ends in the `tool` message too).
 
 ## agent.cancel(): stop the active operation
 

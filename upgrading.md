@@ -7,10 +7,26 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.36.0-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.36.2-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.36.0**.
+Current release: **0.36.2**.
+
+## 0.36.2 — a tool batch that ends early answers every call
+
+No signature changes. The full guide is
+[`docs/0.36.2-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.36.2-migration.md)
+in the library repo.
+
+**A tool batch cut short by a cancel or a fatal error still commits its tool results message.** Through 0.36.1, cancelling a turn (or a `turnTimeoutMs` elapsing) while a tool was running — or a tool throwing `AxleToolFatalError` — left the assistant's tool-call message with no tool results message behind it. The next request carried those calls unanswered and providers rejected it, so after one such turn every later send on that agent failed. From 0.36.2 the message is written before the error is thrown, with one result per call in request order: a call that returned keeps its real result, a call that threw `AxleToolFatalError` gets an `isError` result with `{"error":{"type":"fatal","message":…}}`, and a call cut short by the abort gets an `isError` result with `{"error":{"type":"cancelled","message":…}}`. The send still rejects with the same error (`AxleAbortError`, `AxleAgentAbortError`, or `AxleToolFatalError` from `stream()`, `generate()`, and `agent.send()`) and makes no further request — only what the rejection leaves behind changes. `agent.messages` and the error's `messages` now end in the `tool` message (`["user", "assistant", "tool"]` on the agent; `["assistant", "tool"]` on the error), so code that assumed the last message after a cancelled turn is the assistant's needs updating, and a follow-up send is accepted. A session saved by an earlier version that already ends in unanswered tool calls is not repaired — drop the trailing assistant message, or append a tool results message for its calls, before sending on it again.
+
+## 0.36.1 — Anthropic documents no longer return citations
+
+One breaking behavior change, no signature changes. The full guide is
+[`docs/0.36.1-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.36.1-migration.md)
+in the library repo.
+
+**Anthropic documents are sent without asking for citations, and answers arrive as plain text.** Every PDF or text document sent to Anthropic used to carry `citations: { enabled: true }`, so an answer about one could arrive as several text parts each carrying `citations` with `source.type` `"document"`. Axle no longer asks, and there is no option to turn it back on — the answer arrives as plain text parts. Citations from hosted web search are unchanged on every provider. A conversation stored by an earlier version can still hold answers with document citations: they stay on the stored messages, and Axle leaves them out of the requests it sends to Anthropic (which would otherwise reject a replayed document citation with a 400). If your UI rendered `document` citations, keep the case — old history can still carry it.
 
 ## 0.36.0 — deferred tools, the operation lifecycle, remote agents
 
