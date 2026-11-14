@@ -63,7 +63,8 @@ You don't have to hurry to register callbacks — processing starts on the next
 microtask, so anything registered synchronously after the call sees every event.
 
 `handle.cancel(reason)` aborts, and `handle.final` then rejects with
-`AxleAbortError` carrying `reason`, `usage`, `messages`, and `partial`.
+`AxleAbortError` carrying `reason`, `usage`, `messages`, and `partial`
+(`partial` is `undefined` when the cancel landed before anything was written).
 
 ## Passing an Instruct
 
