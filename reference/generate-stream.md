@@ -180,7 +180,7 @@ output existed.
 
 | Event | Fields |
 | --- | --- |
-| `thinking:start` | `continuity?`, `providerMetadata?` |
+| `thinking:start` | `continuity?` (Anthropic: only once a signature or redacted data has arrived), `providerMetadata?` |
 | `thinking:raw-delta` | `delta`, `accumulated` |
 | `thinking:summary-delta` | `delta`, `accumulated` |
 | `thinking:update` | `continuity?`, `providerMetadata?` |

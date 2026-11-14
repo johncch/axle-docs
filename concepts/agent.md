@@ -195,6 +195,9 @@ the moment it committed.
 
 Either way, the rejected error hangs on to `reason`, `usage`, `turn`, and
 whatever partial output existed. You paid for that; you may as well show it.
+When the cancel landed while the model was still writing its response, the
+partial keeps only what was written — no tool calls, no empty text or thinking
+parts — and is `undefined` when nothing was written.
 
 ### Steering: stop, clear, send
 
