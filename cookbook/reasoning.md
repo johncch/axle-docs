@@ -148,6 +148,12 @@ case "thinking":
 A part opens with no content field; a field appears only once a delta wrote it.
 So render `summary ?? raw` and never test for `""`.
 
+`continuity` follows the same rule on Anthropic: it appears only once the
+signature (or redacted data) has arrived — first on the `thinking:update` that
+carries it — so a thinking part whose signature never arrived has no
+`continuity` field. Testing `part.continuity` for a signed part is enough; no
+need to also check the signature.
+
 Summaries and raw text stream on separate channels — `thinking:summary-delta`
 and `thinking:raw-delta` — because a part can receive both kinds of delta. Some
 providers (OpenAI's reasoning models, DeepSeek) give you the raw thinking text;

@@ -94,7 +94,7 @@ catch (error) {
   if (error instanceof AxleAgentAbortError) {
     error.reason; // what you passed to cancel()
     error.usage; // tokens already spent — still billable
-    error.partial; // the partially-streamed assistant message
+    error.partial; // the partially-streamed assistant message (undefined when nothing was written)
     error.messages; // messages completed before the abort
     error.turn; // the cancelled turn, for rendering
   }
@@ -129,6 +129,16 @@ whether the turn opened:
   next send is accepted. The same holds for a `turnTimeoutMs` elapsing
   mid-batch, and for `stream()` / `generate()` (where the error's `messages`
   ends in the `tool` message too).
+- **Cancelling mid-response keeps only what was written.** When the abort lands
+  while the model is still writing its reply, the partial assistant message
+  holds just the parts with content in them: a `tool-call` part is never kept,
+  a `text` part only when its text is non-empty, a `thinking` part only when it
+  holds text, a summary, redacted content, or `continuity`. Text written before
+  a cut-short tool call is kept without the call. When nothing was written,
+  there is no partial at all (`error.partial` is `undefined`, no assistant
+  message commits) — and the next send is accepted either way. The turn still
+  records what was shown: its action part settles `cancelled` even though the
+  call never reaches the conversation.
 
 ## agent.cancel(): stop the active operation
 

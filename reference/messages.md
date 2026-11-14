@@ -137,7 +137,9 @@ Opaque provider state that lets a model continue reasoning across requests.
 Preserve it verbatim through storage and restoration — strip it and multi-turn
 reasoning breaks. The `openrouter` member carries the `reasoning_details`
 entry's identity so Claude through OpenRouter keeps its signatures across tool
-calls.
+calls. On Anthropic the field itself is absent until a signature or redacted
+data has arrived, so a thinking part with no `continuity` yet is normal — not
+a stripped one.
 
 `ContentPartThinking` keeps the wire vocabulary — `text`, `summary`,
 `redacted` — because it exists to be echoed back to the provider's next

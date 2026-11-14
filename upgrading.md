@@ -7,10 +7,20 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.36.2-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.36.3-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.36.2**.
+Current release: **0.36.3**.
+
+## 0.36.3 — a cancelled response keeps only what was written
+
+No signature changes. The full guide is
+[`docs/0.36.3-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.36.3-migration.md)
+in the library repo.
+
+**A turn cancelled (or timed out via `turnTimeoutMs`) while the model was still writing its response now keeps only the parts something was written to.** Through 0.36.2, the partial assistant message kept every part the response had opened: a tool call that had started streaming stayed with no result, and a text part opened but not yet written to stayed as an empty string. The next request carried them and providers rejected it, so after one such turn every later send on that agent failed. From 0.36.3 a `tool-call` part is never kept (finished arguments included), a `text` part is kept only when its text is non-empty, and a `thinking` part only when it holds text, a summary, redacted content, or `continuity`. Written text and thinking are kept as before, and a step that completed is unaffected — its tool calls are answered as 0.36.2 describes. When nothing was written, `error.partial` is `undefined` and no assistant message is added (`agent.messages` stays at `["user"]`), so code that reads `error.partial` unconditionally needs a guard. Code that read `error.partial` to see which tool the model was about to call no longer finds it there — the `tool:request` and `tool:args-delta` stream events still fire, and the turn still holds the action part, settled `cancelled`. A session saved by an earlier version that already ends in an unanswered tool call or an empty text part is not repaired — remove the trailing assistant message before sending on it again.
+
+**Anthropic thinking parts carry `continuity` only once a signature or redacted data has arrived.** Through 0.36.2 a thinking part started with `continuity: { provider: "anthropic", signature: "" }` on `thinking:start`, and gained the real signature later. From 0.36.3 `continuity` is absent until the signature (or redacted data) arrives with a `thinking:update`. Code that tested `part.continuity` to find a signed thinking part now works without also checking the signature. Requests are unchanged: unsigned thinking was never sent back.
 
 ## 0.36.2 — a tool batch that ends early answers every call
 

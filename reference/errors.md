@@ -171,7 +171,9 @@ Thrown by a cancelled `Agent` handle and by every handle dropped by
 `agent.clear()`. Adds the cancelled turn. Also `name === "AbortError"`. When
 the cancel landed mid-tool-batch, `messages` (and `agent.messages`) end in the
 committed tool results message rather than in unanswered calls, so a follow-up
-send is accepted.
+send is accepted. When it landed while the model was still writing its
+response, the partial keeps only written parts and is `undefined` when nothing
+was written (no assistant message is added).
 
 ## AxleToolFatalError
 
