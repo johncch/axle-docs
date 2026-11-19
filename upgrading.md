@@ -7,10 +7,67 @@ description: Breaking changes by version, and where to find the full migration g
 
 Every release has a full migration guide in the repository under
 [`docs/`](https://github.com/johncch/axle/tree/main/docs), one file each from
-`0.13.0-migration.md` through `0.36.3-migration.md`. This page is the map to
+`0.13.0-migration.md` through `0.37.0-migration.md`. This page is the map to
 them — what changed, and which ones you actually need to read.
 
-Current release: **0.36.3**.
+Current release: **0.37.0**.
+
+## 0.37.0 — the reasoning setting, JSON Schema instructs, onStep, analyze
+
+The full guide is
+[`docs/0.37.0-migration.md`](https://github.com/johncch/axle/blob/main/docs/0.37.0-migration.md)
+in the library repo. Read it end to end if you pass `reasoning`, use an `Instruct` schema, drive a remote agent, or construct `StreamEvent`s or `CatalogData` by hand — all four change shape.
+
+**`reasoning` is `"default"` or `{ enabled?, effort?, display? }`; `"off"` and `"on"` are gone.** `ReasoningSetting` was `"default" | "off" | "on" | { effort, display? }` and is now `"default" | { enabled?, effort?, display? }`. `ReasoningEffort` was `"low" | "medium" | "high"` and is now `"minimal" | "low" | "medium" | "high" | "xhigh" | "max"`, sent to the provider as written. Exhaustive switches and `Record<ReasoningEffort, …>` gain three members; `xhigh` and `max` no longer need `providerOptions`.
+
+```typescript
+// @check-skip — shows the pre-0.37 API
+reasoning: "off";
+reasoning: "on";
+reasoning: { effort: "high" };
+```
+
+becomes:
+
+```typescript
+import { Agent } from "@fifthrevision/axle";
+
+declare const provider: import("@fifthrevision/axle").AIProvider;
+
+new Agent({ provider, model: "claude-sonnet-4-5", reasoning: { enabled: false } });
+new Agent({ provider, model: "claude-sonnet-4-5", reasoning: { effort: "medium" } });
+new Agent({ provider, model: "claude-sonnet-4-5", reasoning: { effort: "high" } });
+```
+
+`"on"` meant medium, which many models lack — there is no setting that means "on" for every model. When the model is chosen at run time, ask the catalog what to send:
+
+```typescript
+declare const thinkingOn: boolean;
+
+const found = catalog.reasoningControl(model, { provider: "anthropic" });
+new Agent({
+  provider,
+  model,
+  reasoning: thinkingOn ? (found?.suggested ?? { effort: "medium" }) : { enabled: false },
+});
+```
+
+`{ enabled: true }` turns thinking on without naming a depth where the provider has a switch (Anthropic, Together AI, OpenRouter, Gemma 4 on Gemini) and throws `INVALID_OPTIONS` elsewhere. An object that sets neither `enabled` nor `effort`, or sets `enabled: false` beside an effort, is rejected. Saved `CatalogData` is version 5 — a file saved by 0.36 is refetched, like any older copy. See [Reasoning models](/cookbook/reasoning).
+
+**An `Instruct` schema is a JSON Schema.** `OutputSchema` was `z.ZodTypeAny` and is now a Standard Schema object (Zod 4.2+, ArkType, and others) or a plain JSON Schema object. A Zod schema keeps working unchanged and `response` keeps its type; code that names the type and calls Zod methods on it (`schema.parse()`, `schema.shape`) needs its own Zod type. The prompt carries the JSON Schema in place of the old field list plus example object, so constraints like `.min()` and `.regex()` now reach the model, and schemas that used to throw (`.nullable()`, unions, tuples, records, `z.email()` and other formats, non-object roots) are accepted. With `.transform()` the model is shown the input side and a defaulted key is not required. `InstructInputs` is `Record<string, string | number | boolean | null>` — render dates and arrays to strings yourself, and pass `null` instead of `undefined`. `parseResponse()` and `Instruct.parse()` return a promise:
+
+```typescript
+declare const reply: import("@fifthrevision/axle").AxleAssistantMessage | undefined;
+
+const parsed = await parseResponse(text, schema);
+const same = await instruct.parse(reply);
+```
+
+`instruct.render()` returns the prompt alone — the schema is stored on the message as `output`. New `Instruct.toJSON()` / `Instruct.fromJSON()` round-trip an `Instruct` as data. A remote `send` command carries that data (`{ type: "send", id, instruct }`) instead of a rendered prompt: a 0.36 client and a 0.37 host do not interoperate, so deploy both sides together. A host's `send` case becomes `agent.send(Instruct.fromJSON(command.instruct), { id: command.id })`. See [Instruct](/concepts/instruct) and [Remote agents](/concepts/remote-agents).
+
+**`agent.onStep()` saves usage and state mid-turn.** The awaited hook fires at the end of each step — however it ended — with `{ turnId, index, usage, messages, signal }`, and the agent waits before sending the next request. `stream()` has the same hook as `handle.onStep(callback)` with `{ usage, messages }`. A step's `usage` is the early copy; `turn:end` carries the authoritative totals. `agent.session` returns `{ sessionId, messages }` synchronously and works inside `onStep`, `onStart`, `onSettled`, continuations, and tools — read it there instead of awaiting `snapshot()`, which is deprecated. Custom `StreamHandle` implementations add `onStep`. See [Agent](/concepts/agent) and [Sessions & persistence](/concepts/sessions).
+
+Additions with no migration cost: `@fifthrevision/axle/analyze` (`analyze()`, the `failed` / `completed` / `cancelled` / `byUser` / `byAgent` / `named` predicates, `streaks` / `repeats` / `sum` / `flatten` / `partOf` / `simplify` — see [Analyzing a conversation](/concepts/analyze)); `Turn` and `turn:end` gain `error` (`{ message, code? }`, for a thrown error) and `cancelReason` (`{ type: "timeout", limitMs }`); text and thinking stream events gain a required `index` (custom `StreamHandle` fixtures and hand-built events add it); `agent.messages` grows as each step ends; `turn:end` usage includes failed requests and keeps subagent rows in call order; a failed or cancelled MCP tool listing keeps its user message and ends the turn `error` / `cancelled` instead of dropping the send; a failed subagent's tool error names the failure kind and message. `CatalogData` version 5 entries may carry `reasoningOptions`, read through `ModelCatalog.reasoningControl()`.
 
 ## 0.36.3 — a cancelled response keeps only what was written
 

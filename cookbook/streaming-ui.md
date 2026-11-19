@@ -160,7 +160,7 @@ Two things to save, not one — this is the step people miss:
 
 ```typescript
 await db.save(sessionId, {
-  session: await agent.snapshot(), // for the model
+  session: agent.session, // for the model
   turns: transcript.turns, // for the reader
 });
 

@@ -11,7 +11,7 @@ import { Agent, anthropic } from "@fifthrevision/axle";
 const agent = new Agent({
   provider: anthropic(process.env.ANTHROPIC_API_KEY!),
   model: "claude-opus-4-5",
-  reasoning: "on",
+  reasoning: { effort: "medium" },
 });
 
 agent.on((event) => {
@@ -40,18 +40,25 @@ console.log(`\nreasoning tokens: ${result.usage.reasoningOut ?? 0}`);
 a named effort level plus a disclosure choice:
 
 ```typescript
-type ReasoningEffort = "low" | "medium" | "high";
-type ReasoningDisplay = "visible" | "hidden";
-type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort; display?: ReasoningDisplay };
+import type { ReasoningEffort, ReasoningSetting } from "@fifthrevision/axle";
+
+type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+// = REASONING_EFFORTS, lowest first
+type ReasoningSetting = "default" | { enabled?: boolean; effort?: ReasoningEffort; display?: "visible" | "hidden" };
 ```
 
 - `"default"` (or omitted) sends no reasoning fields; the model runs at its
   provider's own default, which may be thinking-on or thinking-off.
-- `"on"` is `{ effort: "medium" }` — a moderate choice. Reach for
-  `{ effort: "high" }` on purpose when you want the deepest thinking.
-- `"off"` sends the provider's explicit disable shape. Some always-thinking
-  models reject it; the provider error surfaces unchanged.
-- `{ effort }` picks a named level.
+- `{ effort }` picks a named level — `{ effort: "medium" }` is a moderate
+  choice. Reach for `{ effort: "high" }` on purpose when you want deeper
+  thinking, `{ effort: "max" }` for the deepest. Levels are relative within a
+  model, not comparable compute across models, and the provider rejects one
+  the model lacks.
+- `{ enabled: false }` sends the provider's explicit disable shape. Some
+  always-thinking models reject it; the provider error surfaces unchanged.
+- `{ enabled: true }` turns thinking on without naming a depth, where the
+  provider has a switch — Anthropic, Together AI, OpenRouter, and Gemma 4 on
+  Gemini. Anywhere else it throws `INVALID_OPTIONS`; name an effort instead.
 - `{ effort, display: "hidden" }` keeps thinking out of the turn while the
   message still carries whatever the wire returned, so provider continuity
   keeps working. See [Disclosure vs form](#disclosure-vs-form).
@@ -59,7 +66,7 @@ type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort; di
 Set it per agent, or per send when one question doesn't need it:
 
 ```typescript
-await agent.send("Quick question.", { reasoning: "off" }).final;
+await agent.send("Quick question.", { reasoning: { enabled: false } }).final;
 await agent.send("Think, but keep it out of the transcript.", { reasoning: { effort: "high", display: "hidden" } }).final;
 ```
 
@@ -70,7 +77,7 @@ For provider-specific knobs — thinking budgets, effort levels — use
 const agent = new Agent({
   provider,
   model,
-  reasoning: "on",
+  reasoning: { effort: "medium" },
   providerOptions: { thinking: { type: "enabled", budget_tokens: 10_000 } },
 });
 ```
@@ -89,7 +96,7 @@ assembles.
 *in what form* thinking arrives — that part is the model's, and the thinking
 part records which one showed up.
 
-Enabling reasoning (`"on"` or `{ effort }`) now asks for disclosure wherever a
+Enabling reasoning (`{ effort }` or `{ enabled: true }`) now asks for disclosure wherever a
 request field exists: Anthropic gets `display: "summarized"`, OpenAI gets
 `summary: "auto"`, Gemini gets `includeThoughts: true`. Which means Claude and
 OpenAI models that previously streamed no thinking now stream it — and time to
@@ -105,11 +112,49 @@ await agent.send("...", { reasoning: { effort: "high", display: "hidden" } }).fi
 Anthropic, no summary field on OpenAI, `includeThoughts: false` on Gemini,
 `reasoning: { exclude: true }` on OpenRouter) and withholds thinking content
 from the turn on every route. Generic chat-completions endpoints and Together
-have no field and send nothing either way. `"default"` and `"off"` are
-unchanged and send nothing for display.
+have no field and send nothing either way. `"default"` and `{ enabled: false }`
+are unchanged and send nothing for display.
 
 Fine-grained values stay in `providerOptions`: OpenAI `concise` and `detailed`
 summaries, Anthropic's `updates` display.
+
+## Picking a setting for a model you choose at run time
+
+There is no setting that means "on" for every model — `"on"` used to mean
+medium, and medium is missing from many models' effort lists. When the model
+is chosen at run time, ask the catalog what to send:
+
+```typescript
+declare const thinkingOn: boolean;
+
+const found = catalog.reasoningControl(model, { provider: "anthropic" });
+new Agent({
+  provider,
+  model,
+  reasoning: thinkingOn ? (found?.suggested ?? { effort: "medium" }) : { enabled: false },
+});
+```
+
+`reasoningControl()` reports the kind of control a model has, the efforts to
+offer, and the setting to send when the choice is only on or off. It is
+advisory — requests are never checked against it — and `undefined` when the
+catalog has no record of the model's reasoning controls. `found.control` is
+`"levels"` (efforts listed, `suggested` nearest medium), `"toggle"` (an
+on/off switch, `suggested` is `{ enabled: true }`), or `"none"`. See [Model
+catalog & cost](/concepts/model-catalog).
+
+`{ enabled: true }` alone sends the switch each route spells: Anthropic gets
+`thinking: { type: "adaptive" }`, Together AI and OpenRouter get
+`reasoning: { enabled: true }`, Gemma 4 on Gemini gets
+`thinkingLevel: "high"`. On a route with no switch — OpenAI, generic
+endpoints, other Gemini models, budget-only models — Axle rejects it with
+`INVALID_OPTIONS`, so name an effort there. `{ enabled: true, effort }` is
+the same as `{ effort }`. For Gemma 4, `{ enabled: false }` sends
+`thinkingLevel: "minimal"`, which is how Google spells off for those models.
+
+`xhigh` and `max` exist only on newer models, and budget-only models map
+every level to a token budget (`minimal` through `max` get progressively
+larger budgets). An effort the model lacks is rejected by the provider.
 
 ## What you get back
 
@@ -197,7 +242,7 @@ render as summaries and multi-turn tool loops keep their signatures. But there
 are two places where **you** have to preserve it verbatim:
 
 - **Persistence.** If you serialize and restore sessions, do not strip it.
-  `agent.snapshot()` keeps it; hand-rolled message filtering often does not.
+  `agent.session` keeps it; hand-rolled message filtering often does not.
 - **Compaction.** A compactor that rewrites assistant messages must preserve
   `continuity` on any thinking part it keeps — or drop the whole part. Half a
   thinking part with a mangled signature is worse than none.
@@ -229,14 +274,14 @@ simplify the schema.
 ## Turning it off
 
 Some models reason by default, which isn't always what you want.
-`reasoning: "off"` turns it off wherever the provider supports that — it sends
+`reasoning: { enabled: false }` turns it off wherever the provider supports that — it sends
 the provider's explicit disable shape rather than just omitting the field, so
 a model that thinks by default actually stops. It's worth setting explicitly on
 latency-sensitive paths — and on
 [compaction](/concepts/compaction) calls, where `PromptCompactor` leaves
 `reasoning` unset by default (so the model follows its own default). If you
 *do* want a reasoning model to drive the summary, pass an explicit setting such
-as `reasoning: "on"` (and `providerOptions` for the provider-specific knobs)
+as `reasoning: { effort: "medium" }` (and `providerOptions` for the provider-specific knobs)
 when you construct the compactor — it's opt-in, because a cheap summary rarely
 benefits from the extra latency.
 

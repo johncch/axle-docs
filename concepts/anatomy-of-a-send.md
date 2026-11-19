@@ -133,7 +133,7 @@ This is the part that surprises people most, so it's worth stating plainly:
   and forgets them. If you don't fold those events into a `Transcript` and store
   it, the reader-facing history is gone.
 
-`agent.snapshot()` gives you the continuation — session id and messages — and
+`agent.session` gives you the continuation — session id and messages — and
 deliberately leaves turns out. It's not an oversight; it's the boundary. The
 [Transcripts](/concepts/transcripts) page explains why it's drawn there, and it's
 three lines of code to hold up your end.

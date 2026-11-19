@@ -99,10 +99,23 @@ does not answer — or any call when there is no handler — fails at once with 
 interface StreamHandle {
   on(callback: (event: StreamEvent) => void): void;
   onToolBatchComplete(callback: ToolBatchCompleteCallback): void;
+  onStep(callback: StreamStepCallback): void;
   cancel(reason?: unknown): void;
   toolCall(id: string): WaitingToolCall | undefined;
   readonly final: Promise<StreamResult>;
 }
+
+/**
+ * One step of a run, handed to `onStep` when it ends: a model call and the
+ * tool batch it asked for, if any. `usage` is what the step added to the
+ * run's usage, and `messages` what it added to the conversation.
+ */
+interface StreamStep {
+  usage: Stats;
+  messages: AxleMessage[];
+}
+
+type StreamStepCallback = (step: StreamStep) => void | Promise<void>;
 
 type ToolBatchCompleteCallback = (
   message: AxleToolCallMessage,
@@ -121,6 +134,12 @@ type ToolBatchDecision =
 ```
 
 `StreamInstructHandle<TSchema>` is the same with `final: Promise<StreamInstructResult<TSchema>>`.
+
+`onStep(callback)` installs one awaited callback that runs each time a step
+ends, however it ended: after the tool results are written, or after a model
+call that asked for no tools. The next model call is not sent until it returns.
+A `cancel()` while it is pending takes effect when it returns; a callback that
+throws rejects `final` with that error.
 
 Unlike `agent.on()`, `stream().on()` does not return an unsubscribe function.
 
@@ -170,24 +189,27 @@ output existed.
 
 | Event | Fields |
 | --- | --- |
-| `text:start` | — |
-| `text:delta` | `delta`, `accumulated` |
-| `text:citation` | `citation`, `citations` |
-| `text:end` | `final` |
+| `text:start` | `index` |
+| `text:delta` | `index`, `delta`, `accumulated` |
+| `text:citation` | `index`, `citation`, `citations` |
+| `text:end` | `index`, `final` |
 | `citation` | `citations`, `providerMetadata?` — unanchored source list |
 
 ### Thinking
 
 | Event | Fields |
 | --- | --- |
-| `thinking:start` | `continuity?` (Anthropic: only once a signature or redacted data has arrived), `providerMetadata?` |
-| `thinking:raw-delta` | `delta`, `accumulated` |
-| `thinking:summary-delta` | `delta`, `accumulated` |
-| `thinking:update` | `continuity?`, `providerMetadata?` |
-| `thinking:end` | `summary?`, `raw?` — each present only if a delta wrote it |
+| `thinking:start` | `index`, `continuity?` (Anthropic: only once a signature or redacted data has arrived), `providerMetadata?` |
+| `thinking:raw-delta` | `index`, `delta`, `accumulated` |
+| `thinking:summary-delta` | `index`, `delta`, `accumulated` |
+| `thinking:update` | `index`, `continuity?`, `providerMetadata?` |
+| `thinking:end` | `index`, `summary?`, `raw?` — each present only if a delta wrote it |
 
-Text and thinking parts stream sequentially; a delta belongs to the most recently
-opened part of its kind.
+Every text and thinking event carries the required `index`: the part's position
+in the step's assistant message. Code that only reads these events is
+unaffected; code that constructs them (a custom `StreamHandle`, a test fixture)
+adds the field. (`index` was added in 0.37.0 — it fixes grounding citations
+that arrived after their text, which Gemini sends, being lost from turns.)
 
 ### Tools
 

@@ -138,7 +138,7 @@ A fair warning about what *isn't* portable: `providerOptions` (it's raw
 passthrough), provider tool configuration payloads, and whatever a particular
 model chooses to do with `reasoning`. Those are the escape hatches, and using
 them ties that agent to that vendor. Which is fine — just know when you're doing
-it. Enabling reasoning (`"on"` or `{ effort }`) now also requests disclosure
+it. Enabling reasoning (`{ effort }` or `{ enabled: true }`) now also requests disclosure
 wherever a request field exists, so Claude and OpenAI stream thinking where they
 previously streamed none — pass `{ effort, display: "hidden" }` to keep the old
 wire behaviour. See [Reasoning models](/cookbook/reasoning#disclosure-vs-form).
@@ -235,7 +235,7 @@ const agent = new Agent({
   provider,
   model,
   maxOutputTokens: 4096,
-  reasoning: "on",
+  reasoning: { effort: "medium" },
 });
 
 // Just this one send — merged over the agent's defaults
@@ -244,7 +244,7 @@ await agent.send("...", { maxOutputTokens: 1024 }).final;
 
 | Option | What it does |
 | --- | --- |
-| `reasoning` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high", display?: "visible" \| "hidden" }` — `display` (default `"visible"`) asks the provider to disclose its thinking |
+| `reasoning` | Portable thinking/reasoning control: `"default"` or `{ enabled?, effort?: "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max", display?: "visible" \| "hidden" }` — `display` (default `"visible"`) asks the provider to disclose its thinking |
 | `maxOutputTokens` | Caps output tokens for the request |
 | `toolChoice` | `"auto"`, `"none"`, `"required"`, or `{ type: "tool", name }` |
 | `parallelToolCalls` | Asks the provider to avoid parallel tool calls |

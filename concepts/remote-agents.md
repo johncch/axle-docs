@@ -46,6 +46,7 @@ consumer in one process. HTTP changes the transport, not the shape.
 import {
   Agent,
   InMemoryEventStore,
+  Instruct,
   RemoteAgent,
   isCall,
   loopbackTransport,
@@ -66,7 +67,7 @@ const remoteAgent = new RemoteAgent(
   loopbackTransport(store, async (command) => {
     switch (command.type) {
       case "send": {
-        const handle = served.send(command.prompt, { id: command.id });
+        const handle = served.send(Instruct.fromJSON(command.instruct), { id: command.id });
         handle.final.catch(() => {});
         return { accepted: true as const };
       }
@@ -139,11 +140,13 @@ answer to a call nobody is waiting on, `idle` for a cancel or stop with no
 active turn. Results, the waiting call, the settled turn: those arrive as
 events, so every consumer of the store sees them, not just the one that asked.
 
-A `send` crosses as a rendered prompt — the user turn's `id`, the prompt text
-with everything already in it, its files, and the metadata the send carries.
-The schema never crosses: the remote `send` still takes an `Instruct`, and
-`final` still gives you the parsed object. Per-send request options don't
-cross either; the served agent's configuration applies.
+A `send` crosses as the `Instruct` itself — serialized data carrying the
+prompt with everything already in it, its files, and the schema. The served
+side renders it, so the remote `send` still takes an `Instruct`, and `final`
+still gives you the parsed object. Per-send request options don't
+cross either; the served agent's configuration applies. A 0.36 client and a
+0.37 host do not interoperate — the old shape (a rendered `prompt`) is
+rejected — so deploy both sides together.
 
 Two things don't survive the trip. A remote result carries no `after` list —
 the inline sends' schemas live on the served side, so only their turns cross.

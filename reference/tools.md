@@ -240,7 +240,7 @@ Behavior:
 - Child turn events are forwarded via `ctx.emit`; the subscription is removed when
   the call ends.
 - Child usage is reported via `ctx.reportUsage`.
-- A non-`ok` child result throws `Error("Subagent failed: …")`.
+- A non-`ok` child result throws `Error("Subagent failed (<kind>): <message>")` naming the failure kind and message.
 - A non-string child response is `JSON.stringify`'d.
 - `AxleToolFatalError` and `AxleAbortError` from the child are rebuilt without
   the child's `messages`/`partial`, so the parent never adopts another

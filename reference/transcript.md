@@ -57,6 +57,8 @@ interface Turn<TAnnotation extends Annotation = Annotation> {
   timing?: TimingInfo;
   usage?: Stats;
   failure?: TurnFailure;
+  error?: TurnError;
+  cancelReason?: TimeoutReason;
   reason?: "stop" | "length";
 }
 
@@ -68,6 +70,18 @@ type TurnFailure =
   | { kind: "incomplete"; type: string; message: string }
   | { kind: "refusal"; message: string; text?: string; category?: string }
   | { kind: "parse"; message: string };
+```
+
+```typescript
+// A thrown error that ended the turn `error`, instead of a failure.
+interface TurnError {
+  message: string;
+  code?: AxleErrorCode; // only when Axle threw the error
+}
+
+// Why a `cancelled` turn was cancelled. Present only when `turnTimeoutMs`
+// did it (`{ type: "timeout", limitMs }`); absent on a caller cancel.
+type TimeoutReason = { type: "timeout"; limitMs: number };
 ```
 
 A `pending` turn is a preview of a turn the Agent accepted but hasn't opened —
@@ -229,7 +243,7 @@ type PendingDropReason =
 ```
 
 A queued handle cancelled (`handle.cancel()`, `agent.clear()`, an already-aborted
-signal) drops as `cancelled`; a setup failure (unreachable MCP server, say)
+signal) drops as `cancelled`; a setup failure (an `onStart` refusal, say)
 drops as `error`. Nothing is committed in either case. A `switch` over
 `event.type` with an exhaustiveness check must handle both; a renderer that
 reads `turns` alone can ignore them. `apply()` folds `pending:queued` into
@@ -243,9 +257,9 @@ component keyed by id.
 | --- | --- |
 | `turn:user` | `turn` — the complete user turn |
 | `turn:start` | `turnId`, `timing?` |
-| `turn:end` | `turnId`, `status`, `usage`, `failure?`, `reason?`, `timing?` |
+| `turn:end` | `turnId`, `status`, `usage`, `failure?`, `error?`, `cancelReason?`, `reason?`, `timing?` |
 
-`failure` is a `TurnFailure` (the provider's answer that ended the turn `ok: false`, without `usage`/`raw`/`cause`); `reason` is `"stop"` or `"length"` when the turn ended with a final answer. The old `error` event is gone — match `turn:end`'s `failure` instead.
+`failure` is a `TurnFailure` (the provider's answer that ended the turn `ok: false`, without `usage`/`raw`/`cause`); `reason` is `"stop"` or `"length"` when the turn ended with a final answer. `error` is a `TurnError` (a thrown error the send rejected with, not a provider answer — a turn carries `failure` or `error`, never both); `cancelReason` is present only when `turnTimeoutMs` cancelled the turn. The old `error` event is gone — match `turn:end`'s `failure` instead.
 
 ### Part streaming
 

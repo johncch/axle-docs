@@ -6,7 +6,7 @@ docs: https://axle.fifthrevision.com/llms-full.txt
 
 ## 1. Check the installed version before you write anything
 
-The public surface moved at 0.33, 0.35 and 0.36. Read the version from the
+The public surface moved at 0.33, 0.35, 0.36 and 0.37. Read the version from the
 project's `package.json`, and treat anything you remember as suspect.
 
 | If you were about to write | Since |
@@ -18,10 +18,15 @@ project's `package.json`, and treat anything you remember as suspect.
 | `onToolCall` to intercept a normal tool | 0.36 — it answers **deferred** tools only |
 | `TurnEventCallback` | `AgentEventCallback` in 0.36 |
 | `onSettled` firing per turn | 0.36 — once per operation, after its continuation |
+| `reasoning: "off"` / `"on"` | Gone in 0.37 — `{ enabled: false }` / `{ effort: "medium" }` |
+| `reasoning: { effort }` with three levels | Six in 0.37 — `minimal` through `max`, sent as written |
+| reading `parseResponse()` / `instruct.parse()` synchronously | Async in 0.37 — both return a promise |
+| `instruct.render()` giving the full message | Prompt alone in 0.37 — the schema travels as `output` |
+| `await agent.snapshot()` | Deprecated in 0.37 — read `agent.session` instead |
 
 Every rename: https://axle.fifthrevision.com/upgrading
 
-## 2. Two entry points
+## 2. Entry points
 
 - `@fifthrevision/axle` — everything.
 - `@fifthrevision/axle/ui` — the render and client surface (`Transcript`,
@@ -29,6 +34,10 @@ Every rename: https://axle.fifthrevision.com/upgrading
   `httpTransport`, `renderTerminalMarkdown`, and the types). It pulls in
   `chalk`, `marked` and `zod` and **no provider SDKs**, so use it in browser
   code.
+- `@fifthrevision/axle/analyze` — turn analysis (`analyze`, the `failed` /
+  `completed` / `cancelled` / `byUser` / `byAgent` / `named` predicates, the
+  `streaks` / `repeats` / `sum` / `flatten` / `partOf` / `simplify` functions).
+  Experimental.
 
 ## 3. A correct minimal program
 
@@ -88,7 +97,7 @@ const transcript = new Transcript();
 agent.on(transcript.apply);
 ```
 
-Persist **both** halves, separately: `await agent.snapshot()` for the
+Persist **both** halves, separately: `agent.session` for the
 conversation and `transcript.turns` for what the reader sees. Never persist
 `transcript.pending` — it's live state. Restore with
 `new Agent(config, session)` and `new Transcript(saved.turns)`.

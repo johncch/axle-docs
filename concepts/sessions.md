@@ -23,7 +23,7 @@ conversation. Nothing else.
 Save it when you're done:
 
 ```typescript
-const session = await agent.snapshot();
+const session = agent.session;
 await db.save(session.sessionId, session);
 ```
 
@@ -34,7 +34,12 @@ const session = await db.load(sessionId);
 const agent = new Agent(config, session);
 ```
 
-`snapshot()` is async, and it resolves when the agent goes idle — at once when
+`agent.session` returns that same `{ sessionId, messages }` synchronously, as
+it stands — safe inside `onStep`, `onStart`, `onSettled`, continuations, and
+tools, where `snapshot()` would deadlock. To save a state at rest, read it in
+an `onSettled` or `onIdle` callback, or after awaiting the send's `final`.
+
+`snapshot()` is deprecated but still works: it is async, and it resolves when the agent goes idle — at once when
 nothing is running, otherwise when the last queued operation has settled. That's
 what guarantees you're capturing a conversation at rest: a snapshot never
 contains a streaming or half-executed turn, and it includes everything queued
@@ -43,8 +48,8 @@ agent busy, fires no `onIdle`, and `clear()` doesn't cancel it.
 
 ::: danger Don't await snapshot() from inside a send or an onSettled callback
 It needs the agent to go idle, so calling it from a tool's `execute`, an
-`onToolCall` handler, a compaction callback, or an `onSettled` callback will
-deadlock. Call it from outside a send.
+`onToolCall` handler, a compaction callback, an `onStep` callback, or an `onSettled` callback will
+deadlock. Call it from outside a send — or read `agent.session` instead.
 :::
 
 To save after each operation without awaiting the queue empty, use `onSettled`
@@ -84,7 +89,7 @@ persist both:
 
 ```typescript
 await db.save(id, {
-  session: await agent.snapshot(),
+  session: agent.session,
   turns: transcript.turns,
 });
 ```

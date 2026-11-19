@@ -74,7 +74,7 @@ its own system prompt, which matters if that conversation contains anything a
 user or a tool put there.
 
 `reasoning` is left unset by default for the summary call, so the summarizing
-model follows its own default. Pass an explicit setting such as `reasoning: "on"`
+model follows its own default. Pass an explicit setting such as `reasoning: { effort: "medium" }`
 (and `providerOptions` for the knobs) if you want a thinking-capable model to do
 the summarizing — most of the time you don't, which is why it's opt-in. See
 [Reasoning models](/cookbook/reasoning#turning-it-off) for the trade-off.

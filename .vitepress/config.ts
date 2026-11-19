@@ -13,7 +13,7 @@ export default defineConfig({
       { text: 'Reference', link: '/reference/agent', activeMatch: '/reference/' },
       { text: 'Cookbook', link: '/cookbook/tool-using-agent', activeMatch: '/cookbook/' },
       {
-        text: 'v0.36.3',
+        text: 'v0.37.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Upgrading', link: '/upgrading' },
@@ -49,6 +49,7 @@ export default defineConfig({
           { text: 'Remote agents', link: '/concepts/remote-agents' },
           { text: 'Compaction', link: '/concepts/compaction' },
           { text: 'Skills', link: '/concepts/skills' },
+          { text: 'Analyzing a conversation', link: '/concepts/analyze' },
         ],
       },
       {

@@ -91,9 +91,9 @@ const b = agent.send("Second question."); // waits for a
 Each handle settles with its own result, and `b` sees the history `a` committed.
 
 The queue is doing more work than it looks like: `compact()` goes through it
-too, so compaction never races a turn. (`snapshot()` used to queue as well; in
-0.34.0 it waits for the agent to go idle instead — see [Sessions &
-persistence](/concepts/sessions).) Every accepted operation also announces
+too, so compaction never races a turn. (Saving doesn't queue: `snapshot()`
+waits for the agent to go idle instead, and `session` reads the state as it
+stands — see [Sessions & persistence](/concepts/sessions).) Every accepted operation also announces
 itself: `send()` emits `pending:queued` with a preview turn carrying the id the
 committed turn will have, so a UI rendering `[...transcript.turns,
 ...transcript.pending]` keyed by id shows queued work. A handle cancelled while
@@ -103,9 +103,10 @@ events](/concepts/turn-events).
 ::: danger One way to deadlock
 `agent.compact()` queues behind in-flight work, and `agent.snapshot()` waits
 for idle — so if you await either from inside a tool's `execute`, an
-`onToolCall` handler, a compaction callback, or an `onSettled` callback, you'll
-hang. The send is holding the queue (or the idle) that your nested call is
-waiting on. Call them from outside a send instead.
+`onToolCall` handler, a compaction callback, an `onStep` callback, or an
+`onSettled` callback, you'll hang. The send is holding the queue (or the idle) that your nested call is
+waiting on. Call them from outside a send instead —
+or read `agent.session` when you need the state from inside one.
 :::
 
 ## Interrupting: four different things
@@ -179,9 +180,12 @@ Immediate, and local to that handle. `handle.final` rejects with
 Whether anything commits comes down to timing, and the line is whether the turn
 opened:
 
-- Cancel **before** it (while queued, or during MCP setup) and the handle just
+- Cancel **before** it (while queued) and the handle just
   disappears — `pending:queued` is followed by `pending:dropped`, no user
-  message, nothing committed.
+  message, nothing committed. (Failing or cancelling while listing MCP tools
+  no longer drops the send: the user turn opens first, so the user message
+  stays and the agent turn ends `error` or `cancelled`. A retry is a new send,
+  so remove the first user message first if you don't want both kept.)
 - Cancel **after** it and the user message stays, with the agent turn marked
   `cancelled`. A cancelled turn is always recorded as `cancelled`, even when the
   provider rethrows something that doesn't look like an abort. That includes
@@ -251,6 +255,13 @@ place to close whatever your host opened when work began. Neither fires for an
 operation cancelled while still queued: it never ran. See the [Agent
 reference](/reference/agent#onsettled).
 
+One more hook, at a finer grain: `onStep()` fires at the end of each step
+inside a turn — one model call and the tools it asked for — however the step
+ended. The agent waits for your callback before sending the next request, so
+it's where you save usage and state while the turn is still running instead of
+once at `turn:end`. Read `agent.session` there, not `snapshot()`. Full shape in
+the [Agent reference](/reference/agent#onstep).
+
 ## Reading the conversation
 
 ```typescript
@@ -261,7 +272,10 @@ agent.system; // readonly getter — configured prompt, then the skills catalog 
 ```
 
 `messages` is a copy, so mutating it does nothing. If you want to change the
-conversation, that's [compaction](/concepts/compaction). `system` is derived —
+conversation, that's [compaction](/concepts/compaction). It grows as each step
+ends while a turn runs — an assistant message that asked for tools appears
+together with its tool results — so code that reads it mid-turn (a tool, an
+event listener, `onStep`) sees the finished steps. `system` is derived —
 set the prompt at construction; skills append their own section (see
 [Skills](/concepts/skills)).
 
@@ -295,12 +309,13 @@ registered with `agent.onToolCall()`, one per agent, or wait for
 ## Picking up where you left off
 
 ```typescript
-const session = await agent.snapshot();
+const session = agent.session;
 // ...later, in a new process
 const restored = new Agent(config, session);
 ```
 
-See [Sessions & persistence](/concepts/sessions).
+`snapshot()` (which waits for the agent to go idle) is deprecated — read
+`session` instead. See [Sessions & persistence](/concepts/sessions).
 
 ## Next
 

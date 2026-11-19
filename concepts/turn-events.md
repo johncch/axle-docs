@@ -45,7 +45,7 @@ Every event after `turn:user` carries a `turnId`, and part-level events carry a
 
 - **Operation lifecycle** — `operation:start`, `after:start`, `after:end`, `operation:end`, `agent:idle`
 - **Pending lifecycle** — `pending:queued`, `pending:dropped`
-- **Turn lifecycle** — `turn:user`, `turn:start`, `turn:end` (carries `failure?` and `reason?`)
+- **Turn lifecycle** — `turn:user`, `turn:start`, `turn:end` (carries `failure?`, `error?`, `cancelReason?`, and `reason?`)
 - **Part streaming** — `part:start`, `text:delta`, `text:citation`,
   `thinking:raw-delta`, `thinking:summary-delta`, `thinking:update`, `part:end`
 - **Actions** — `action:args-delta`, `action:running`, `action:waiting`, `action:input`,
@@ -76,7 +76,7 @@ a `TurnEvent`, so `agent.on(transcript.apply)` keeps working unchanged.
 and the committed turn share their id, parts, and timing. That means
 `pending:queued` arrives inside the `send()` call, before `turn:user` — and a
 send that never starts still emits `pending:queued` followed by
-`pending:dropped` (cancelled while queued, or a setup failure). The turn's
+`pending:dropped` (cancelled while queued, refused by `onStart`, or a setup failure). A send that fails while listing MCP tools is not dropped — the user turn opens first, so the failure ends the turn `error` instead. The turn's
 timing is the moment of the call, not the moment the turn committed; for a send
 that waited in the queue the two differ by the wait. A renderer that has no use
 for previews can ignore both events — `Transcript` folds them, and they never

@@ -30,7 +30,7 @@ Extends `AxleModelRequestOptions` minus `signal`.
 | `mcps` | `MCP[]` | — | MCP clients, resolved lazily on first send. |
 | `observability` | `ObservabilityOptions` | — | Logging and tracing. |
 | `fileResolver` | `FileResolver` | — | Resolves deferred file references. |
-| `reasoning` | `ReasoningSetting` | — | Portable reasoning/thinking control: `"default"`, `"off"`, `"on"`, or `{ effort, display? }`. |
+| `reasoning` | `ReasoningSetting` | — | Portable reasoning/thinking control: `"default"` or `{ enabled?, effort?, display? }`. |
 | `maxOutputTokens` | `number` | — | Output token cap. |
 | `toolChoice` | `ToolChoice` | — | `"auto"`, `"none"`, `"required"`, `{ type: "tool", name }`. |
 | `parallelToolCalls` | `boolean` | — | Ask the provider to avoid parallel tool calls. |
@@ -65,8 +65,9 @@ session id wins.
 | `streamStallMs` | `number \| undefined` | readonly |
 | `status` | `AgentStatus` | `{ phase: "idle" }`, or `{ phase: "busy", id }` with the running operation's id. Busy covers `onStart` callbacks, the continuation, and `onSettled` — changes only at `operation:start` and `agent:idle`, and already reads the new value when the event that moved it is delivered. |
 | `sessionId` | `string` | mutable |
+| `session` | `AgentSession` | Getter returning `{ sessionId, messages }` as it stands — synchronous, and safe inside `onStep`, `onStart`, `onSettled`, continuations, and tools, where `snapshot()` would deadlock. |
 | `system` | `string \| undefined` | readonly getter — the configured system prompt, then the skills catalog when skills are present |
-| `messages` | `AxleMessage[]` | Getter returning a **copy** of the active conversation. |
+| `messages` | `AxleMessage[]` | Getter returning a **copy** of the active conversation. Grows as each step ends while a turn runs, so a reader inside the turn sees finished steps. |
 
 ## send()
 
@@ -248,6 +249,67 @@ Do not await `send()`, `compact()`, or `snapshot()` on this agent from inside a
 callback: the callback holds the queue they wait for, so the nested call
 deadlocks.
 
+## onStep()
+
+```typescript
+onStep(callback: StepCallback): () => void
+```
+
+Called each time a step ends inside a turn, so a host can save usage and state
+while the turn runs. A step is one model call and the tool batch it asked for,
+if any, and it fires however the step ended: answered, failed, refused, or
+cancelled. A compaction whose callback ran is a step too. Inline turns sent by
+a continuation fire it.
+
+```typescript
+type StepCallback = (step: AgentStep) => void | Promise<void>;
+
+interface AgentStep {
+  turnId: string;
+  index: number; // counts the turn's steps from 0, compactions included
+  signal: AbortSignal; // aborts when the turn is cancelled or times out
+  usage: Stats; // what the Agent saw spent in the step (empty for a compaction)
+}
+```
+
+`step.index` counts the turn's steps from 0 and `step.usage` holds the rows the
+step added: the rows of a turn's steps, in order, are the `usage` its `turn:end`
+reports. The step's messages are already in `messages` — a conversation the
+provider accepts — and every event belonging to the step has reached `on`
+listeners. A subagent's rows arrive on the step whose tools ran it.
+
+The agent waits for the callback before it sends the next request: a callback
+may return a promise, and all callbacks run together. One that throws stops the
+turn there — nothing further runs, the turn ends `error`, `onSettled` runs with
+the thrown error, and the handle rejects with it. A `cancel()` while callbacks
+run takes effect when they return. No timeout is applied. Catch your own errors
+if saving should be best effort.
+
+Do not await `send()`, `compact()`, or `snapshot()` on this agent from inside a
+callback — the callback holds the queue they wait for, so the nested call
+deadlocks. Read `session` for the state to save.
+
+```typescript
+declare const saveSession: (session: AgentSession) => Promise<void>;
+declare const usageLedger: unknown;
+
+agent.onStep(async (step) => {
+  await db.insert(usageLedger).values(
+    step.usage.breakdown.map((row, i) => ({
+      turnId: step.turnId,
+      step: step.index,
+      row: i,
+      ...row,
+    })),
+  );
+  await saveSession(agent.session);
+});
+```
+
+`stream()` has the same hook as `handle.onStep(callback)`, receiving
+`{ usage, messages }` for the step. Custom `StreamHandle` implementations must
+add it.
+
 ## onToolCall()
 
 ```typescript
@@ -387,6 +449,10 @@ running turn, and it includes everything queued before the agent went idle. It
 is not queued work: it does not make the agent busy, fires no `onIdle`, and is
 not cancelled by `clear()`. Returns `{ sessionId, messages }`. Excludes
 transcripts and all runtime objects.
+
+**Deprecated** — read `session` instead, which returns the same value without
+waiting. To save a state at rest, read it in an `onSettled` or `onIdle`
+callback.
 
 **Do not await from inside a running send or an `onSettled` callback** — the
 agent cannot go idle until they return, so the nested call deadlocks. To save
