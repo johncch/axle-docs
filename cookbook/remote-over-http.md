@@ -88,7 +88,7 @@ Three things in there are load-bearing:
 calls is yours, because only the server knows how to find the agent:
 
 ```typescript
-import type { AgentCommand, CommandOutcome } from "@fifthrevision/axle";
+import { Instruct, type AgentCommand, type CommandOutcome } from "@fifthrevision/axle";
 
 const accepted: CommandOutcome = { accepted: true };
 const notWaiting = (callId: string): CommandOutcome => ({
@@ -99,7 +99,7 @@ const notWaiting = (callId: string): CommandOutcome => ({
 async function runCommand(agent: Agent, command: AgentCommand): Promise<CommandOutcome> {
   switch (command.type) {
     case "send": {
-      const handle = agent.send(command.prompt, { id: command.id });
+      const handle = agent.send(Instruct.fromJSON(command.instruct), { id: command.id });
       handle.final.catch(() => {}); // the result reaches the client as events
       return accepted;
     }

@@ -31,9 +31,9 @@ if you want a one-shot call without agent-managed history.
 
 ## Structured output
 
-Hand it a Zod schema. Axle compiles that into output-format instructions,
-prepends them to your message, and parses the model's reply back into a typed
-object.
+Hand it a schema — a Zod schema (or any Standard Schema), or a plain JSON
+Schema object. Axle shows the model the JSON Schema, prepended to your prompt
+as output-format instructions, and parses the reply back into a typed value.
 
 ```typescript
 const instruct = new Instruct({
@@ -46,9 +46,42 @@ const instruct = new Instruct({
 });
 ```
 
-`.describe()` on a field flows straight into those generated instructions, so
-it's the cheapest way to clear up an ambiguous field name. Axle also builds a
-worked example from your schema, which helps more than you'd expect.
+```typescript
+const instruct = new Instruct({
+  prompt: "Tell me about Mars.",
+  schema: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      distanceFromSunKm: { type: "number" },
+      moons: { type: "array", items: { type: "string" }, description: "Named moons, largest first" },
+    },
+    required: ["name", "distanceFromSunKm", "moons"],
+  },
+});
+```
+
+A Zod schema works unchanged and `response` keeps its type. `.describe()` on a
+field flows into the instructions shown to the model, so it's the cheapest way
+to clear up an ambiguous field name. And because the model sees the schema
+itself rather than an example object, value constraints like `.min()` and
+`.regex()` now reach it — as do schemas that used to throw: `.nullable()`,
+unions, tuples, records, `z.email()` and other formats, and non-object roots.
+A schema a library can't convert to JSON Schema (such as one with `z.date()`)
+throws that library's error. With `.transform()` the model is shown the input
+side, and a key with `.default()` is not required.
+
+```typescript
+declare const reply: import("@fifthrevision/axle").AxleAssistantMessage | undefined;
+
+const value = await instruct.parse(reply); // Promise — validation may be async
+const same = await parseResponse(text, schema);
+```
+
+Parsing is async — `Instruct.parse()` and the exported `parseResponse()` return
+a promise, since a schema's validator may answer asynchronously. Note the
+`await`: code written before 0.37 that reads the value synchronously now holds
+a promise instead of the parsed object.
 
 If the model returns something unparseable, you get `ok: false` with
 `error.kind === "parse"` rather than a throw. See
@@ -81,6 +114,16 @@ new Instruct({ prompt: "Cost is {{price}}", vars: "optional" });
 
 Strings you pass to `agent.send()` are already wrapped with `vars: "optional"`,
 so user-typed braces will never blow up a turn.
+
+Inputs are strings, numbers, booleans, or `null` — the values that render the
+same on both sides of a remote send. Render anything else yourself before
+passing it in, and pass `null` instead of `undefined`:
+
+```typescript
+template.withInput("when", new Date().toISOString());
+template.withInput("tags", ["a", "b"].join(", "));
+template.withInput("count", null);
+```
 
 ## Host context vs. your prompt
 
@@ -130,12 +173,18 @@ a request actually needs them — see
 
 ## What actually gets sent
 
+The stored message is the prompt — output instructions are no longer part of
+it. The message carries the schema as `output: { schema }`, and each request's
+copy of the message gets the schema prepended as output-format instructions
+(the directive plus the JSON Schema itself, not a field list or an example).
+A conversation saved by an earlier Axle keeps the old instructions in its
+message text and has no `output`, so it replays as it was.
+
 The final message comes together in this order:
 
-1. Output-format instructions (only if you set a schema)
-2. Your prompt, with variables filled in
-3. `## Reference N` sections, one per text file
-4. `## Context N` sections, one per `addContext` call
+1. Your prompt, with variables filled in
+2. `## Reference N` sections, one per text file
+3. `## Context N` sections, one per `addContext` call
 
 And you can just look at it:
 
@@ -143,7 +192,10 @@ And you can just look at it:
 console.log(instruct.render());
 ```
 
-Honestly, that's the most useful debugging call in the library. When a model does
+`render()` returns the prompt alone — no output instructions. (Code that sent
+`render()` to a model itself and relied on the instructions now passes the
+`Instruct` to `stream()` or `generate()` instead.) Honestly, that's still the
+most useful debugging call in the library. When a model does
 something baffling, print the message first.
 
 ## Reusing an Instruct
@@ -156,6 +208,17 @@ to fork a template:
 const base = new Instruct({ prompt: "Answer {{q}}.", schema });
 const variant = base.clone();
 ```
+
+An `Instruct` also round-trips as plain data — what crosses the wire on a
+remote send, and what you can persist yourself:
+
+```typescript
+const data = instruct.toJSON();
+const revived = Instruct.fromJSON(data);
+```
+
+A revived `Instruct` holds a JSON Schema, so its answer is parsed as JSON
+without validation. See [Remote agents](/concepts/remote-agents).
 
 ## Next
 

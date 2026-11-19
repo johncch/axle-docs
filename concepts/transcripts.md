@@ -23,6 +23,8 @@ interface Turn {
   timing?: { start: string; end?: string };
   usage?: Stats;
   failure?: TurnFailure; // when the send resolved ok: false
+  error?: { message: string; code?: string }; // when the send threw instead
+  cancelReason?: { type: "timeout"; limitMs: number }; // when turnTimeoutMs cancelled it
   reason?: "stop" | "length"; // how the final answer ended, when there was one
 }
 ```
@@ -107,7 +109,7 @@ Parts are a discriminated union on `type`, so a `switch` covers them exhaustivel
 | `action` | A tool call, subagent run, or provider tool — see below |
 | `compaction` | A compaction event, rendered as a divider or summary (`trigger`, `status`, `summary`) |
 
-A failed turn carries `failure` (`kind`, `message`, plus `type`/`status`/`text`/`category` where the kind has them) instead of an `error` object, and a turn cut off at the output limit carries `reason: "length"` (`"stop"` when the final answer finished). The old `turn.error` field is gone.
+A failed turn carries `failure` (`kind`, `message`, plus `type`/`status`/`text`/`category` where the kind has them) instead of an `error` object, and a turn cut off at the output limit carries `reason: "length"` (`"stop"` when the final answer finished). The old `turn.error` field is gone. A turn whose send *threw* — a fatal tool error, a throwing `onStep`, a failed MCP tool listing — carries `error` (`message`, plus `code` when Axle threw it) instead of `failure`: a turn has one or the other, never both. A turn cancelled by `turnTimeoutMs` carries `cancelReason`; a caller-cancelled turn carries neither.
 
 Action parts discriminate further on `kind`:
 
@@ -207,7 +209,7 @@ back:
 
 ```typescript
 await db.save(sessionId, {
-  session: await agent.snapshot(), // { sessionId, messages }
+  session: agent.session, // { sessionId, messages }
   turns: transcript.turns,
 });
 

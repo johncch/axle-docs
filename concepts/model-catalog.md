@@ -97,6 +97,37 @@ send one. `cost` is per million tokens, as that provider charges it.
 Both return `undefined` when nothing matches, and what to assume then is your
 call. That's the one decision the catalog refuses to make for you.
 
+### What thinking a model offers
+
+```typescript
+declare const thinkingOn: boolean;
+
+const found = catalog.reasoningControl(model, { provider: "anthropic" });
+// { control: "levels", efforts: ["low", "medium", "high"], suggested: { effort: "medium" }, id }
+// | { control: "toggle", efforts: [], suggested: { enabled: true }, id }
+// | { control: "none", efforts: [], id }
+// | undefined
+```
+
+`reasoningControl()` reads the catalog's record of a provider's reasoning
+controls: the efforts a model offers and the `reasoning` setting to send.
+`control` is `"levels"` (efforts listed, `suggested` nearest medium),
+`"toggle"` (an on/off switch, `suggested` is `{ enabled: true }`), or
+`"none"` — which is different from `undefined` (the catalog has no record of
+the model's reasoning controls at all). It is advisory: requests are never
+checked against it. The usual use is picking a setting for a model chosen at
+run time:
+
+```typescript
+new Agent({
+  provider,
+  model,
+  reasoning: thinkingOn ? (found?.suggested ?? { effort: "medium" }) : { enabled: false },
+});
+```
+
+See [Reasoning models](/cookbook/reasoning#picking-a-setting-for-a-model-you-choose-at-run-time).
+
 ### Two layers, and why a price needs a provider
 
 The data has a canonical layer, keyed `publisher/model` and independent of who
@@ -210,6 +241,9 @@ const catalog = new ModelCatalog(data);
 `new ModelCatalog(data)` takes its data as given, so read saved text with
 `parseCatalogData` rather than `JSON.parse` — it validates the version and
 shape and returns `undefined` when there is no usable copy, which means fetch.
+`CatalogData` is version-stamped (version 5, which added per-provider
+`reasoningOptions`), and a file saved by an older Axle is treated as no usable
+copy — the next `refreshIfStale()` refetches.
 `fetchModelsDev()` is the fetch on its own if you would rather not keep a
 store: it resolves `CatalogData` or rejects with `CatalogFetchError`, never a
 partial result, so the data you already had stays the best you have.

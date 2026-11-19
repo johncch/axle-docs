@@ -143,7 +143,10 @@ OpenRouter as well, because Axle asks for caching there by default (see
 per model. A step that fans out (Anthropic `pause_turn` follow-ups, a tool loop
 with several steps) yields one row per request, each with that request's own
 `in` and `out`, so each row can be priced at the tier its prompt size selects.
-The top-level `in`/`out` are still the totals.
+A request that failed or was refused after the provider reported usage is
+included too. When several subagents run in one tool batch, each subagent's
+rows stay together and the groups follow the order the calls were requested,
+not the order they finished. The top-level `in`/`out` are still the totals. A turn's `turn:end` usage is the sum of what its steps reported to `onStep`, so it matches the send's `result.usage` exactly.
 
 ```typescript
 for (const entry of result.usage.breakdown) {

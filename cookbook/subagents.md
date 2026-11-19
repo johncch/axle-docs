@@ -61,7 +61,7 @@ and gets confused in ways that are hard to debug.
 | Child → parent | The final response string, token usage, turn events |
 
 Notably *not* flowing: the child's messages. If the child fails, the parent gets
-`Error("Subagent failed: …")`, and fatal or abort errors are rebuilt without the
+`Error("Subagent failed (<kind>): <message>")` naming the failure kind and message, and fatal or abort errors are rebuilt without the
 child's `messages`/`partial` so the parent never adopts another conversation's
 history. Usage is kept, since you still paid for it.
 

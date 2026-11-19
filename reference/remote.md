@@ -31,7 +31,7 @@ does.
 | `onConnection(callback)` | `(connection: RemoteConnection) => void` → unsubscribe | The link's state. |
 | `onToolCall(handler)` | `ToolCallCallback` → unsubscribe | Answers the served agent's deferred calls from here. Receives the call and no `ToolContext`: no `emit`, no `signal`. |
 | `toolCall(id)` | `(id: string) => RemoteWaitingToolCall \| undefined` | The deferred call this consumer has seen waiting and not yet seen settle. |
-| `send(message, options?)` / `send(instruct, options?)` | → `RemoteHandle<T>` | Like `Agent.send`, minus `after`: a plain prompt sends as-is, an `Instruct` is rendered and the schema parses `response`. Returns `{ final }` only — no `cancel`, since a queued remote send cannot be cancelled by id. `final` settles when the served operation ends, after its continuation and `onSettled`: `complete` resolves with the result, `cancelled` rejects with `AxleAgentAbortError`, `error` rejects with an `AxleError` carrying the message. |
+| `send(message, options?)` / `send(instruct, options?)` | → `RemoteHandle<T>` | Like `Agent.send`, minus `after`: the `Instruct` crosses as data (`InstructData`) and the served side renders it; the schema still parses `response`. A 0.36 client and a 0.37 host do not interoperate — deploy both sides together. Returns `{ final }` only — no `cancel`, since a queued remote send cannot be cancelled by id. `final` settles when the served operation ends, after its continuation and `onSettled`: `complete` resolves with the result, `cancelled` rejects with `AxleAgentAbortError`, `error` rejects with an `AxleError` carrying the message. |
 | `cancel()` / `stop()` / `clear()` | `() => Promise<boolean>` | The `Agent` meanings — the active turn now, the active turn at its batch boundary, the queue — each posted as one command. |
 | `close()` | `() => void` | Stops listening. Open sends reject; the served agent is untouched. |
 | `connection` | `RemoteConnection` | `connecting` until the stream opens, `open` while it runs, then `ended` or `error`. |
@@ -156,7 +156,7 @@ function parseAgentCommand(body: unknown): AgentCommand | null;
 
 ```typescript
 type AgentCommand =
-  | { type: "send"; id: string; prompt: string; files?: FileInfo[]; metadata?: Record<string, unknown> }
+  | { type: "send"; id: string; instruct: InstructData }
   | { type: "answer"; callId: string; content: string | ToolResultPart[] }
   | { type: "fail"; callId: string; message: string }
   | { type: "cancel" }

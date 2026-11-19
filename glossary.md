@@ -65,6 +65,8 @@ the `Turn` as `failure`: the provider's answer from a send that resolved
 only on a turn whose `status` is `error` and whose send resolved — a turn that
 ended because the call threw has none.
 
+**Turn error** — how an agent turn ended when its send rejected with a thrown error instead of resolving: carried on `turn:end` and kept on the `Turn` as `error` (`message`, plus `code` when Axle threw it). A fatal tool error, a failed MCP tool listing, a throwing `onStep`, a failed manual compaction. A turn has `failure` (the provider's answer) or `error` (a thrown error), never both. `cancelReason` (`{ type: "timeout", limitMs }`) says `turnTimeoutMs` cancelled the turn; it is absent on a caller's cancel.
+
 **Send** — the Agent API verb: one scheduled conversation exchange
 (`agent.send(...)`), executed as a FIFO queue item. The host-facing unit of "the
 agent took its turn."
@@ -141,7 +143,7 @@ stands. Unrelated to the chat-side `Refusal`, which describes a declined request
 or blocked output.
 
 **Display** — the request-side reasoning disclosure control:
-`display: "visible" | "hidden"` on the `{ effort }` form of `reasoning`. It says
+`display: "visible" | "hidden"` on the object form of `reasoning`. It says
 whether the provider should show its thinking, never in what form. The form that
 arrives — a `summary` or `raw` text — is recorded on the thinking part and is
 the model's property. `"hidden"` withholds thinking content from the turn while
@@ -174,7 +176,7 @@ of them.
 
 **Session** — the continuable identity of a conversation (`sessionId`).
 `AgentSession` is its serialized form: the pure continuation
-`{ sessionId, messages }` that `agent.snapshot()` captures and the `Agent`
+`{ sessionId, messages }` that `agent.session` returns and the `Agent`
 constructor restores. `snapshot()` resolves when the Agent goes idle, so the
 capture is always at rest. The transcript is not part of it.
 
@@ -352,5 +354,13 @@ reasoning tokens at their own rate where the provider lists one.
 | `unanswered` tool error result | removed — an unanswered deferred call waits for `toolCall(id)`, the tool's `timeout`, or cancellation (`generate()` fails fast instead) | 0.36.0 |
 | `onSettled` per turn, including inline turns | `onSettled` once per operation, after the continuation | 0.36.0 |
 | `InlineSendOptions` with `signal` | `signal` removed — it was ignored; cancel the operation to abort an inline turn | 0.36.0 |
+| `reasoning: "off"` / `"on"` | `{ enabled: false }` / `{ effort: "medium" }` — `ReasoningSetting` is `"default"` or `{ enabled?, effort?, display? }` | 0.37.0 |
+| `ReasoningEffort` (`"low" \| "medium" \| "high"`) | six levels: `"minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max"`, sent as written | 0.37.0 |
+| `OutputSchema` as `z.ZodTypeAny` | a Standard Schema object or a plain JSON Schema; the model is shown the JSON Schema, constraints reach it | 0.37.0 |
+| sync `parseResponse()` / `Instruct.parse()` | both return a promise | 0.37.0 |
+| `instruct.render()` with output instructions | returns the prompt alone; the schema is stored on the message as `output` | 0.37.0 |
+| `InstructInputs` as `Record<string, unknown>` | `Record<string, string \| number \| boolean \| null>` | 0.37.0 |
+| remote `send` command with a rendered `prompt` | carries the `Instruct` as data (`Instruct.fromJSON(command.instruct)`) — 0.36 and 0.37 do not interoperate | 0.37.0 |
+| `agent.snapshot()` | deprecated — read `agent.session` | 0.37.0 |
 
 See [Upgrading](/upgrading).

@@ -50,6 +50,8 @@ If you've come from `agent.on()`, four things change:
 
 - **Deltas carry `accumulated` as well as `delta`**, so you never have to
   concatenate yourself. Turn events assume a `Transcript` is holding the part.
+  Every text and thinking event also carries `index` — the part's position in
+  the step's assistant message — so a late citation still finds its part.
 - **Tool events correlate by `id`**, not by part id.
 - **Text and thinking stream sequentially**, and a delta belongs to the most
   recently opened part of its kind.

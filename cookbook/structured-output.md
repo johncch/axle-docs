@@ -5,7 +5,8 @@ description: Typed responses with Zod schemas, with and without an agent.
 
 # Structured output
 
-Hand a Zod schema to `Instruct` and `result.response` comes back parsed and
+Hand a schema to `Instruct` — a Zod schema (or any Standard Schema), or a
+plain JSON Schema object — and `result.response` comes back parsed and
 typed. No JSON parsing on your side, no casting.
 
 ```typescript
@@ -34,9 +35,12 @@ result.response.moons; // string[] — fully typed
 result.response.distanceFromSunKm; // number
 ```
 
-Axle compiles your schema into output-format instructions, prepends them to the
-prompt, and parses the reply back. `.describe()` text flows into those
+Axle shows the model your schema as output-format instructions, prepended to
+the prompt, and parses the reply back. `.describe()` text flows into those
 instructions, so it's worth adding wherever a field name isn't self-explanatory.
+Because the model sees the JSON Schema itself, constraints like `.min()` and
+`.regex()` reach it — and schemas that used to throw (`.nullable()`, unions,
+tuples, records, non-object roots) are accepted.
 
 ## Without an agent
 

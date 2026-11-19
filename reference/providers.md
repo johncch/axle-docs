@@ -119,7 +119,7 @@ and on `GenerateParams` / `StreamParams`.
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `reasoning` | `ReasoningSetting` | Portable thinking/reasoning control: `"default"`, `"off"`, `"on"`, or `{ effort: "low" \| "medium" \| "high", display?: "visible" \| "hidden" }`. |
+| `reasoning` | `ReasoningSetting` | Portable thinking/reasoning control: `"default"` or `{ enabled?, effort?: "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max", display?: "visible" \| "hidden" }`. |
 | `maxOutputTokens` | `number` | Output token cap. |
 | `toolChoice` | `ToolChoice` | Tool-use constraint. |
 | `parallelToolCalls` | `boolean` | Ask the provider to avoid parallel tool calls. |
@@ -136,13 +136,14 @@ See [Upgrading](/upgrading).
 ```typescript
 type ToolChoice = "auto" | "none" | "required" | { type: "tool"; name: string };
 
-type ReasoningEffort = "low" | "medium" | "high";
+type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+// = REASONING_EFFORTS, lowest first
 type ReasoningDisplay = "visible" | "hidden";
-type ReasoningSetting = "default" | "off" | "on" | { effort: ReasoningEffort; display?: ReasoningDisplay };
+type ReasoningSetting = "default" | { enabled?: boolean; effort?: ReasoningEffort; display?: ReasoningDisplay };
 ```
 
 `display` (default `"visible"`) asks the provider to disclose its thinking
-wherever a request field exists. Enabling reasoning (`"on"` or `{ effort }`)
+wherever a request field exists. Enabling reasoning (`{ effort }` or `{ enabled: true }`)
 now requests disclosure on Anthropic (`display: "summarized"`), OpenAI
 (`summary: "auto"`), and Gemini (`includeThoughts: true`), so Claude and OpenAI
 models that streamed no thinking under 0.31 now do. Pass
